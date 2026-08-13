@@ -1,0 +1,93 @@
+import '../translation_keys.dart';
+
+const Map<String, String> enUs = {
+  TranslationKeys.landingTagline: 'Draughts & checkers, together.',
+  TranslationKeys.continueWithGoogle: 'Continue with Google',
+  TranslationKeys.continueWithApple: 'Continue with Apple',
+  TranslationKeys.playAsGuest: 'Play as Guest',
+  TranslationKeys.signInFailed: 'Sign-in failed. Please try again.',
+  TranslationKeys.languageEnglish: 'English',
+  TranslationKeys.languageFrench: 'French',
+
+  TranslationKeys.editProfileTitle: 'Your Profile',
+  TranslationKeys.nicknameLabel: 'Nickname',
+  TranslationKeys.nicknameRequired: 'Please choose a nickname.',
+  TranslationKeys.privacyNudge:
+      'For your privacy, do not use your real name or photo.',
+  TranslationKeys.saveProfile: 'Save',
+  TranslationKeys.profileSaveFailed:
+      'Could not save your profile. Please try again.',
+  TranslationKeys.changePhoto: 'Change photo',
+  TranslationKeys.removePhoto: 'Remove photo',
+
+  TranslationKeys.tabPlay: 'Play',
+  TranslationKeys.tabWatch: 'Watch',
+  TranslationKeys.tabTop30: 'Top 30',
+  TranslationKeys.welcomeBack: 'Welcome back,',
+  TranslationKeys.playWithPc: 'Play with PC',
+  TranslationKeys.playWithPeople: 'Play with People',
+  TranslationKeys.howToPlay: 'How to Play',
+  TranslationKeys.comingSoon: 'Coming soon',
+
+  TranslationKeys.moreLanguages: 'Languages',
+  TranslationKeys.moreEditProfile: 'Edit Profile',
+  TranslationKeys.moreLinkAccount: 'Link Account',
+  TranslationKeys.moreLogOut: 'Log Out',
+  TranslationKeys.moreDeleteAccount: 'Delete Account',
+  TranslationKeys.logOutAnonymousWarningTitle: 'Are you sure?',
+  TranslationKeys.logOutAnonymousWarningMessage:
+      'You are playing as a guest. If you log out, this account and its '
+      'rating cannot be recovered.',
+  TranslationKeys.deleteAccountTitle: 'Delete account',
+  TranslationKeys.deleteAccountMessage:
+      'This permanently deletes your account and profile. Completed games '
+      'are kept anonymously. This cannot be undone.',
+  TranslationKeys.confirm: 'Confirm',
+  TranslationKeys.cancel: 'Cancel',
+  TranslationKeys.close: 'Close',
+  TranslationKeys.ok: 'OK',
+
+  TranslationKeys.difficulty: 'Difficulty',
+  TranslationKeys.difficultyEasy: 'Easy',
+  TranslationKeys.difficultyMedium: 'Medium',
+  TranslationKeys.difficultyHard: 'Hard',
+  TranslationKeys.rules: 'Rules',
+  TranslationKeys.presetInternational: 'International (10x10)',
+  TranslationKeys.presetBrazilian: 'Brazilian (8x8)',
+  TranslationKeys.presetAmerican: 'American (8x8)',
+  TranslationKeys.presetCustom: 'Custom',
+  TranslationKeys.boardSize: 'Board size',
+  TranslationKeys.backwardCapture: 'Pawns capture backward',
+  TranslationKeys.flyingKing: 'Flying kings',
+  TranslationKeys.playAsWhite: 'White',
+  TranslationKeys.playAsBlack: 'Black',
+  TranslationKeys.playAsRandom: 'Random',
+  TranslationKeys.startGame: 'Start Game',
+
+  TranslationKeys.yourTurn: 'Your turn',
+  TranslationKeys.opponentTurn: "Opponent's turn",
+  TranslationKeys.youWon: 'You won!',
+  TranslationKeys.youLost: 'You lost',
+  TranslationKeys.draw: 'Draw',
+  TranslationKeys.playAgain: 'Play Again',
+  TranslationKeys.backHome: 'Home',
+  TranslationKeys.resign: 'Resign',
+  TranslationKeys.resignConfirmTitle: 'Resign the game?',
+  TranslationKeys.resignConfirmMessage:
+      'Resigning counts as a loss. Are you sure?',
+  TranslationKeys.offerDraw: 'Offer draw',
+  TranslationKeys.undoMove: 'Undo',
+  TranslationKeys.mandatoryCaptureHint:
+      'Capturing is mandatory: you must play a highlighted capture.',
+  TranslationKeys.drawReasonAgreement: 'Draw by agreement',
+  TranslationKeys.drawReasonRepetition: 'Draw: position repeated three times',
+  TranslationKeys.drawReason25Moves: 'Draw: 25 king moves without progress',
+  TranslationKeys.drawReason16Moves: 'Draw: 16-move endgame rule',
+  TranslationKeys.drawReason5Moves: 'Draw: 5-move endgame rule',
+  TranslationKeys.drawReason40Moves: 'Draw: 40 moves without progress',
+  TranslationKeys.winReasonNoPieces: 'All pieces captured',
+  TranslationKeys.winReasonBlocked: 'No legal moves left',
+  TranslationKeys.winReasonResignation: 'By resignation',
+  TranslationKeys.winReasonTimeout: 'On time',
+  TranslationKeys.winReasonAbandonment: 'Opponent left the game',
+};
