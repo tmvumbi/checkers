@@ -3,6 +3,7 @@ import 'package:checkers/data/models/user_profile.dart';
 import 'package:checkers/main.dart';
 import 'package:checkers/services/analytics_service.dart';
 import 'package:checkers/services/auth_service.dart';
+import 'package:checkers/services/online_game_service.dart';
 import 'package:checkers/services/profile_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,17 +14,21 @@ class MockAuthService extends Mock implements AuthService {}
 
 class MockProfileService extends Mock implements ProfileService {}
 
+class MockOnlineGameService extends Mock implements OnlineGameService {}
+
 class _TestBinding extends Bindings {
-  _TestBinding(this.auth, this.profile);
+  _TestBinding(this.auth, this.profile, this.online);
 
   final AuthService auth;
   final ProfileService profile;
+  final OnlineGameService online;
 
   @override
   void dependencies() {
     Get.put<AnalyticsService>(NoopAnalyticsService());
     Get.put<AuthService>(auth);
     Get.put<ProfileService>(profile);
+    Get.put<OnlineGameService>(online);
   }
 }
 
@@ -32,10 +37,18 @@ const _guestUser = AuthUser(uid: 'uid-1', isAnonymous: true);
 void main() {
   late MockAuthService auth;
   late MockProfileService profile;
+  late MockOnlineGameService online;
 
   setUp(() {
     auth = MockAuthService();
     profile = MockProfileService();
+    online = MockOnlineGameService();
+    when(() => online.fetchWatchableGames()).thenAnswer(
+      (_) async => const Success([]),
+    );
+    when(() => online.fetchLeaderboard()).thenAnswer(
+      (_) async => const Success([]),
+    );
     when(() => auth.supportsAppleSignIn).thenReturn(false);
     when(() => auth.currentUser).thenReturn(_guestUser);
     when(() => auth.userChanges).thenAnswer((_) => const Stream.empty());
@@ -51,7 +64,7 @@ void main() {
   Future<void> pumpHome(WidgetTester tester) async {
     await tester.pumpWidget(
       CheckersApp(
-        initialBinding: _TestBinding(auth, profile),
+        initialBinding: _TestBinding(auth, profile, online),
         initialRoute: '/home',
       ),
     );

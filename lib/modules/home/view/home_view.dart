@@ -54,8 +54,8 @@ class _HomeTabBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (tab) {
       HomeTab.play => const _PlayTab(),
-      HomeTab.watch => const _PlaceholderTab(icon: Icons.visibility),
-      HomeTab.leaderboard => const _PlaceholderTab(icon: Icons.emoji_events),
+      HomeTab.watch => const _WatchTab(),
+      HomeTab.leaderboard => const _LeaderboardTab(),
       HomeTab.more => const _MoreTab(),
     };
   }
@@ -215,34 +215,240 @@ class _HomeProfileHeader extends GetView<HomeController> {
   }
 }
 
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({required this.icon});
-
-  final IconData icon;
+class _WatchTab extends GetView<HomeController> {
+  const _WatchTab();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 64,
-            color: theme.colorScheme.onPrimary.withValues(alpha: 0.4),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            TranslationKeys.comingSoon.tr,
-            style: theme.textTheme.bodyLarge!.copyWith(
-              color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
-              fontSize: 18,
+    final brand = theme.extension<CheckersThemeExtension>()!;
+
+    return Obx(() {
+      if (controller.watchLoading.value) {
+        return Center(
+          child: CircularProgressIndicator(color: brand.brandGold),
+        );
+      }
+      final games = controller.watchableGames;
+      if (games.isEmpty) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.visibility_outlined,
+                  size: 56,
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  TranslationKeys.watchEmpty.tr,
+                  key: const Key('watch-empty'),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
+        );
+      }
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: games.length,
+        itemBuilder: (context, index) {
+          final game = games[index];
+          final white = game.players
+              .where((p) => p.color?.name == 'white')
+              .toList();
+          final black = game.players
+              .where((p) => p.color?.name == 'black')
+              .toList();
+          return InkWell(
+            key: Key('watch-game-${game.id}'),
+            onTap: () => controller.openWatchGame(game),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.6),
+                  width: 2,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      white.isEmpty ? '…' : white.first.nickname,
+                      textAlign: TextAlign.end,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'VS',
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: brand.brandGold,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      black.isEmpty ? '…' : black.first.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    });
+  }
+}
+
+class _LeaderboardTab extends GetView<HomeController> {
+  const _LeaderboardTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final brand = theme.extension<CheckersThemeExtension>()!;
+
+    return Obx(() {
+      if (controller.leaderboardLoading.value) {
+        return Center(
+          child: CircularProgressIndicator(color: brand.brandGold),
+        );
+      }
+      final players = controller.leaderboard;
+      if (players.isEmpty) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text(
+              TranslationKeys.leaderboardEmpty.tr,
+              key: const Key('leaderboard-empty'),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge!.copyWith(
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                fontSize: 16,
+              ),
+            ),
+          ),
+        );
+      }
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: players.length,
+        itemBuilder: (context, index) {
+          final player = players[index];
+          final isPodium = index < 3;
+          final rankColor = switch (index) {
+            0 => brand.brandGold,
+            1 => const Color(0xFFC0C0C0),
+            2 => const Color(0xFFCD7F32),
+            _ => theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+          };
+          return Container(
+            key: Key('leaderboard-row-$index'),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: isPodium ? 14 : 10,
+            ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.shadow.withValues(
+                alpha: isPodium ? 0.45 : 0.3,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isPodium
+                    ? rankColor
+                    : theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+                width: 2,
+              ),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    '${index + 1}',
+                    style: theme.textTheme.headlineMedium!.copyWith(
+                      color: rankColor,
+                      fontSize: isPodium ? 24 : 18,
+                    ),
+                  ),
+                ),
+                if (isPodium) ...[
+                  Icon(Icons.emoji_events, color: rankColor, size: 22),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        player.nickname,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: isPodium ? 17 : 15,
+                        ),
+                      ),
+                      Text(
+                        '${player.wins}W · ${player.losses}L · '
+                        '${player.draws}D',
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme.colorScheme.onPrimary.withValues(
+                            alpha: 0.6,
+                          ),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${player.rating}',
+                  style: theme.textTheme.headlineMedium!.copyWith(
+                    color: brand.brandGold,
+                    fontSize: isPodium ? 22 : 18,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    });
   }
 }
 

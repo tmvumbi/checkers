@@ -47,6 +47,28 @@ const Map<String, String> enUs = {
   TranslationKeys.close: 'Close',
   TranslationKeys.ok: 'OK',
 
+  TranslationKeys.moreShareApp: 'Share App',
+  TranslationKeys.moreFeedback: 'Feedback',
+  TranslationKeys.shareAppText:
+      'Play checkers with me! https://checkers.contribution.club',
+  TranslationKeys.feedbackTitle: 'Feedback',
+  TranslationKeys.feedbackHint: 'Tell us what you think…',
+  TranslationKeys.feedbackSend: 'Send',
+  TranslationKeys.feedbackThanks: 'Thanks for your feedback!',
+  TranslationKeys.feedbackFailed: 'Could not send feedback. Try again.',
+  TranslationKeys.deleteAccountFailed:
+      'Could not delete the account. Try again.',
+  TranslationKeys.updateRequiredTitle: 'Update required',
+  TranslationKeys.updateRequiredMessage:
+      'This version of Checkers is no longer supported. Please update to '
+      'keep playing.',
+
+  TranslationKeys.watchEmpty:
+      'No live games right now. Check back in a moment!',
+  TranslationKeys.leaderboardEmpty:
+      'No ranked players yet. Play online games to enter the Top 30!',
+  TranslationKeys.spectatorWinner: '@name wins!',
+
   TranslationKeys.joinOnlineGame: 'Join Online Game',
   TranslationKeys.inviteFriends: 'Invite Friends to Play',
   TranslationKeys.invitePlayersTitle: 'Invite Players',

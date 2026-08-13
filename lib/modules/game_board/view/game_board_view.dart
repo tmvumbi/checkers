@@ -130,7 +130,9 @@ class _OpponentHeader extends GetView<GameBoardController> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Obx(() {
         controller.boardVersion.value;
-        final opponent = controller.opponentPlayer;
+        final opponent = controller.isWatching
+            ? controller.playerOfColor(PieceColor.black)
+            : controller.opponentPlayer;
         final name = controller.isOnline
             ? (opponent?.nickname ?? '…')
             : 'PC — ${switch (controller.args.aiLevel!) {
@@ -138,8 +140,9 @@ class _OpponentHeader extends GetView<GameBoardController> {
                 AiLevel.medium => TranslationKeys.difficultyMedium.tr,
                 AiLevel.hard => TranslationKeys.difficultyHard.tr,
               }}';
-        final subtitle = controller.isOnline &&
-                !controller.opponentConnected.value
+        final subtitle = controller.isWatching
+            ? ''
+            : controller.isOnline && !controller.opponentConnected.value
             ? TranslationKeys.opponentDisconnected.tr
             : (controller.aiThinking.value ||
                     controller.activeAnimation.value != null
@@ -294,6 +297,32 @@ class _OwnHeader extends GetView<GameBoardController> {
             child: Obx(() {
               controller.boardVersion.value;
               final canUndo = controller.canUndo;
+              if (controller.isWatching) {
+                final white = controller.playerOfColor(PieceColor.white);
+                final theme = Theme.of(context);
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        white?.nickname ?? '…',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ),
+                    _ClockDisplay(
+                      isOwn: true,
+                      theme: theme,
+                      brand:
+                          theme.extension<CheckersThemeExtension>()!,
+                    ),
+                  ],
+                );
+              }
               return Row(
                 children: [
                   if (!controller.isOnline) ...[
@@ -452,6 +481,16 @@ class _GameOverBanner extends GetView<GameBoardController> {
     if (isDraw) {
       return TranslationKeys.draw.tr;
     }
+    if (controller.isWatching) {
+      final winner = controller.playerOfColor(
+        controller.result.value == GameResult.whiteWin
+            ? PieceColor.white
+            : PieceColor.black,
+      );
+      return TranslationKeys.spectatorWinner.trParams({
+        'name': winner?.nickname ?? '',
+      });
+    }
     return humanWon ? TranslationKeys.youWon.tr : TranslationKeys.youLost.tr;
   }
 
@@ -476,7 +515,7 @@ class _GameOverBanner extends GetView<GameBoardController> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final brand = theme.extension<CheckersThemeExtension>()!;
-    if (humanWon) {
+    if (humanWon && !controller.isWatching) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Confetti.launch(
           context,
@@ -522,7 +561,9 @@ class _GameOverBanner extends GetView<GameBoardController> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                if (controller.isOnline)
+                if (controller.isWatching)
+                  const SizedBox.shrink()
+                else if (controller.isOnline)
                   Obx(() {
                     final waiting = controller.rematchRequested.value;
                     final opponentWants =

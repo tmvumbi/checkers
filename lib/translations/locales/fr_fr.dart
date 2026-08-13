@@ -48,6 +48,29 @@ const Map<String, String> frFr = {
   TranslationKeys.close: 'Fermer',
   TranslationKeys.ok: 'OK',
 
+  TranslationKeys.moreShareApp: "Partager l'application",
+  TranslationKeys.moreFeedback: 'Commentaires',
+  TranslationKeys.shareAppText:
+      'Joue aux dames avec moi ! https://checkers.contribution.club',
+  TranslationKeys.feedbackTitle: 'Commentaires',
+  TranslationKeys.feedbackHint: 'Dites-nous ce que vous en pensez…',
+  TranslationKeys.feedbackSend: 'Envoyer',
+  TranslationKeys.feedbackThanks: 'Merci pour vos commentaires !',
+  TranslationKeys.feedbackFailed:
+      "Impossible d'envoyer vos commentaires. Réessayez.",
+  TranslationKeys.deleteAccountFailed:
+      'Impossible de supprimer le compte. Réessayez.',
+  TranslationKeys.updateRequiredTitle: 'Mise à jour requise',
+  TranslationKeys.updateRequiredMessage:
+      "Cette version de Checkers n'est plus prise en charge. Veuillez la "
+      'mettre à jour pour continuer à jouer.',
+
+  TranslationKeys.watchEmpty:
+      'Aucune partie en direct pour le moment. Revenez bientôt !',
+  TranslationKeys.leaderboardEmpty:
+      'Aucun joueur classé. Jouez en ligne pour entrer dans le Top 30 !',
+  TranslationKeys.spectatorWinner: '@name gagne !',
+
   TranslationKeys.joinOnlineGame: 'Rejoindre une partie',
   TranslationKeys.inviteFriends: 'Inviter des amis',
   TranslationKeys.invitePlayersTitle: 'Inviter des joueurs',

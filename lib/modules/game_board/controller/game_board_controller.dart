@@ -87,7 +87,23 @@ class GameBoardController extends GetxController {
 
   PieceColor get humanColor => args.humanColor;
 
-  bool get isOnline => args.mode == GameBoardMode.online;
+  bool get isOnline =>
+      args.mode == GameBoardMode.online || args.mode == GameBoardMode.watching;
+
+  bool get isWatching => args.mode == GameBoardMode.watching;
+
+  OnlineGamePlayer? playerOfColor(PieceColor color) {
+    final players = snapshot.value?.players;
+    if (players == null) {
+      return null;
+    }
+    for (final player in players) {
+      if (player.color == color) {
+        return player;
+      }
+    }
+    return null;
+  }
 
   OnlineGamePlayer? get opponentPlayer {
     final uid = _authService.currentUser?.uid;
@@ -104,6 +120,7 @@ class GameBoardController extends GetxController {
   }
 
   bool get isHumanTurn =>
+      !isWatching &&
       engine.result == GameResult.ongoing &&
       result.value == GameResult.ongoing &&
       engine.sideToMove == humanColor &&
@@ -135,7 +152,7 @@ class GameBoardController extends GetxController {
   void onClose() {
     _gameSubscription?.cancel();
     _clockTimer?.cancel();
-    if (isOnline && args.gameId != null) {
+    if (isOnline && !isWatching && args.gameId != null) {
       _onlineGameService.touchConnection(args.gameId!, false);
     }
     super.onClose();
@@ -148,7 +165,9 @@ class GameBoardController extends GetxController {
   Future<void> _startOnline() async {
     final gameId = args.gameId!;
     _serverOffsetMs = await _onlineGameService.serverTimeOffsetMs();
-    await _onlineGameService.touchConnection(gameId, true);
+    if (!isWatching) {
+      await _onlineGameService.touchConnection(gameId, true);
+    }
     await _resyncFromServer();
     _gameSubscription = _onlineGameService
         .watchGame(gameId)
@@ -208,7 +227,7 @@ class GameBoardController extends GetxController {
       final mover = engine.sideToMove;
       _applyingRemote = true;
       try {
-        if (mover != humanColor) {
+        if (isWatching || mover != humanColor) {
           await _animateAndApply(snap.lastMove!, movedByHuman: false);
         } else if (engine.moveHistory.length < snap.ply) {
           // Our own move already applied optimistically; nothing to do.

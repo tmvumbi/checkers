@@ -45,6 +45,24 @@ abstract final class TranslationKeys {
   static const String close = 'close';
   static const String ok = 'ok';
 
+  // More extras
+  static const String moreShareApp = 'more_share_app';
+  static const String moreFeedback = 'more_feedback';
+  static const String shareAppText = 'share_app_text';
+  static const String feedbackTitle = 'feedback_title';
+  static const String feedbackHint = 'feedback_hint';
+  static const String feedbackSend = 'feedback_send';
+  static const String feedbackThanks = 'feedback_thanks';
+  static const String feedbackFailed = 'feedback_failed';
+  static const String deleteAccountFailed = 'delete_account_failed';
+  static const String updateRequiredTitle = 'update_required_title';
+  static const String updateRequiredMessage = 'update_required_message';
+
+  // Watch & leaderboard
+  static const String watchEmpty = 'watch_empty';
+  static const String leaderboardEmpty = 'leaderboard_empty';
+  static const String spectatorWinner = 'spectator_winner';
+
   // Invites
   static const String joinOnlineGame = 'join_online_game';
   static const String inviteFriends = 'invite_friends';
