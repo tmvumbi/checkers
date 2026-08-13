@@ -48,6 +48,43 @@ const Map<String, String> frFr = {
   TranslationKeys.close: 'Fermer',
   TranslationKeys.ok: 'OK',
 
+  TranslationKeys.htpBoardTitle: 'Le damier',
+  TranslationKeys.htpBoardBody:
+      'On joue uniquement sur les cases foncées. Les règles internationales '
+      'utilisent un damier 10x10 avec 20 pions chacun ; les règles '
+      'brésiliennes et américaines un damier 8x8 avec 12 pions. Les Blancs '
+      'jouent toujours en premier.',
+  TranslationKeys.htpMovesTitle: 'Déplacements',
+  TranslationKeys.htpMovesBody:
+      "Les pions avancent d'une case en diagonale vers une case vide. Un "
+      'pion qui atteint la dernière rangée et s\'y arrête est couronné '
+      'dame.',
+  TranslationKeys.htpCaptureTitle: 'Prises',
+  TranslationKeys.htpCaptureBody:
+      'La prise est obligatoire : sautez par-dessus une pièce adverse '
+      'adjacente vers la case vide au-delà, en enchaînant les sauts dans le '
+      'même tour. Avec les règles internationales et brésiliennes, les '
+      'pions prennent aussi en arrière et vous devez jouer la séquence qui '
+      'prend le plus de pièces. Les pièces prises ne quittent le damier '
+      "qu'à la fin de la séquence.",
+  TranslationKeys.htpKingTitle: 'Dames',
+  TranslationKeys.htpKingBody:
+      'Avec les dames volantes (règles internationales et brésiliennes), '
+      'une dame glisse sur toute la diagonale et peut atterrir sur '
+      "n'importe quelle case libre après la pièce prise. Les dames "
+      'américaines se déplacent d\'une seule case.',
+  TranslationKeys.htpDrawTitle: 'Parties nulles',
+  TranslationKeys.htpDrawBody:
+      'Une partie est nulle par accord mutuel, par triple répétition de la '
+      'même position, ou automatiquement selon les règles officielles de '
+      'non-progression (par exemple 25 coups de dame sans prise ni '
+      'mouvement de pion).',
+  TranslationKeys.htpClockTitle: 'La pendule (en ligne)',
+  TranslationKeys.htpClockBody:
+      'En ligne, vous disposez de 15 secondes par coup plus une réserve de '
+      '5 minutes. Réfléchir plus de 15 secondes consomme votre réserve ; '
+      'si elle est épuisée, vous perdez au temps.',
+
   TranslationKeys.difficulty: 'Difficulté',
   TranslationKeys.difficultyEasy: 'Facile',
   TranslationKeys.difficultyMedium: 'Moyen',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/constants/app_locales.dart';
+import '../../../routes/app_routes.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_flag_icon.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
@@ -11,6 +12,7 @@ import '../../../shared/widgets/checkers_staggered_entrance.dart';
 import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
 import '../controller/home_controller.dart';
+import 'widgets/play_pc_modal.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -82,7 +84,7 @@ class _PlayTab extends GetView<HomeController> {
                   CheckersGradientButton(
                     key: const Key('home-play-pc-button'),
                     label: TranslationKeys.playWithPc.tr,
-                    onPressed: () => _showComingSoon(context),
+                    onPressed: () => _showPlayPcModal(context),
                   ),
                   const SizedBox(height: 14),
                   CheckersGradientButton(
@@ -95,7 +97,7 @@ class _PlayTab extends GetView<HomeController> {
                     key: const Key('home-how-to-play-button'),
                     label: TranslationKeys.howToPlay.tr,
                     gradientStyle: CheckersGradientButtonStyle.logo,
-                    onPressed: () => _showComingSoon(context),
+                    onPressed: () => Get.toNamed<void>(AppRoutes.howToPlay),
                   ),
                 ],
               ),
@@ -103,6 +105,13 @@ class _PlayTab extends GetView<HomeController> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showPlayPcModal(BuildContext context) {
+    showCheckersModal<void>(
+      context: context,
+      builder: (dialogContext) => const PlayPcModalContent(),
     );
   }
 

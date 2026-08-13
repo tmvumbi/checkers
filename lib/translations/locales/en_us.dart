@@ -47,6 +47,39 @@ const Map<String, String> enUs = {
   TranslationKeys.close: 'Close',
   TranslationKeys.ok: 'OK',
 
+  TranslationKeys.htpBoardTitle: 'The board',
+  TranslationKeys.htpBoardBody:
+      'Play happens on the dark squares only. International rules use a '
+      '10x10 board with 20 men each; Brazilian and American use 8x8 with '
+      '12 men each. White always moves first.',
+  TranslationKeys.htpMovesTitle: 'Moving',
+  TranslationKeys.htpMovesBody:
+      'Men move one square diagonally forward to an empty square. When a '
+      'man reaches the far row and stops there, it is crowned a king.',
+  TranslationKeys.htpCaptureTitle: 'Capturing',
+  TranslationKeys.htpCaptureBody:
+      'Capturing is mandatory: jump over an adjacent enemy piece onto the '
+      'empty square beyond, chaining jumps in one turn. Under International '
+      'and Brazilian rules men also capture backward and you must play the '
+      'sequence that captures the most pieces. Captured pieces leave the '
+      'board only after the whole sequence ends.',
+  TranslationKeys.htpKingTitle: 'Kings',
+  TranslationKeys.htpKingBody:
+      'With flying kings (International and Brazilian), a king slides any '
+      'distance along a diagonal and may land on any free square beyond a '
+      'captured piece. American kings move one square at a time in any '
+      'direction.',
+  TranslationKeys.htpDrawTitle: 'Draws',
+  TranslationKeys.htpDrawBody:
+      'A game is drawn by agreement, by repeating the same position three '
+      'times, or automatically by the official no-progress rules (for '
+      'example 25 king moves without a capture or a man move).',
+  TranslationKeys.htpClockTitle: 'The clock (online)',
+  TranslationKeys.htpClockBody:
+      'Online you have 15 seconds per move plus a 5-minute reserve. '
+      'Thinking longer than 15 seconds consumes your reserve; if it runs '
+      'out you lose on time.',
+
   TranslationKeys.difficulty: 'Difficulty',
   TranslationKeys.difficultyEasy: 'Easy',
   TranslationKeys.difficultyMedium: 'Medium',

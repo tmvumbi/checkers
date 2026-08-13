@@ -45,6 +45,20 @@ abstract final class TranslationKeys {
   static const String close = 'close';
   static const String ok = 'ok';
 
+  // How to play
+  static const String htpBoardTitle = 'htp_board_title';
+  static const String htpBoardBody = 'htp_board_body';
+  static const String htpMovesTitle = 'htp_moves_title';
+  static const String htpMovesBody = 'htp_moves_body';
+  static const String htpCaptureTitle = 'htp_capture_title';
+  static const String htpCaptureBody = 'htp_capture_body';
+  static const String htpKingTitle = 'htp_king_title';
+  static const String htpKingBody = 'htp_king_body';
+  static const String htpDrawTitle = 'htp_draw_title';
+  static const String htpDrawBody = 'htp_draw_body';
+  static const String htpClockTitle = 'htp_clock_title';
+  static const String htpClockBody = 'htp_clock_body';
+
   // Game setup
   static const String difficulty = 'difficulty';
   static const String difficultyEasy = 'difficulty_easy';
