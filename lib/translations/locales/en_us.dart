@@ -47,6 +47,21 @@ const Map<String, String> enUs = {
   TranslationKeys.close: 'Close',
   TranslationKeys.ok: 'OK',
 
+  TranslationKeys.drawOfferSent: 'Draw offered…',
+  TranslationKeys.drawOfferedByOpponent: 'Your opponent offers a draw',
+  TranslationKeys.accept: 'Accept',
+  TranslationKeys.decline: 'Decline',
+  TranslationKeys.rematch: 'Rematch',
+  TranslationKeys.rematchWaiting: 'Waiting for opponent…',
+  TranslationKeys.opponentWantsRematch: 'Your opponent wants a rematch!',
+
+  TranslationKeys.lobbyTitle: 'Online Game',
+  TranslationKeys.lobbyWaiting: 'Waiting for an opponent…',
+  TranslationKeys.lobbyFailed:
+      'Could not join an online game. Please try again.',
+  TranslationKeys.lobbyLeave: 'Leave Lobby',
+  TranslationKeys.opponentDisconnected: 'Opponent disconnected…',
+
   TranslationKeys.htpBoardTitle: 'The board',
   TranslationKeys.htpBoardBody:
       'Play happens on the dark squares only. International rules use a '

@@ -13,6 +13,7 @@ import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
 import '../controller/home_controller.dart';
 import 'widgets/play_pc_modal.dart';
+import 'widgets/play_people_modal.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -90,7 +91,7 @@ class _PlayTab extends GetView<HomeController> {
                   CheckersGradientButton(
                     key: const Key('home-play-people-button'),
                     label: TranslationKeys.playWithPeople.tr,
-                    onPressed: () => _showComingSoon(context),
+                    onPressed: () => _showPlayPeopleModal(context),
                   ),
                   const SizedBox(height: 14),
                   CheckersGradientButton(
@@ -115,17 +116,13 @@ class _PlayTab extends GetView<HomeController> {
     );
   }
 
-  void _showComingSoon(BuildContext context) {
+  void _showPlayPeopleModal(BuildContext context) {
     showCheckersModal<void>(
       context: context,
-      builder: (dialogContext) => CheckersMessageModalContent(
-        title: TranslationKeys.comingSoon.tr,
-        message: TranslationKeys.comingSoon.tr,
-        buttonLabel: TranslationKeys.ok.tr,
-        onClose: () => Navigator.of(dialogContext).pop(),
-      ),
+      builder: (dialogContext) => const PlayPeopleModalContent(),
     );
   }
+
 }
 
 class _HomeProfileHeader extends GetView<HomeController> {

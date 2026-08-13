@@ -45,6 +45,22 @@ abstract final class TranslationKeys {
   static const String close = 'close';
   static const String ok = 'ok';
 
+  // Draws and rematch (online)
+  static const String drawOfferSent = 'draw_offer_sent';
+  static const String drawOfferedByOpponent = 'draw_offered_by_opponent';
+  static const String accept = 'accept';
+  static const String decline = 'decline';
+  static const String rematch = 'rematch';
+  static const String rematchWaiting = 'rematch_waiting';
+  static const String opponentWantsRematch = 'opponent_wants_rematch';
+
+  // Online lobby
+  static const String lobbyTitle = 'lobby_title';
+  static const String lobbyWaiting = 'lobby_waiting';
+  static const String lobbyFailed = 'lobby_failed';
+  static const String lobbyLeave = 'lobby_leave';
+  static const String opponentDisconnected = 'opponent_disconnected';
+
   // How to play
   static const String htpBoardTitle = 'htp_board_title';
   static const String htpBoardBody = 'htp_board_body';

@@ -9,6 +9,8 @@ import '../modules/home/view/home_view.dart';
 import '../modules/how_to_play/view/how_to_play_view.dart';
 import '../modules/landing/binding/landing_binding.dart';
 import '../modules/landing/view/landing_view.dart';
+import '../modules/online_lobby/binding/online_lobby_binding.dart';
+import '../modules/online_lobby/view/online_lobby_view.dart';
 import 'app_routes.dart';
 
 abstract final class AppPages {
@@ -34,5 +36,10 @@ abstract final class AppPages {
       binding: GameBoardBinding(),
     ),
     GetPage<dynamic>(name: AppRoutes.howToPlay, page: HowToPlayView.new),
+    GetPage<dynamic>(
+      name: AppRoutes.onlineLobby,
+      page: OnlineLobbyView.new,
+      binding: OnlineLobbyBinding(),
+    ),
   ];
 }

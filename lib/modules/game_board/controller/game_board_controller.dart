@@ -3,13 +3,16 @@ import 'dart:math';
 
 import 'package:get/get.dart';
 
+import '../../../data/models/online_game.dart';
 import '../../../engine/ai/ai_config.dart';
 import '../../../engine/checkers_engine.dart';
 import '../../../engine/move.dart';
 import '../../../engine/rules_config.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/analytics_service.dart';
+import '../../../services/auth_service.dart';
 import '../../../services/checkers_ai_service.dart';
+import '../../../services/online_game_service.dart';
 import '../models/game_board_arguments.dart';
 
 /// Board-square animation step for multi-hop capture rendering.
@@ -25,6 +28,8 @@ class GameBoardController extends GetxController {
     GameBoardArguments? arguments,
     AiService? aiService,
     AnalyticsService? analyticsService,
+    OnlineGameService? onlineGameService,
+    AuthService? authService,
     Duration? aiMinThinkTime,
   }) : args =
            arguments ??
@@ -36,12 +41,21 @@ class GameBoardController extends GetxController {
                )),
        _aiService = aiService ?? Get.find(),
        _analyticsService = analyticsService ?? Get.find(),
+       _onlineGameServiceOverride = onlineGameService,
+       _authServiceOverride = authService,
        _aiMinThinkTime = aiMinThinkTime ?? const Duration(milliseconds: 800);
 
   final GameBoardArguments args;
   final AiService _aiService;
   final AnalyticsService _analyticsService;
+  final OnlineGameService? _onlineGameServiceOverride;
+  final AuthService? _authServiceOverride;
   final Duration _aiMinThinkTime;
+
+  // Resolved lazily so PC-mode tests need not register online services.
+  OnlineGameService get _onlineGameService =>
+      _onlineGameServiceOverride ?? Get.find();
+  AuthService get _authService => _authServiceOverride ?? Get.find();
 
   late final CheckersEngine engine = CheckersEngine(config: args.rules);
 
@@ -53,10 +67,45 @@ class GameBoardController extends GetxController {
   final Rx<GameResult> result = GameResult.ongoing.obs;
   final Rx<ResultReason> resultReason = ResultReason.none.obs;
 
+  // Online-only state.
+  final Rxn<OnlineGameSnapshot> snapshot = Rxn<OnlineGameSnapshot>();
+  final RxInt ownBankMs = 300000.obs;
+  final RxInt opponentBankMs = 300000.obs;
+  final RxInt turnRemainingMs = 15000.obs;
+  final RxBool opponentConnected = true.obs;
+  final RxBool drawOfferPending = false.obs;
+  final RxBool incomingDrawOffer = false.obs;
+  final RxBool rematchRequested = false.obs;
+  final RxBool opponentWantsRematch = false.obs;
+  int _drawOffersMade = 0;
+
+  StreamSubscription<OnlineGameSnapshot>? _gameSubscription;
+  Timer? _clockTimer;
+  int _serverOffsetMs = 0;
+  bool _timeoutClaimed = false;
+  bool _applyingRemote = false;
+
   PieceColor get humanColor => args.humanColor;
+
+  bool get isOnline => args.mode == GameBoardMode.online;
+
+  OnlineGamePlayer? get opponentPlayer {
+    final uid = _authService.currentUser?.uid;
+    final players = snapshot.value?.players;
+    if (players == null) {
+      return null;
+    }
+    for (final player in players) {
+      if (player.uid != uid) {
+        return player;
+      }
+    }
+    return null;
+  }
 
   bool get isHumanTurn =>
       engine.result == GameResult.ongoing &&
+      result.value == GameResult.ongoing &&
       engine.sideToMove == humanColor &&
       activeAnimation.value == null;
 
@@ -75,8 +124,160 @@ class GameBoardController extends GetxController {
       'preset': args.rules.preset.name,
       'level': args.aiLevel?.name ?? 'none',
     });
-    _maybeTriggerAi();
+    if (isOnline) {
+      _startOnline();
+    } else {
+      _maybeTriggerAi();
+    }
   }
+
+  @override
+  void onClose() {
+    _gameSubscription?.cancel();
+    _clockTimer?.cancel();
+    if (isOnline && args.gameId != null) {
+      _onlineGameService.touchConnection(args.gameId!, false);
+    }
+    super.onClose();
+  }
+
+  // -------------------------------------------------------------------
+  // Online wiring
+  // -------------------------------------------------------------------
+
+  Future<void> _startOnline() async {
+    final gameId = args.gameId!;
+    _serverOffsetMs = await _onlineGameService.serverTimeOffsetMs();
+    await _onlineGameService.touchConnection(gameId, true);
+    await _resyncFromServer();
+    _gameSubscription = _onlineGameService
+        .watchGame(gameId)
+        .listen(_onSnapshot, onError: (_) {});
+    _clockTimer = Timer.periodic(
+      const Duration(milliseconds: 250),
+      (_) => _tickClocks(),
+    );
+  }
+
+  Future<void> _resyncFromServer() async {
+    final gameId = args.gameId!;
+    final snapshotResult = await _onlineGameService.fetchGame(gameId);
+    final movesResult = await _onlineGameService.fetchMoves(gameId);
+    snapshotResult.when(
+      success: (snap) {
+        movesResult.when(
+          success: (moves) {
+            engine.reset();
+            for (final move in moves) {
+              engine.applyMove(move);
+            }
+            snapshot.value = snap;
+            _applyFinishedState(snap);
+            boardVersion.value++;
+          },
+          failure: (_) {},
+        );
+      },
+      failure: (_) {},
+    );
+  }
+
+  Future<void> _onSnapshot(OnlineGameSnapshot snap) async {
+    snapshot.value = snap;
+    opponentConnected.value = opponentPlayer?.connected ?? true;
+
+    // Draw-offer bookkeeping.
+    final offer = snap.drawOfferColor;
+    drawOfferPending.value = offer == humanColor;
+    incomingDrawOffer.value = offer != null && offer != humanColor;
+
+    // Rematch bookkeeping.
+    final uid = _authService.currentUser?.uid;
+    opponentWantsRematch.value = snap.rematchRequestedBy != null &&
+        snap.rematchRequestedBy != uid;
+    if (snap.rematchGameId != null && rematchRequested.value) {
+      _navigateToRematch(snap.rematchGameId!);
+      return;
+    }
+
+    if (_applyingRemote) {
+      return;
+    }
+    if (snap.ply == engine.moveHistory.length + 1 && snap.lastMove != null) {
+      // Opponent's (or our confirmed) next move: animate if it isn't ours.
+      final mover = engine.sideToMove;
+      _applyingRemote = true;
+      try {
+        if (mover != humanColor) {
+          await _animateAndApply(snap.lastMove!, movedByHuman: false);
+        } else if (engine.moveHistory.length < snap.ply) {
+          // Our own move already applied optimistically; nothing to do.
+        }
+      } finally {
+        _applyingRemote = false;
+      }
+    } else if (snap.ply > engine.moveHistory.length + 1) {
+      await _resyncFromServer();
+    }
+    _applyFinishedState(snap);
+  }
+
+  void _applyFinishedState(OnlineGameSnapshot snap) {
+    if (!snap.isFinished) {
+      return;
+    }
+    final mapped = switch (snap.result) {
+      'whiteWin' => GameResult.whiteWin,
+      'blackWin' => GameResult.blackWin,
+      'draw' => GameResult.draw,
+      _ => GameResult.draw,
+    };
+    ResultReason reason;
+    try {
+      reason = ResultReason.values.byName(snap.resultReason ?? 'none');
+    } catch (_) {
+      reason = ResultReason.none;
+    }
+    result.value = mapped;
+    resultReason.value = reason;
+  }
+
+  void _tickClocks() {
+    final snap = snapshot.value;
+    if (snap == null || !snap.isPlaying) {
+      return;
+    }
+    final ownIsWhite = humanColor == PieceColor.white;
+    var ownBank = ownIsWhite ? snap.whiteBankMs : snap.blackBankMs;
+    var oppBank = ownIsWhite ? snap.blackBankMs : snap.whiteBankMs;
+
+    final now = DateTime.now().add(Duration(milliseconds: _serverOffsetMs));
+    if (snap.turnStartedAt != null) {
+      final elapsed = now.difference(snap.turnStartedAt!).inMilliseconds;
+      final overrun = max(0, elapsed - 15000);
+      turnRemainingMs.value = max(0, 15000 - elapsed);
+      if (snap.sideToMove == humanColor) {
+        ownBank = max(0, ownBank - overrun);
+      } else {
+        oppBank = max(0, oppBank - overrun);
+      }
+    }
+    ownBankMs.value = ownBank;
+    opponentBankMs.value = oppBank;
+
+    if (snap.turnDeadlineAt != null &&
+        now.isAfter(snap.turnDeadlineAt!.add(const Duration(seconds: 1))) &&
+        !_timeoutClaimed) {
+      _timeoutClaimed = true;
+      _onlineGameService.claimTimeout(snap.id).then((_) {
+        _timeoutClaimed = false;
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Shared move handling
+  // -------------------------------------------------------------------
 
   /// Legal moves currently available from [square].
   List<Move> movesFrom(int square) {
@@ -118,8 +319,22 @@ class GameBoardController extends GetxController {
   }
 
   Future<void> _playHumanMove(Move move) async {
-    await _animateAndApply(move, movedByHuman: true);
-    await _maybeTriggerAi();
+    if (isOnline) {
+      final expectedPly = engine.moveHistory.length;
+      await _animateAndApply(move, movedByHuman: true);
+      final submission = await _onlineGameService.submitMove(
+        args.gameId!,
+        move,
+        expectedPly,
+      );
+      submission.when(
+        success: (_) {},
+        failure: (_) => _resyncFromServer(),
+      );
+    } else {
+      await _animateAndApply(move, movedByHuman: true);
+      await _maybeTriggerAi();
+    }
   }
 
   Future<void> _animateAndApply(Move move, {required bool movedByHuman}) async {
@@ -133,13 +348,20 @@ class GameBoardController extends GetxController {
     engine.applyMove(move);
     activeAnimation.value = null;
     boardVersion.value++;
-    result.value = engine.result;
-    resultReason.value = engine.resultReason;
-    if (engine.result != GameResult.ongoing) {
+    if (!isOnline) {
+      result.value = engine.result;
+      resultReason.value = engine.resultReason;
+    } else if (engine.result != GameResult.ongoing) {
+      // Local engine reached a verdict; the authoritative one arrives with
+      // the next snapshot, but mirror it for instant feedback.
+      result.value = engine.result;
+      resultReason.value = engine.resultReason;
+    }
+    if (result.value != GameResult.ongoing) {
       _analyticsService.logEvent('game_completed', {
         'mode': args.mode.name,
-        'result': engine.result.name,
-        'reason': engine.resultReason.name,
+        'result': result.value.name,
+        'reason': resultReason.value.name,
       });
     }
   }
@@ -178,8 +400,12 @@ class GameBoardController extends GetxController {
   }
 
   void resign() {
-    if (engine.result != GameResult.ongoing) {
+    if (result.value != GameResult.ongoing) {
       return;
+    }
+    if (isOnline) {
+      _onlineGameService.resignGame(args.gameId!);
+      return; // Authoritative result arrives via the snapshot stream.
     }
     engine.declareResult(
       humanColor == PieceColor.white ? GameResult.blackWin : GameResult.whiteWin,
@@ -189,7 +415,60 @@ class GameBoardController extends GetxController {
     resultReason.value = engine.resultReason;
   }
 
+  bool get canOfferDraw =>
+      isOnline &&
+      result.value == GameResult.ongoing &&
+      !drawOfferPending.value &&
+      !incomingDrawOffer.value &&
+      _drawOffersMade < 3;
+
+  Future<void> offerDraw() async {
+    if (!canOfferDraw) {
+      return;
+    }
+    _drawOffersMade++;
+    drawOfferPending.value = true;
+    await _onlineGameService.offerDraw(args.gameId!);
+  }
+
+  Future<void> respondDraw(bool accept) async {
+    incomingDrawOffer.value = false;
+    await _onlineGameService.respondDraw(args.gameId!, accept);
+  }
+
+  Future<void> requestRematch() async {
+    if (!isOnline || rematchRequested.value) {
+      return;
+    }
+    rematchRequested.value = true;
+    final response = await _onlineGameService.requestRematch(args.gameId!);
+    response.when(
+      success: (data) {
+        if (data.status == 'ready' && data.gameId != null) {
+          _navigateToRematch(data.gameId!);
+        }
+      },
+      failure: (_) => rematchRequested.value = false,
+    );
+  }
+
+  void _navigateToRematch(String newGameId) {
+    Get.offNamed<void>(
+      AppRoutes.gameBoard,
+      preventDuplicates: false,
+      arguments: GameBoardArguments.online(
+        rules: args.rules,
+        gameId: newGameId,
+        humanColor: humanColor.opponent,
+      ),
+    );
+  }
+
   void playAgain() {
+    if (isOnline) {
+      goHome();
+      return;
+    }
     engine.reset();
     selectedSquare.value = null;
     activeAnimation.value = null;

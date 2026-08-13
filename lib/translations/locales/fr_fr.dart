@@ -48,6 +48,21 @@ const Map<String, String> frFr = {
   TranslationKeys.close: 'Fermer',
   TranslationKeys.ok: 'OK',
 
+  TranslationKeys.drawOfferSent: 'Nulle proposée…',
+  TranslationKeys.drawOfferedByOpponent: 'Votre adversaire propose la nulle',
+  TranslationKeys.accept: 'Accepter',
+  TranslationKeys.decline: 'Refuser',
+  TranslationKeys.rematch: 'Revanche',
+  TranslationKeys.rematchWaiting: "En attente de l'adversaire…",
+  TranslationKeys.opponentWantsRematch: 'Votre adversaire veut une revanche !',
+
+  TranslationKeys.lobbyTitle: 'Partie en ligne',
+  TranslationKeys.lobbyWaiting: "En attente d'un adversaire…",
+  TranslationKeys.lobbyFailed:
+      'Impossible de rejoindre une partie. Veuillez réessayer.',
+  TranslationKeys.lobbyLeave: 'Quitter le salon',
+  TranslationKeys.opponentDisconnected: "L'adversaire s'est déconnecté…",
+
   TranslationKeys.htpBoardTitle: 'Le damier',
   TranslationKeys.htpBoardBody:
       'On joue uniquement sur les cases foncées. Les règles internationales '
