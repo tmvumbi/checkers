@@ -339,6 +339,14 @@ Board representation: bitboards — three 64-bit ints (`white`, `black`, `kings`
 - Expected strength on a mid-range phone (Dart ≈ 0.5–2 M nodes/s): depth 6–8 in 0.3 s, 10–14 in 1 s, 14–18 in 3 s — Hard plays far above casual level. References: Chinook (8x8 — game weakly solved, perfect play is a draw), Scan / Kingsrow (10x10 state of the art).
 - Runs in a **long-lived background isolate** (TT and killer/history tables stay warm across moves); board state passed as the 3-int encoding; hard time cutoff checked every ~1024 nodes; supports cancellation (user leaves the screen).
 
+> **Implementation note (2026-08-13):** v1 implements server-side move
+> validation as the shared JS engine running **inside Postgres via plv8**
+> (`checkers_engine()` function) with pl/pgsql RPCs, instead of Edge
+> Functions — the fallback anticipated by risk #5, chosen because it is
+> fully transactional and needs no separate deployment pipeline on the
+> self-hosted stack. The Dart and JS engines are locked together by a
+> generated 668-vector test suite run in `flutter test` and `deno test`.
+
 ### 7.4 Backend: Supabase on Coolify
 
 A new **Supabase project deployed as a Coolify service** on the existing instance (`http://192.168.101.240:8000/`) — Coolify's one-click Supabase stack (Postgres, GoTrue auth, PostgREST, Realtime, Storage, Edge Functions runtime, Studio). Setup checklist in §10 M0.

@@ -478,15 +478,164 @@ class _MoreTab extends GetView<HomeController> {
               ),
               const SizedBox(height: 14),
               CheckersGradientButton(
+                key: const Key('more-share-app-button'),
+                label: TranslationKeys.moreShareApp.tr,
+                onPressed: controller.shareApp,
+              ),
+              const SizedBox(height: 14),
+              CheckersGradientButton(
+                key: const Key('more-feedback-button'),
+                label: TranslationKeys.moreFeedback.tr,
+                onPressed: () => _showFeedbackModal(context),
+              ),
+              const SizedBox(height: 14),
+              CheckersGradientButton(
                 key: const Key('more-log-out-button'),
                 label: TranslationKeys.moreLogOut.tr,
                 gradientStyle: CheckersGradientButtonStyle.logo,
                 onPressed: () => _confirmLogOut(context),
               ),
+              const SizedBox(height: 14),
+              CheckersGradientButton(
+                key: const Key('more-delete-account-button'),
+                label: TranslationKeys.moreDeleteAccount.tr,
+                gradientStyle: CheckersGradientButtonStyle.logo,
+                onPressed: () => _confirmDeleteAccount(context),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _showFeedbackModal(BuildContext context) {
+    final textController = TextEditingController();
+    showCheckersModal<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final brand = theme.extension<CheckersThemeExtension>()!;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              TranslationKeys.feedbackTitle.tr,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium!.copyWith(
+                color: brand.brandGold,
+                fontSize: 24,
+              ),
+            ),
+            const SizedBox(height: 14),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: theme.colorScheme.onPrimary,
+                  width: 2,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: TextField(
+                  key: const Key('feedback-text'),
+                  controller: textController,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    counterText: '',
+                    hintText: TranslationKeys.feedbackHint.tr,
+                    hintStyle: theme.textTheme.bodyLarge!.copyWith(
+                      color: theme.colorScheme.onPrimary.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            CheckersGradientButton(
+              key: const Key('feedback-send'),
+              label: TranslationKeys.feedbackSend.tr,
+              onPressed: () async {
+                final sent =
+                    await controller.sendFeedback(textController.text);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+                Get.snackbar(
+                  '',
+                  sent
+                      ? TranslationKeys.feedbackThanks.tr
+                      : TranslationKeys.feedbackFailed.tr,
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteAccount(BuildContext context) {
+    showCheckersModal<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              TranslationKeys.deleteAccountTitle.tr,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium!.copyWith(
+                color: theme.extension<CheckersThemeExtension>()!.brandGold,
+                fontSize: 24,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              TranslationKeys.deleteAccountMessage.tr,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge!.copyWith(
+                color: theme.colorScheme.onPrimary,
+                fontSize: 15,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 20),
+            CheckersGradientButton(
+              key: const Key('delete-account-confirm'),
+              label: TranslationKeys.confirm.tr,
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                final deleted = await controller.deleteAccount();
+                if (!deleted) {
+                  Get.snackbar(
+                    '',
+                    TranslationKeys.deleteAccountFailed.tr,
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+            CheckersGradientButton(
+              label: TranslationKeys.cancel.tr,
+              gradientStyle: CheckersGradientButtonStyle.logo,
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
     );
   }
 

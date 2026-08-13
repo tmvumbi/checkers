@@ -45,6 +45,7 @@ class OnlineLobbyController extends GetxController {
 
   StreamSubscription<OnlineGameSnapshot>? _subscription;
   Timer? _startupTimeout;
+  Timer? _heartbeatTimer;
   bool _navigated = false;
 
   @override
@@ -71,6 +72,12 @@ class OnlineLobbyController extends GetxController {
 
   void _watch(String id) {
     gameId.value = id;
+    // Keep our lobby seat alive so matchmaking GC doesn't reap the game.
+    _onlineGameService.touchConnection(id, true);
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _onlineGameService.touchConnection(id, true),
+    );
     _subscription = _onlineGameService
         .watchGame(id)
         .listen(_onSnapshot, onError: (_) => failed.value = true);
@@ -127,6 +134,7 @@ class OnlineLobbyController extends GetxController {
   void onClose() {
     _subscription?.cancel();
     _startupTimeout?.cancel();
+    _heartbeatTimer?.cancel();
     super.onClose();
   }
 }

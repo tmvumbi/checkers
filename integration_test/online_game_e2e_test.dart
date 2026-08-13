@@ -54,6 +54,11 @@ void main() {
             return;
           }
           if (row['status'] != 'playing') {
+            // Keep the lobby seat alive against matchmaking GC.
+            await b.rpc<dynamic>('touch_game_connection', params: {
+              'p_game_id': gameId,
+              'p_connected': true,
+            });
             continue;
           }
           final players = await b
@@ -132,6 +137,8 @@ void main() {
     await tester.tap(find.byKey(const Key('home-play-people-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('play-people-american')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('play-people-join')));
 
     // Lobby → matched → board.
     await _settleUntil(

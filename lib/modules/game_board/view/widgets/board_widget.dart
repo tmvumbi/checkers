@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/constants/app_colors.dart';
@@ -50,6 +51,9 @@ class BoardWidget extends GetView<GameBoardController> {
     }
     final square = engine.geometry.indexOf(row, col);
     if (square != null) {
+      if (controller.selectableSquares.contains(square)) {
+        HapticFeedback.selectionClick();
+      }
       controller.onSquareTapped(square);
     }
   }

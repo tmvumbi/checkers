@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../modules/app_update/view/app_update_required_view.dart';
 import '../modules/edit_profile/binding/edit_profile_binding.dart';
 import '../modules/edit_profile/view/edit_profile_view.dart';
 import '../modules/game_board/binding/game_board_binding.dart';
@@ -47,6 +48,10 @@ abstract final class AppPages {
       name: AppRoutes.invitePlayers,
       page: InvitePlayersView.new,
       binding: InvitePlayersBinding(),
+    ),
+    GetPage<dynamic>(
+      name: AppRoutes.appUpdateRequired,
+      page: AppUpdateRequiredView.new,
     ),
   ];
 }
