@@ -7,6 +7,8 @@ import '../modules/game_board/view/game_board_view.dart';
 import '../modules/home/binding/home_binding.dart';
 import '../modules/home/view/home_view.dart';
 import '../modules/how_to_play/view/how_to_play_view.dart';
+import '../modules/invite_players/binding/invite_players_binding.dart';
+import '../modules/invite_players/view/invite_players_view.dart';
 import '../modules/landing/binding/landing_binding.dart';
 import '../modules/landing/view/landing_view.dart';
 import '../modules/online_lobby/binding/online_lobby_binding.dart';
@@ -40,6 +42,11 @@ abstract final class AppPages {
       name: AppRoutes.onlineLobby,
       page: OnlineLobbyView.new,
       binding: OnlineLobbyBinding(),
+    ),
+    GetPage<dynamic>(
+      name: AppRoutes.invitePlayers,
+      page: InvitePlayersView.new,
+      binding: InvitePlayersBinding(),
     ),
   ];
 }

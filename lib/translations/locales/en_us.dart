@@ -47,6 +47,19 @@ const Map<String, String> enUs = {
   TranslationKeys.close: 'Close',
   TranslationKeys.ok: 'OK',
 
+  TranslationKeys.joinOnlineGame: 'Join Online Game',
+  TranslationKeys.inviteFriends: 'Invite Friends to Play',
+  TranslationKeys.invitePlayersTitle: 'Invite Players',
+  TranslationKeys.invitePlayersEmpty:
+      'No players are available right now. Share an invite link instead!',
+  TranslationKeys.invite: 'Invite',
+  TranslationKeys.inviteFailed: 'Could not send the invite. Try again.',
+  TranslationKeys.inviteReceivedTitle: 'Game Invite',
+  TranslationKeys.inviteReceivedMessage:
+      '@name invites you to play checkers!',
+  TranslationKeys.shareInviteLink: 'Share Invite Link',
+  TranslationKeys.shareInviteText: 'Join my game of Checkers: @url',
+
   TranslationKeys.drawOfferSent: 'Draw offered…',
   TranslationKeys.drawOfferedByOpponent: 'Your opponent offers a draw',
   TranslationKeys.accept: 'Accept',

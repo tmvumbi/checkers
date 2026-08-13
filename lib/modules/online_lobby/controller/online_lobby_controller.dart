@@ -11,9 +11,13 @@ import '../../../services/online_game_service.dart';
 import '../../game_board/models/game_board_arguments.dart';
 
 class OnlineLobbyArguments {
-  const OnlineLobbyArguments({required this.preset});
+  const OnlineLobbyArguments({required this.preset, this.existingGameId});
 
   final String preset;
+
+  /// When set, the lobby watches this already-created (invite/social) game
+  /// instead of joining public matchmaking.
+  final String? existingGameId;
 }
 
 class OnlineLobbyController extends GetxController {
@@ -52,30 +56,40 @@ class OnlineLobbyController extends GetxController {
   Future<void> _join() async {
     await _analyticsService.logEvent('online_join_attempt', {
       'preset': args.preset,
+      'existing': args.existingGameId != null,
     });
+    if (args.existingGameId != null) {
+      _watch(args.existingGameId!);
+      return;
+    }
     final result = await _onlineGameService.joinOnlineGame(args.preset);
     result.when(
-      success: (joined) {
-        gameId.value = joined.gameId;
-        _subscription = _onlineGameService
-            .watchGame(joined.gameId)
-            .listen(_onSnapshot, onError: (_) => failed.value = true);
-        // Kopo's 8s no-first-snapshot timeout.
-        _startupTimeout = Timer(const Duration(seconds: 8), () {
-          if (snapshot.value == null) {
-            failed.value = true;
-          }
-        });
-        // The stream may already miss the initial row; fetch once.
-        _onlineGameService.fetchGame(joined.gameId).then((fetched) {
-          fetched.when(
-            success: _onSnapshot,
-            failure: (_) {},
-          );
-        });
-      },
+      success: (joined) => _watch(joined.gameId),
       failure: (_) => failed.value = true,
     );
+  }
+
+  void _watch(String id) {
+    gameId.value = id;
+    _subscription = _onlineGameService
+        .watchGame(id)
+        .listen(_onSnapshot, onError: (_) => failed.value = true);
+    // Kopo's 8s no-first-snapshot timeout (invite lobbies wait for the
+    // opponent, so only enforce it for matchmaking).
+    if (args.existingGameId == null) {
+      _startupTimeout = Timer(const Duration(seconds: 8), () {
+        if (snapshot.value == null) {
+          failed.value = true;
+        }
+      });
+    }
+    // The stream may miss the initial row; fetch once.
+    _onlineGameService.fetchGame(id).then((fetched) {
+      fetched.when(
+        success: _onSnapshot,
+        failure: (_) {},
+      );
+    });
   }
 
   void _onSnapshot(OnlineGameSnapshot snap) {

@@ -7,8 +7,45 @@ import '../core/network/api_result.dart';
 import '../data/models/online_game.dart';
 import '../engine/move.dart';
 
+class LeaderboardPlayer {
+  const LeaderboardPlayer({
+    required this.uid,
+    required this.nickname,
+    this.photoUrl,
+    required this.rating,
+    required this.ratedGames,
+    required this.wins,
+    required this.losses,
+    required this.draws,
+  });
+
+  final String uid;
+  final String nickname;
+  final String? photoUrl;
+  final int rating;
+  final int ratedGames;
+  final int wins;
+  final int losses;
+  final int draws;
+
+  factory LeaderboardPlayer.fromJson(Map<String, dynamic> json) {
+    return LeaderboardPlayer(
+      uid: json['uid'] as String,
+      nickname: (json['nickname'] as String?) ?? '',
+      photoUrl: json['photo_url'] as String?,
+      rating: (json['rating'] as num).toInt(),
+      ratedGames: (json['rated_games'] as num?)?.toInt() ?? 0,
+      wins: (json['wins'] as num?)?.toInt() ?? 0,
+      losses: (json['losses'] as num?)?.toInt() ?? 0,
+      draws: (json['draws'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 abstract class OnlineGameService {
   Future<ApiResult<({String gameId, int seat})>> joinOnlineGame(String preset);
+  Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames();
+  Future<ApiResult<List<LeaderboardPlayer>>> fetchLeaderboard();
   Future<ApiResult<OnlineGameSnapshot>> fetchGame(String gameId);
   Stream<OnlineGameSnapshot> watchGame(String gameId);
   Future<ApiResult<void>> submitMove(String gameId, Move move, int expectedPly);
@@ -161,6 +198,42 @@ class SupabaseOnlineGameService implements OnlineGameService {
       return [
         for (final row in rows)
           Move.fromJson((row['move'] as Map).cast<String, dynamic>()),
+      ];
+    });
+  }
+
+  @override
+  Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames() {
+    return _guard(() async {
+      final rows = await _client
+          .from('games')
+          .select('*, game_players(*)')
+          .eq('status', 'playing')
+          .eq('is_private', false)
+          .order('started_at', ascending: false)
+          .limit(30);
+      return [
+        for (final row in rows)
+          OnlineGameSnapshot.fromRow(
+            row,
+            players: [
+              for (final playerRow in (row['game_players'] as List? ?? []))
+                OnlineGamePlayer.fromJson(
+                  (playerRow as Map).cast<String, dynamic>(),
+                ),
+            ]..sort((a, b) => a.seat.compareTo(b.seat)),
+          ),
+      ];
+    });
+  }
+
+  @override
+  Future<ApiResult<List<LeaderboardPlayer>>> fetchLeaderboard() {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>('get_leaderboard');
+      return [
+        for (final row in response as List)
+          LeaderboardPlayer.fromJson((row as Map).cast<String, dynamic>()),
       ];
     });
   }

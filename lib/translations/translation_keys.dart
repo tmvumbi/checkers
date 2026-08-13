@@ -45,6 +45,18 @@ abstract final class TranslationKeys {
   static const String close = 'close';
   static const String ok = 'ok';
 
+  // Invites
+  static const String joinOnlineGame = 'join_online_game';
+  static const String inviteFriends = 'invite_friends';
+  static const String invitePlayersTitle = 'invite_players_title';
+  static const String invitePlayersEmpty = 'invite_players_empty';
+  static const String invite = 'invite';
+  static const String inviteFailed = 'invite_failed';
+  static const String inviteReceivedTitle = 'invite_received_title';
+  static const String inviteReceivedMessage = 'invite_received_message';
+  static const String shareInviteLink = 'share_invite_link';
+  static const String shareInviteText = 'share_invite_text';
+
   // Draws and rematch (online)
   static const String drawOfferSent = 'draw_offer_sent';
   static const String drawOfferedByOpponent = 'draw_offered_by_opponent';
