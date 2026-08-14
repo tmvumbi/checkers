@@ -23,7 +23,10 @@ class Move {
 
   /// Legal identity of a move: origin, destination and the captured set —
   /// FMJD treats tied sequences over the same pieces as the same choice.
-  String get key {
+  /// Cached: the AI uses keys heavily for move ordering.
+  late final String key = _computeKey();
+
+  String _computeKey() {
     final capturedSorted = [...captured]..sort();
     return '$from>$to:${capturedSorted.join(',')}';
   }

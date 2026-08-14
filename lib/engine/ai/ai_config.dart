@@ -32,18 +32,12 @@ class AiConfig {
   /// Deterministic evaluation noise amplitude (1 man = 100).
   final int noiseCentiMen;
 
+  // Ladder rebalanced after playtesting (2026-08-14): the original Medium
+  // was too weak, so it became Easy, the original Hard became Medium, and
+  // Hard is a new full-strength profile with a much larger budget on top of
+  // the TT/killer move ordering in the search.
   static const AiConfig easy = AiConfig(
     level: AiLevel.easy,
-    maxDepth: 4,
-    budgetMs: 300,
-    topN: 4,
-    pickSecondBestChance: 0.5,
-    blunderChance: 0.15,
-    noiseCentiMen: 40,
-  );
-
-  static const AiConfig medium = AiConfig(
-    level: AiLevel.medium,
     maxDepth: 8,
     budgetMs: 900,
     topN: 2,
@@ -52,10 +46,20 @@ class AiConfig {
     noiseCentiMen: 15,
   );
 
-  static const AiConfig hard = AiConfig(
-    level: AiLevel.hard,
+  static const AiConfig medium = AiConfig(
+    level: AiLevel.medium,
     maxDepth: 24,
     budgetMs: 2800,
+    topN: 1,
+    pickSecondBestChance: 0,
+    blunderChance: 0,
+    noiseCentiMen: 0,
+  );
+
+  static const AiConfig hard = AiConfig(
+    level: AiLevel.hard,
+    maxDepth: 40,
+    budgetMs: 6500,
     topN: 1,
     pickSecondBestChance: 0,
     blunderChance: 0,

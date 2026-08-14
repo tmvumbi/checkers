@@ -79,6 +79,12 @@ class CheckersEngine {
   GameResult result = GameResult.ongoing;
   ResultReason resultReason = ResultReason.none;
 
+  /// When true, applyMove skips the (expensive) blocked-opponent detection —
+  /// the AI search calls it once per node anyway via legalMoves() and treats
+  /// an empty move list as the loss itself. Only the AI enables this, on its
+  /// own engine copy, for the duration of a search.
+  bool searchMode = false;
+
   int hash = 0;
   final List<int> _hashHistory = [];
   final List<_UndoRecord> _undoStack = [];
@@ -569,7 +575,7 @@ class CheckersEngine {
       resultReason = ResultReason.noPieces;
       return;
     }
-    if (legalMovesFor(mover).isEmpty) {
+    if (!searchMode && legalMovesFor(mover).isEmpty) {
       result = mover == PieceColor.white
           ? GameResult.blackWin
           : GameResult.whiteWin;

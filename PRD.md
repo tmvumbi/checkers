@@ -160,9 +160,13 @@ All levels use the same engine (negamax + alpha-beta + iterative deepening + tra
 
 | Level | Think budget | Behavior |
 |---|---|---|
-| **Easy** | ~0.3 s, depth cap 4 | Picks among the top 3–4 moves with softmax randomness; evaluation noise; ~15% bounded-blunder probability (never hangs more than ~1 man's worth when avoidable). Beatable by a beginner who pays attention. |
-| **Medium** | ~1 s | Full quiescence; occasionally (~20%) plays the 2nd-best move; small eval noise; ~4% bounded blunders. Challenge for a casual club-level player. |
-| **Hard** | ~3 s | Full engine strength, always the best move found. Target: clearly stronger than almost all human players (depth 12–18 with quiescence at 10x10). |
+| **Easy** | ~1 s, depth cap 8 | Full quiescence; occasionally (~20%) plays the 2nd-best move; small eval noise; ~4% bounded blunders. Beatable by a casual player who pays attention. |
+| **Medium** | ~3 s | Full engine strength at a moderate budget, always the best move found. Challenge for a club-level player. |
+| **Hard** | ~6.5 s, depth cap 40 | Full strength with transposition-table + killer-move ordering inside the search (several extra plies at the same node budget). Target: clearly stronger than almost all human players. |
+
+*(Rebalanced after playtesting on 2026-08-14: the original Easy tier proved
+redundant — the original Medium was already beatable — so the ladder shifted
+up one notch and Hard gained a deeper search.)*
 
 Noise is deterministic per position (derived from the Zobrist key) so the transposition table stays consistent.
 

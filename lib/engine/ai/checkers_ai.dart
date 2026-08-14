@@ -4,11 +4,15 @@ import '../move.dart';
 import 'ai_config.dart';
 
 class _TtEntry {
-  _TtEntry(this.depth, this.score, this.flag);
+  _TtEntry(this.depth, this.score, this.flag, this.bestKey);
 
   final int depth;
   final int score;
   final int flag; // 0 exact, 1 lower bound, 2 upper bound.
+
+  /// Key of the best move found here — used for move ordering on re-visits,
+  /// which is where most of alpha-beta's pruning power comes from.
+  final String? bestKey;
 }
 
 class AiMoveChoice {
@@ -35,6 +39,13 @@ class CheckersAi {
   final AiConfig config;
 
   final Map<int, _TtEntry> _table = {};
+
+  /// Two killer-move keys per ply: quiet moves that recently caused beta
+  /// cutoffs at the same depth get searched early.
+  final List<List<String>> _killers = List.generate(64, (_) => <String>[]);
+
+  /// History heuristic: cutoff counts per move key, weighted by depth².
+  final Map<String, int> _history = {};
   int _nodes = 0;
   int _deadline = 0;
   bool _aborted = false;
@@ -62,6 +73,15 @@ class CheckersAi {
     _aborted = false;
     _nodes = 0;
     _table.clear();
+    engine.searchMode = true;
+    try {
+      return _search(legal);
+    } finally {
+      engine.searchMode = false;
+    }
+  }
+
+  AiMoveChoice _search(List<Move> legal) {
 
     // Iterative deepening over root moves, keeping per-move scores so the
     // difficulty layer can pick among the top N.
@@ -77,7 +97,7 @@ class CheckersAi {
       for (final entry in rootScores) {
         final move = entry.key;
         engine.applyMove(move);
-        final score = -_negamax(depth - 1, -_win * 2, -alpha);
+        final score = -_negamax(depth - 1, 1, -_win * 2, -alpha);
         engine.undoMove();
         if (_aborted) {
           break;
@@ -140,7 +160,7 @@ class CheckersAi {
     return ranked.first.key;
   }
 
-  int _negamax(int depth, int alpha, int beta) {
+  int _negamax(int depth, int ply, int alpha, int beta) {
     _nodes++;
     if ((_nodes & 1023) == 0 &&
         DateTime.now().millisecondsSinceEpoch > _deadline) {
@@ -160,7 +180,12 @@ class CheckersAi {
     }
 
     final moves = engine.legalMoves();
-    final isCapturePosition = moves.isNotEmpty && moves.first.isCapture;
+    if (moves.isEmpty) {
+      // Blocked: the side to move loses (search-mode replaces the engine's
+      // own blocked detection).
+      return -_win + (_nodes & 63);
+    }
+    final isCapturePosition = moves.first.isCapture;
 
     // Quiescence: never evaluate a position with pending forced captures.
     if (depth <= 0 && !isCapturePosition) {
@@ -183,33 +208,72 @@ class CheckersAi {
       }
     }
 
+    // Move ordering: TT best move, then killers, then history score;
+    // captures already dominate when present (they are the only legal
+    // moves and majority-filtered). Ranks are precomputed once per move.
+    if (moves.length > 1) {
+      final bestKey = entry?.bestKey;
+      final killers = ply < _killers.length ? _killers[ply] : const <String>[];
+      final ranks = <Move, int>{
+        for (final move in moves) move: _orderRank(move, bestKey, killers),
+      };
+      moves.sort((a, b) => ranks[a]!.compareTo(ranks[b]!));
+    }
+
     // Forced-move extension keeps the horizon honest in forcing lines.
     final nextDepth = moves.length == 1 ? depth : depth - 1;
 
     var best = -_win * 2;
+    String? bestKey;
     for (final move in moves) {
       engine.applyMove(move);
-      final score = -_negamax(nextDepth, -beta, -alpha);
+      final score = -_negamax(nextDepth, ply + 1, -beta, -alpha);
       engine.undoMove();
       if (_aborted) {
         return 0;
       }
       if (score > best) {
         best = score;
+        bestKey = move.key;
       }
       if (best > alpha) {
         alpha = best;
       }
       if (alpha >= beta) {
+        if (!move.isCapture) {
+          final key = move.key;
+          if (ply < _killers.length) {
+            final killers = _killers[ply];
+            if (!killers.contains(key)) {
+              killers.insert(0, key);
+              if (killers.length > 2) {
+                killers.removeLast();
+              }
+            }
+          }
+          _history[key] = (_history[key] ?? 0) + depth * depth;
+        }
         break;
       }
     }
 
     final flag = best <= originalAlpha ? 2 : (best >= beta ? 1 : 0);
     if (_table.length < 1 << 18) {
-      _table[engine.hash] = _TtEntry(depth, best, flag);
+      _table[engine.hash] = _TtEntry(depth, best, flag, bestKey);
     }
     return best;
+  }
+
+  int _orderRank(Move move, String? bestKey, List<String> killers) {
+    final key = move.key;
+    if (key == bestKey) {
+      return -(1 << 40);
+    }
+    final killerIndex = killers.indexOf(key);
+    if (killerIndex >= 0) {
+      return -(1 << 30) + killerIndex;
+    }
+    return -(_history[key] ?? 0);
   }
 
   // -------------------------------------------------------------------

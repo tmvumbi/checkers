@@ -87,8 +87,31 @@ void main() {
       for (var i = 0; i < 8; i++) {
         engine.applyMove(engine.legalMoves().first);
       }
-      final choice = CheckersAi(engine, AiConfig.medium).chooseMove();
+      final choice = CheckersAi(engine, AiConfig.easy).chooseMove();
       expect(choice.depth, greaterThanOrEqualTo(4));
+    });
+
+    test('difficulty ladder is ordered: hard searches deeper than easy', () {
+      final engine = CheckersEngine(config: RulesConfig.international);
+      // Advance to a mid-game position that offers a real choice of moves
+      // (a single forced capture would short-circuit the search at depth 0).
+      var plies = 0;
+      while (plies < 30 &&
+          (plies < 10 || engine.legalMoves().length <= 2)) {
+        engine.applyMove(engine.legalMoves().first);
+        plies++;
+      }
+      expect(engine.legalMoves().length, greaterThan(2));
+      final easy = CheckersAi(
+        CheckersEngine.fromJson(engine.toJson()),
+        AiConfig.easy,
+      ).chooseMove();
+      final hard = CheckersAi(
+        CheckersEngine.fromJson(engine.toJson()),
+        AiConfig.hard,
+      ).chooseMove();
+      expect(hard.depth, greaterThan(easy.depth));
+      expect(hard.depth, greaterThanOrEqualTo(10));
     });
   });
 }
