@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../../../data/models/online_game.dart';
@@ -473,15 +474,18 @@ class GameBoardController extends GetxController {
   }
 
   void _navigateToRematch(String newGameId) {
-    Get.offNamed<void>(
-      AppRoutes.gameBoard,
-      preventDuplicates: false,
-      arguments: GameBoardArguments.online(
-        rules: args.rules,
-        gameId: newGameId,
-        humanColor: humanColor.opponent,
-      ),
+    // Replacing the board route with itself makes GetX dispose the
+    // controller after the new route resolved it (controller-not-found
+    // crash). Rebuild the stack instead: home, then a fresh board.
+    final arguments = GameBoardArguments.online(
+      rules: args.rules,
+      gameId: newGameId,
+      humanColor: humanColor.opponent,
     );
+    Get.offAllNamed<void>(AppRoutes.home);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.toNamed<void>(AppRoutes.gameBoard, arguments: arguments);
+    });
   }
 
   void playAgain() {

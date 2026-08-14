@@ -120,6 +120,47 @@ void main() {
     if (!done.isCompleted) {
       done.complete();
     }
+
+    // ---- Rematch: A requests via the UI; headless B accepts. A must land
+    // on a fresh board (this navigation used to crash with a GetX
+    // controller-not-found).
+    unawaited(() async {
+      while (true) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        try {
+          final row =
+              await b.from('games').select().eq('id', gameId).single();
+          if (row['rematch_game_id'] != null) {
+            return;
+          }
+          if (row['rematch_requested_by'] != null) {
+            await b.rpc<dynamic>(
+              'request_rematch',
+              params: {'p_game_id': gameId},
+            );
+            return;
+          }
+        } catch (_) {}
+      }
+    }());
+
+    await tester.tap(find.byKey(const Key('game-rematch')));
+    await _settleUntil(
+      tester,
+      () {
+        if (find.byKey(const Key('game-turn-label')).evaluate().isEmpty) {
+          return false;
+        }
+        final fresh = Get.find<GameBoardController>();
+        return fresh.args.gameId != gameId &&
+            fresh.result.value == GameResult.ongoing;
+      },
+      timeout: const Duration(seconds: 30),
+    );
+
+    final rematchController = Get.find<GameBoardController>();
+    expect(rematchController.args.gameId, isNot(gameId));
+    expect(rematchController.engine.moveHistory, isEmpty);
   });
 }
 
