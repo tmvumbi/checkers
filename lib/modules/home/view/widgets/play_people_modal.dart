@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../../routes/app_routes.dart';
 import '../../../../shared/widgets/checkers_gradient_button.dart';
+import '../../../../shared/widgets/checkers_modal.dart';
 import '../../../../themes/app_theme.dart';
 import '../../../../translations/translation_keys.dart';
 import '../../../invite_players/controller/invite_players_controller.dart';
@@ -76,27 +77,10 @@ class _PlayPeopleModalContentState extends State<PlayPeopleModalContent> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Text(
-              TranslationKeys.playWithPeople.tr,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium!.copyWith(
-                color: brand.brandGold,
-                fontSize: 24,
-              ),
-            ),
-            Positioned(
-              right: -8,
-              child: IconButton(
-                key: const Key('play-people-close'),
-                onPressed: () => Navigator.of(context).pop(),
-                icon: Icon(Icons.close, color: theme.colorScheme.onPrimary),
-                tooltip: TranslationKeys.close.tr,
-              ),
-            ),
-          ],
+        CheckersModalHeader(
+          title: TranslationKeys.playWithPeople.tr,
+          closeKey: const Key('play-people-close'),
+          onClose: () => Navigator.of(context).pop(),
         ),
         const SizedBox(height: 16),
         presetChip(

@@ -8,6 +8,7 @@ import '../../../../engine/checkers_engine.dart';
 import '../../../../engine/rules_config.dart';
 import '../../../../routes/app_routes.dart';
 import '../../../../shared/widgets/checkers_gradient_button.dart';
+import '../../../../shared/widgets/checkers_modal.dart';
 import '../../../../themes/app_theme.dart';
 import '../../../../translations/translation_keys.dart';
 import '../../../game_board/models/game_board_arguments.dart';
@@ -66,8 +67,6 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final brand = theme.extension<CheckersThemeExtension>()!;
     final preset = _rules.preset;
 
     return SingleChildScrollView(
@@ -75,30 +74,10 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Text(
-                TranslationKeys.playWithPc.tr,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium!.copyWith(
-                  color: brand.brandGold,
-                  fontSize: 24,
-                ),
-              ),
-              Positioned(
-                right: -8,
-                child: IconButton(
-                  key: const Key('play-pc-close'),
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: Icon(
-                    Icons.close,
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                  tooltip: TranslationKeys.close.tr,
-                ),
-              ),
-            ],
+          CheckersModalHeader(
+            title: TranslationKeys.playWithPc.tr,
+            closeKey: const Key('play-pc-close'),
+            onClose: () => Navigator.of(context).pop(),
           ),
           const SizedBox(height: 16),
           _SectionLabel(text: TranslationKeys.difficulty.tr),

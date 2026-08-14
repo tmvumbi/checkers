@@ -515,18 +515,14 @@ class _MoreTab extends GetView<HomeController> {
       context: context,
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
-        final brand = theme.extension<CheckersThemeExtension>()!;
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              TranslationKeys.feedbackTitle.tr,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium!.copyWith(
-                color: brand.brandGold,
-                fontSize: 24,
-              ),
+            CheckersModalHeader(
+              title: TranslationKeys.feedbackTitle.tr,
+              closeKey: const Key('feedback-close'),
+              onClose: () => Navigator.of(dialogContext).pop(),
             ),
             const SizedBox(height: 14),
             DecoratedBox(
@@ -643,20 +639,14 @@ class _MoreTab extends GetView<HomeController> {
     showCheckersModal<void>(
       context: context,
       builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              TranslationKeys.moreLanguages.tr,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium!.copyWith(
-                color: theme
-                    .extension<CheckersThemeExtension>()!
-                    .brandGold,
-                fontSize: 26,
-              ),
+            CheckersModalHeader(
+              title: TranslationKeys.moreLanguages.tr,
+              closeKey: const Key('languages-close'),
+              onClose: () => Navigator.of(dialogContext).pop(),
             ),
             const SizedBox(height: 20),
             _LanguageModalRow(

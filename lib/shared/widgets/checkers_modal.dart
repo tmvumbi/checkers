@@ -1,8 +1,10 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../themes/app_theme.dart';
+import '../../translations/translation_keys.dart';
 import 'checkers_gradient_button.dart';
 
 Future<T?> showCheckersModal<T>({
@@ -93,6 +95,51 @@ class CheckersModal extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Standard modal header: centered gold title with an optional X close
+/// button. Confirmation dialogs with explicit Cancel buttons skip the X.
+class CheckersModalHeader extends StatelessWidget {
+  const CheckersModalHeader({
+    required this.title,
+    this.onClose,
+    this.closeKey,
+    super.key,
+  });
+
+  final String title;
+  final VoidCallback? onClose;
+  final Key? closeKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final brand = theme.extension<CheckersThemeExtension>()!;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineMedium!.copyWith(
+            color: brand.brandGold,
+            fontSize: 24,
+          ),
+        ),
+        if (onClose != null)
+          Positioned(
+            right: -8,
+            child: IconButton(
+              key: closeKey,
+              onPressed: onClose,
+              icon: Icon(Icons.close, color: theme.colorScheme.onPrimary),
+              tooltip: TranslationKeys.close.tr,
+            ),
+          ),
+      ],
     );
   }
 }
