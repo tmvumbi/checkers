@@ -142,6 +142,7 @@ const Map<String, String> enUs = {
   TranslationKeys.boardSize: 'Board size',
   TranslationKeys.backwardCapture: 'Pawns capture backward',
   TranslationKeys.flyingKing: 'Flying kings',
+  TranslationKeys.allowUndoMoves: 'Allow undoing moves',
   TranslationKeys.playAsWhite: 'White',
   TranslationKeys.playAsBlack: 'Black',
   TranslationKeys.playAsRandom: 'Random',

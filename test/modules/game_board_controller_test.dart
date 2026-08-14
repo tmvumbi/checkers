@@ -10,12 +10,14 @@ import 'package:get/get.dart';
 
 GameBoardController _pcController({
   RulesConfig rules = RulesConfig.international,
+  bool allowUndo = true,
 }) {
   return GameBoardController(
     arguments: GameBoardArguments.pc(
       rules: rules,
       aiLevel: AiLevel.easy,
       humanColor: PieceColor.white,
+      allowUndo: allowUndo,
     ),
     aiService: SyncAiService(),
     analyticsService: NoopAnalyticsService(),
@@ -64,6 +66,16 @@ void main() {
     controller.undoLastExchange();
     expect(controller.engine.moveHistory, isEmpty);
     expect(controller.engine.sideToMove, PieceColor.white);
+  });
+
+  test('undo stays unavailable when not opted in at setup', () async {
+    final controller = _pcController(allowUndo: false);
+    final move = controller.legalMoves.first;
+    controller.onSquareTapped(move.from);
+    controller.onSquareTapped(move.to);
+    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    expect(controller.engine.moveHistory.length, 2);
+    expect(controller.canUndo, isFalse);
   });
 
   test('resign ends the game against the human', () {

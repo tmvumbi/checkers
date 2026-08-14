@@ -150,6 +150,7 @@ const Map<String, String> frFr = {
   TranslationKeys.boardSize: 'Taille du damier',
   TranslationKeys.backwardCapture: 'Les pions prennent en arrière',
   TranslationKeys.flyingKing: 'Dames volantes',
+  TranslationKeys.allowUndoMoves: "Autoriser l'annulation des coups",
   TranslationKeys.playAsWhite: 'Blancs',
   TranslationKeys.playAsBlack: 'Noirs',
   TranslationKeys.playAsRandom: 'Aléatoire',

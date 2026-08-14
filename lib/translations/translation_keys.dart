@@ -118,6 +118,7 @@ abstract final class TranslationKeys {
   static const String boardSize = 'board_size';
   static const String backwardCapture = 'backward_capture';
   static const String flyingKing = 'flying_king';
+  static const String allowUndoMoves = 'allow_undo_moves';
   static const String playAsWhite = 'play_as_white';
   static const String playAsBlack = 'play_as_black';
   static const String playAsRandom = 'play_as_random';

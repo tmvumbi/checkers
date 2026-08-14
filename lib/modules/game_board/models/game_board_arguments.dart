@@ -9,6 +9,7 @@ class GameBoardArguments {
     required this.rules,
     required this.aiLevel,
     required this.humanColor,
+    this.allowUndo = false,
   }) : mode = GameBoardMode.pc,
        gameId = null;
 
@@ -17,16 +18,21 @@ class GameBoardArguments {
     required this.gameId,
     required this.humanColor,
   }) : mode = GameBoardMode.online,
-       aiLevel = null;
+       aiLevel = null,
+       allowUndo = false;
 
   const GameBoardArguments.watching({required this.rules, required this.gameId})
     : mode = GameBoardMode.watching,
       aiLevel = null,
-      humanColor = PieceColor.white;
+      humanColor = PieceColor.white,
+      allowUndo = false;
 
   final GameBoardMode mode;
   final RulesConfig rules;
   final AiLevel? aiLevel;
   final PieceColor humanColor;
   final String? gameId;
+
+  /// PC games only: whether the player opted in to undoing moves.
+  final bool allowUndo;
 }

@@ -27,6 +27,7 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
   int _boardSize = 10;
   bool _backwardCapture = true;
   bool _flyingKing = true;
+  bool _allowUndo = false;
   _SideChoice _side = _SideChoice.white;
 
   RulesConfig get _rules => RulesConfig(
@@ -58,6 +59,7 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
         rules: _rules,
         aiLevel: _level,
         humanColor: humanColor,
+        allowUndo: _allowUndo,
       ),
     );
   }
@@ -73,13 +75,30 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            TranslationKeys.playWithPc.tr,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineMedium!.copyWith(
-              color: brand.brandGold,
-              fontSize: 24,
-            ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Text(
+                TranslationKeys.playWithPc.tr,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineMedium!.copyWith(
+                  color: brand.brandGold,
+                  fontSize: 24,
+                ),
+              ),
+              Positioned(
+                right: -8,
+                child: IconButton(
+                  key: const Key('play-pc-close'),
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Icon(
+                    Icons.close,
+                    color: theme.colorScheme.onPrimary,
+                  ),
+                  tooltip: TranslationKeys.close.tr,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           _SectionLabel(text: TranslationKeys.difficulty.tr),
@@ -167,6 +186,12 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
             label: TranslationKeys.flyingKing.tr,
             value: _flyingKing,
             onChanged: (value) => setState(() => _flyingKing = value),
+          ),
+          _SwitchRow(
+            key: const Key('play-pc-allow-undo'),
+            label: TranslationKeys.allowUndoMoves.tr,
+            value: _allowUndo,
+            onChanged: (value) => setState(() => _allowUndo = value),
           ),
           const SizedBox(height: 10),
           Row(

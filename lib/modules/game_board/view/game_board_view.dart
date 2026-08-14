@@ -325,7 +325,7 @@ class _OwnHeader extends GetView<GameBoardController> {
               }
               return Row(
                 children: [
-                  if (!controller.isOnline) ...[
+                  if (!controller.isOnline && controller.args.allowUndo) ...[
                     CheckersSquareIconButton(
                       key: const Key('game-undo-button'),
                       icon: Icons.undo,

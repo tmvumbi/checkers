@@ -128,6 +128,7 @@ class GameBoardController extends GetxController {
 
   bool get canUndo =>
       args.mode == GameBoardMode.pc &&
+      args.allowUndo &&
       engine.moveHistory.length >= 2 &&
       isHumanTurn;
 
