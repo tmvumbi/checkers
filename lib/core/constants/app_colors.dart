@@ -13,8 +13,10 @@ abstract final class AppColors {
   static const Color boardFrame = Color(0xFF2E1F13);
   static const Color pieceLight = Color(0xFFF3E9D8);
   static const Color pieceLightEdge = Color(0xFFC9B896);
-  static const Color pieceDark = Color(0xFF3A2A20);
-  static const Color pieceDarkEdge = Color(0xFF1F140D);
+  // The "black" side plays gold: dark-brown discs disappeared on the dark
+  // squares, so the second side uses a rich gold with a deep brown edge.
+  static const Color pieceDark = Color(0xFFE8A917);
+  static const Color pieceDarkEdge = Color(0xFF6B4A00);
   static const Color moveHighlight = Color(0x66FFC801);
   static const Color captureHighlight = Color(0x88D64545);
   static const Color lastMoveTint = Color(0x4400C8FF);

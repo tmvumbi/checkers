@@ -311,8 +311,12 @@ class _PiecePainter extends CustomPainter {
         ..strokeWidth = radius * 0.07,
     );
     if (isKing) {
-      final crown = Paint()..color = AppColors.gold;
-      canvas.drawCircle(center, radius * 0.3, crown);
+      // The crown must contrast with the disc: dark marker on the golden
+      // side, gold marker on the cream side.
+      final crownColor = color == PieceColor.white
+          ? AppColors.gold
+          : AppColors.pieceDarkEdge;
+      canvas.drawCircle(center, radius * 0.3, Paint()..color = crownColor);
       canvas.drawCircle(
         center,
         radius * 0.3,
