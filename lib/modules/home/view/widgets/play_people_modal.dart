@@ -43,31 +43,29 @@ class _PlayPeopleModalContentState extends State<PlayPeopleModalContent> {
 
     Widget presetChip(String preset, String label, Key key) {
       final selected = _preset == preset;
-      return Expanded(
-        child: InkWell(
-          key: key,
-          onTap: () => setState(() => _preset = preset),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: selected
-                    ? brand.brandGold
-                    : theme.colorScheme.onPrimary.withValues(alpha: 0.5),
-                width: 2,
-              ),
+      return InkWell(
+        key: key,
+        onTap: () => setState(() => _preset = preset),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected
+                  ? brand.brandGold
+                  : theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+              width: 2,
             ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge!.copyWith(
-                color:
-                    selected ? brand.brandGold : theme.colorScheme.onPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge!.copyWith(
+              color:
+                  selected ? brand.brandGold : theme.colorScheme.onPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -78,33 +76,51 @@ class _PlayPeopleModalContentState extends State<PlayPeopleModalContent> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          TranslationKeys.playWithPeople.tr,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium!.copyWith(
-            color: brand.brandGold,
-            fontSize: 24,
-          ),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            Text(
+              TranslationKeys.playWithPeople.tr,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium!.copyWith(
+                color: brand.brandGold,
+                fontSize: 24,
+              ),
+            ),
+            Positioned(
+              right: -8,
+              child: IconButton(
+                key: const Key('play-people-close'),
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(Icons.close, color: theme.colorScheme.onPrimary),
+                tooltip: TranslationKeys.close.tr,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
+        presetChip(
+          'international',
+          TranslationKeys.presetInternational.tr,
+          const Key('play-people-international'),
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
-            presetChip(
-              'international',
-              '10x10',
-              const Key('play-people-international'),
+            Expanded(
+              child: presetChip(
+                'brazilian',
+                TranslationKeys.presetBrazilian.tr,
+                const Key('play-people-brazilian'),
+              ),
             ),
             const SizedBox(width: 8),
-            presetChip(
-              'brazilian',
-              TranslationKeys.presetBrazilian.tr,
-              const Key('play-people-brazilian'),
-            ),
-            const SizedBox(width: 8),
-            presetChip(
-              'american',
-              TranslationKeys.presetAmerican.tr,
-              const Key('play-people-american'),
+            Expanded(
+              child: presetChip(
+                'american',
+                TranslationKeys.presetAmerican.tr,
+                const Key('play-people-american'),
+              ),
             ),
           ],
         ),
