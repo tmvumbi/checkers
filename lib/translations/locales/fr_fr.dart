@@ -50,15 +50,15 @@ const Map<String, String> frFr = {
   TranslationKeys.ok: 'OK',
 
   TranslationKeys.moreShareApp: "Partager l'application",
-  TranslationKeys.moreFeedback: 'Commentaires',
+  TranslationKeys.moreFeedback: 'Écrire aux admins',
   TranslationKeys.shareAppText:
       'Joue aux dames avec moi ! https://checkers.contribution.club',
-  TranslationKeys.feedbackTitle: 'Commentaires',
-  TranslationKeys.feedbackHint: 'Dites-nous ce que vous en pensez…',
+  TranslationKeys.feedbackTitle: 'Écrire aux admins',
+  TranslationKeys.feedbackHint: 'Votre message aux admins…',
   TranslationKeys.feedbackSend: 'Envoyer',
-  TranslationKeys.feedbackThanks: 'Merci pour vos commentaires !',
+  TranslationKeys.feedbackThanks: 'Message envoyé. Merci !',
   TranslationKeys.feedbackFailed:
-      "Impossible d'envoyer vos commentaires. Réessayez.",
+      "Impossible d'envoyer votre message. Réessayez.",
   TranslationKeys.deleteAccountFailed:
       'Impossible de supprimer le compte. Réessayez.',
   TranslationKeys.updateRequiredTitle: 'Mise à jour requise',

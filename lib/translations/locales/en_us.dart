@@ -49,14 +49,14 @@ const Map<String, String> enUs = {
   TranslationKeys.ok: 'OK',
 
   TranslationKeys.moreShareApp: 'Share App',
-  TranslationKeys.moreFeedback: 'Feedback',
+  TranslationKeys.moreFeedback: 'Write to Admins',
   TranslationKeys.shareAppText:
       'Play checkers with me! https://checkers.contribution.club',
-  TranslationKeys.feedbackTitle: 'Feedback',
-  TranslationKeys.feedbackHint: 'Tell us what you think…',
+  TranslationKeys.feedbackTitle: 'Write to Admins',
+  TranslationKeys.feedbackHint: 'Your message to the admins…',
   TranslationKeys.feedbackSend: 'Send',
-  TranslationKeys.feedbackThanks: 'Thanks for your feedback!',
-  TranslationKeys.feedbackFailed: 'Could not send feedback. Try again.',
+  TranslationKeys.feedbackThanks: 'Message sent. Thank you!',
+  TranslationKeys.feedbackFailed: 'Could not send your message. Try again.',
   TranslationKeys.deleteAccountFailed:
       'Could not delete the account. Try again.',
   TranslationKeys.updateRequiredTitle: 'Update required',
