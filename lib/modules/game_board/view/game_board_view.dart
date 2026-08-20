@@ -213,16 +213,16 @@ class _OpponentHeader extends GetView<GameBoardController> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Obx(() {
         controller.boardVersion.value;
-        final opponent = controller.isWatching
+        final opponent = controller.spectatorLayout
             ? controller.playerOfColor(PieceColor.black)
             : controller.opponentPlayer;
-        final name = controller.isOnline
+        final name = controller.isOnline || controller.isReplay
             ? seatDisplayName(
                 opponent,
                 aiLevel: controller.snapshot.value?.aiLevel,
               )
             : 'PC (${difficultyLabel(controller.args.aiLevel!.name)})';
-        final subtitle = controller.isWatching
+        final subtitle = controller.spectatorLayout
             ? ''
             : controller.isOnline && !controller.opponentConnected.value
             ? TranslationKeys.opponentDisconnected.tr
@@ -236,7 +236,9 @@ class _OpponentHeader extends GetView<GameBoardController> {
         return Row(
           children: [
             _AvatarBadge(
-              icon: !controller.isOnline || (opponent?.isBot ?? false)
+              icon:
+                  (!controller.isOnline && !controller.isReplay) ||
+                      (opponent?.isBot ?? false)
                   ? Icons.smart_toy
                   : Icons.person,
               borderColor: theme.colorScheme.onPrimary,
@@ -270,7 +272,7 @@ class _OpponentHeader extends GetView<GameBoardController> {
             ),
             _EmoteBubble(emote: controller.topEmote),
             _CapturedCountChip(
-              byColor: controller.isWatching
+              byColor: controller.spectatorLayout
                   ? PieceColor.black
                   : (controller.humanColor == PieceColor.white
                         ? PieceColor.black
@@ -386,15 +388,15 @@ class _OwnHeader extends GetView<GameBoardController> {
         children: [
           Obx(() {
             controller.boardVersion.value;
-            final white = controller.isWatching
+            final white = controller.spectatorLayout
                 ? controller.playerOfColor(PieceColor.white)
                 : null;
-            final photoUrl = controller.isWatching
+            final photoUrl = controller.spectatorLayout
                 ? white?.photoUrl
                 : controller.ownPlayer?.photoUrl ??
                       controller.ownProfilePhotoUrl.value;
             return _AvatarBadge(
-              icon: controller.isWatching && (white?.isBot ?? false)
+              icon: controller.spectatorLayout && (white?.isBot ?? false)
                   ? Icons.smart_toy
                   : Icons.person,
               borderColor: AppColors.gold,
@@ -402,7 +404,7 @@ class _OwnHeader extends GetView<GameBoardController> {
             );
           }),
           _CapturedCountChip(
-            byColor: controller.isWatching
+            byColor: controller.spectatorLayout
                 ? PieceColor.white
                 : controller.humanColor,
           ),
@@ -412,6 +414,78 @@ class _OwnHeader extends GetView<GameBoardController> {
             child: Obx(() {
               controller.boardVersion.value;
               final canUndo = controller.canUndo;
+              if (controller.isReplay) {
+                final white = controller.playerOfColor(PieceColor.white);
+                final theme = Theme.of(context);
+                return FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      Text(
+                        seatDisplayName(
+                          white,
+                          aiLevel: controller.snapshot.value?.aiLevel,
+                        ),
+                        maxLines: 1,
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 17,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      CheckersSquareIconButton(
+                        key: const Key('replay-prev'),
+                        icon: Icons.skip_previous,
+                        dimension: 44,
+                        iconSize: 26,
+                        tooltip: TranslationKeys.replayPrevious.tr,
+                        onPressed: controller.replayIndex.value > 0
+                            ? controller.replayPrev
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      CheckersSquareIconButton(
+                        key: const Key('replay-play'),
+                        icon: controller.replayPlaying.value
+                            ? Icons.pause
+                            : Icons.play_arrow,
+                        dimension: 44,
+                        iconSize: 26,
+                        tooltip: TranslationKeys.replayPlay.tr,
+                        onPressed: controller.replayTogglePlay,
+                      ),
+                      const SizedBox(width: 8),
+                      CheckersSquareIconButton(
+                        key: const Key('replay-next'),
+                        icon: Icons.skip_next,
+                        dimension: 44,
+                        iconSize: 26,
+                        tooltip: TranslationKeys.replayNext.tr,
+                        onPressed:
+                            controller.replayIndex.value <
+                                controller.replayTotal.value
+                            ? controller.replayNext
+                            : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${controller.replayIndex.value}'
+                        '/${controller.replayTotal.value}',
+                        key: const Key('replay-counter'),
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme
+                              .extension<CheckersThemeExtension>()!
+                              .brandGold,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
               if (controller.isWatching) {
                 final white = controller.playerOfColor(PieceColor.white);
                 final theme = Theme.of(context);

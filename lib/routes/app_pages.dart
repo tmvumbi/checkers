@@ -18,6 +18,10 @@ import '../modules/messages/view/message_link_view.dart';
 import '../modules/messages/view/messages_view.dart';
 import '../modules/online_lobby/binding/online_lobby_binding.dart';
 import '../modules/online_lobby/view/online_lobby_view.dart';
+import '../modules/tournament/binding/tournament_binding.dart';
+import '../modules/tournament/view/tournament_view.dart';
+import '../modules/tournament_lobby/binding/tournament_lobby_binding.dart';
+import '../modules/tournament_lobby/view/tournament_lobby_view.dart';
 import 'app_routes.dart';
 
 abstract final class AppPages {
@@ -69,6 +73,16 @@ abstract final class AppPages {
     GetPage<dynamic>(
       name: AppRoutes.blocked,
       page: BlockedView.new,
+    ),
+    GetPage<dynamic>(
+      name: AppRoutes.tournamentLobby,
+      page: TournamentLobbyView.new,
+      binding: TournamentLobbyBinding(),
+    ),
+    GetPage<dynamic>(
+      name: AppRoutes.tournament,
+      page: TournamentView.new,
+      binding: TournamentBinding(),
     ),
   ];
 }

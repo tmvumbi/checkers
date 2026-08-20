@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 import '../../../core/constants/app_locales.dart';
 import '../../../core/locale_preference.dart';
 import '../../../data/models/online_game.dart';
+import '../../../data/models/tournament.dart';
 import '../../../data/models/user_profile.dart';
 import '../../../modules/game_board/models/game_board_arguments.dart';
 import '../../../routes/app_routes.dart';
@@ -18,9 +19,10 @@ import '../../../services/auth_service.dart';
 import '../../../services/online_game_service.dart';
 import '../../../services/player_message_service.dart';
 import '../../../services/profile_service.dart';
+import '../../../services/tournament_service.dart';
 import '../../../translations/translation_keys.dart';
 
-enum HomeTab { play, watch, leaderboard, more }
+enum HomeTab { play, watch, tournament, leaderboard, more }
 
 class HomeController extends GetxController {
   HomeController({
@@ -29,17 +31,20 @@ class HomeController extends GetxController {
     AnalyticsService? analyticsService,
     OnlineGameService? onlineGameService,
     PlayerMessageService? playerMessageService,
+    TournamentService? tournamentService,
   }) : _authService = authService ?? Get.find(),
        _profileService = profileService ?? Get.find(),
        _analyticsService = analyticsService ?? Get.find(),
        _onlineGameServiceOverride = onlineGameService,
-       _playerMessageServiceOverride = playerMessageService;
+       _playerMessageServiceOverride = playerMessageService,
+       _tournamentServiceOverride = tournamentService;
 
   final AuthService _authService;
   final ProfileService _profileService;
   final AnalyticsService _analyticsService;
   final OnlineGameService? _onlineGameServiceOverride;
   final PlayerMessageService? _playerMessageServiceOverride;
+  final TournamentService? _tournamentServiceOverride;
 
   OnlineGameService get _onlineGameService =>
       _onlineGameServiceOverride ?? Get.find();
@@ -68,6 +73,17 @@ class HomeController extends GetxController {
   final RxBool watchLoading = false.obs;
   final RxList<LeaderboardPlayer> leaderboard = <LeaderboardPlayer>[].obs;
   final RxBool leaderboardLoading = false.obs;
+
+  static const int tournamentsPageSize = 10;
+  final RxList<TournamentSummary> tournaments = <TournamentSummary>[].obs;
+  final RxBool tournamentsLoading = false.obs;
+  final RxBool hasMoreTournaments = false.obs;
+
+  TournamentService? get _tournamentService =>
+      _tournamentServiceOverride ??
+      (Get.isRegistered<TournamentService>()
+          ? Get.find<TournamentService>()
+          : null);
 
   Timer? _watchRefreshTimer;
 
@@ -154,7 +170,55 @@ class HomeController extends GetxController {
       );
     } else if (newTab == HomeTab.leaderboard) {
       refreshLeaderboard();
+    } else if (newTab == HomeTab.tournament) {
+      refreshTournaments();
     }
+  }
+
+  Future<void> refreshTournaments() async {
+    final service = _tournamentService;
+    if (service == null) {
+      return;
+    }
+    tournamentsLoading.value = tournaments.isEmpty;
+    final result = await service.fetchTournaments(
+      offset: 0,
+      limit: tournamentsPageSize,
+    );
+    result.when(
+      success: (page) {
+        tournaments.value = page;
+        hasMoreTournaments.value = page.length == tournamentsPageSize;
+      },
+      failure: (_) {},
+    );
+    tournamentsLoading.value = false;
+  }
+
+  Future<void> loadMoreTournaments() async {
+    final service = _tournamentService;
+    if (service == null || !hasMoreTournaments.value) {
+      return;
+    }
+    final result = await service.fetchTournaments(
+      offset: tournaments.length,
+      limit: tournamentsPageSize,
+    );
+    result.when(
+      success: (page) {
+        tournaments.addAll(page);
+        hasMoreTournaments.value = page.length == tournamentsPageSize;
+      },
+      failure: (_) {},
+    );
+  }
+
+  void openTournamentLobby() {
+    Get.toNamed<void>(AppRoutes.tournamentLobby);
+  }
+
+  void openTournament(TournamentSummary tournament) {
+    Get.toNamed<void>(AppRoutes.tournament, arguments: tournament.id);
   }
 
   Future<void> refreshWatchableGames() async {

@@ -212,4 +212,55 @@ const Map<String, String> frFr = {
   TranslationKeys.rateAppLater: 'Plus tard',
   TranslationKeys.rateAppDecline: 'Non merci',
   TranslationKeys.sendEmote: 'Envoyer un emoji',
+  TranslationKeys.tabTournament: 'Tournoi',
+  TranslationKeys.joinTournament: 'Rejoindre un tournoi',
+  TranslationKeys.tournamentsEmpty:
+      'Aucun tournoi pour le moment. Rejoignez la salle pour lancer le '
+      'premier !',
+  TranslationKeys.tournamentNumber: 'Tournoi n°@number',
+  TranslationKeys.tournamentPlayersCount: '@count joueurs',
+  TranslationKeys.tournamentLive: 'En direct',
+  TranslationKeys.stageElimination: 'Tour éliminatoire',
+  TranslationKeys.stageQuarterfinals: 'Quarts de finale',
+  TranslationKeys.stageSemifinals: 'Demi-finales',
+  TranslationKeys.stageFinal: 'Finale',
+  TranslationKeys.stageThirdPlace: '3e place',
+  TranslationKeys.stageRoundOf: 'Tableau de @count',
+  TranslationKeys.tournamentHowTitle: 'Fonctionnement des tournois',
+  TranslationKeys.tournamentHowBody:
+      'Un nouveau tournoi démarre toutes les 30 minutes dès que 4 joueurs '
+      'au moins attendent dans la salle. Un nombre pair de joueurs est '
+      'retenu, en donnant la priorité aux premiers arrivés.\n\n'
+      'Si le nombre de participants est une puissance de deux (4, 8, 16…), '
+      'la phase à élimination directe commence aussitôt : tirage aléatoire '
+      'à chaque tour, les vainqueurs avancent et les perdants des '
+      'demi-finales jouent la 3e place.\n\n'
+      'Sinon, le tournoi commence par un tour éliminatoire : paires '
+      'aléatoires, une victoire vaut 3 points, un nul 1 point chacun, une '
+      'défaite 0. La plus grande puissance de deux possible se qualifie '
+      'ensuite, départagée par les points, puis le classement ELO, puis '
+      "l'ordre d'arrivée dans la salle.\n\n"
+      'Les nuls en phase finale sont départagés dans le même ordre : '
+      "points du tour éliminatoire, puis ELO, puis ordre d'arrivée.\n\n"
+      "Quitter l'application, lancer une autre partie ou perdre la "
+      'connexion vous retire de la salle. Les parties utilisent les '
+      'pendules habituelles (15 s par coup + 5 min de réserve) : un joueur '
+      'absent perd au temps.',
+  TranslationKeys.tournamentHowFooter: 'Bonne chance !',
+  TranslationKeys.tournamentLobbyTitle: 'Salle du tournoi',
+  TranslationKeys.tournamentNextStart: 'Prochain tournoi dans',
+  TranslationKeys.tournamentMinPlayers:
+      'Démarre toutes les 30 minutes avec au moins 4 joueurs.',
+  TranslationKeys.tournamentLobbyPlayers: 'Joueurs présents : @count',
+  TranslationKeys.tournamentJoinFailed:
+      'Impossible de rejoindre la salle du tournoi.',
+  TranslationKeys.tournamentYourMatchReady:
+      'Votre match est prêt — jouez !',
+  TranslationKeys.tournamentFixtures: 'Affiches',
+  TranslationKeys.tournamentTable: 'Tableau',
+  TranslationKeys.tournamentStandings: 'Classement',
+  TranslationKeys.tournamentPts: 'pts',
+  TranslationKeys.replayPrevious: 'Coup précédent',
+  TranslationKeys.replayPlay: 'Lecture / pause',
+  TranslationKeys.replayNext: 'Coup suivant',
 };

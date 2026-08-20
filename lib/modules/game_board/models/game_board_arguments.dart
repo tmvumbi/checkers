@@ -2,7 +2,7 @@ import '../../../engine/ai/ai_config.dart';
 import '../../../engine/checkers_engine.dart';
 import '../../../engine/rules_config.dart';
 
-enum GameBoardMode { pc, online, watching }
+enum GameBoardMode { pc, online, watching, replay }
 
 class GameBoardArguments {
   const GameBoardArguments.pc({
@@ -23,6 +23,13 @@ class GameBoardArguments {
 
   const GameBoardArguments.watching({required this.rules, required this.gameId})
     : mode = GameBoardMode.watching,
+      aiLevel = null,
+      humanColor = PieceColor.white,
+      allowUndo = false;
+
+  /// Step through a recorded (finished) game.
+  const GameBoardArguments.replay({required this.rules, required this.gameId})
+    : mode = GameBoardMode.replay,
       aiLevel = null,
       humanColor = PieceColor.white,
       allowUndo = false;

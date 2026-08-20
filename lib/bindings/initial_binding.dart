@@ -13,6 +13,7 @@ import '../services/player_message_service.dart';
 import '../services/presence_service.dart';
 import '../services/profile_photo_service.dart';
 import '../services/profile_service.dart';
+import '../services/tournament_service.dart';
 import '../services/tracking_consent_service.dart';
 
 class InitialBinding extends Bindings {
@@ -27,6 +28,7 @@ class InitialBinding extends Bindings {
     );
     Get.lazyPut<AiService>(IsolateAiService.new, fenix: true);
     Get.lazyPut<OnlineGameService>(SupabaseOnlineGameService.new, fenix: true);
+    Get.lazyPut<TournamentService>(SupabaseTournamentService.new, fenix: true);
     Get.put<PresenceService>(PresenceService(), permanent: true);
     Get.put<PlayerMessageService>(
       SupabasePlayerMessageService(),

@@ -136,6 +136,88 @@ class GameBoardController extends GetxController {
 
   bool get isWatching => args.mode == GameBoardMode.watching;
 
+  bool get isReplay => args.mode == GameBoardMode.replay;
+
+  /// Watching and replay share the spectator board layout (white at the
+  /// bottom, no own controls).
+  bool get spectatorLayout => isWatching || isReplay;
+
+  // Replay state.
+  final RxInt replayIndex = 0.obs;
+  final RxInt replayTotal = 0.obs;
+  final RxBool replayPlaying = false.obs;
+  List<Move> _replayMoves = const [];
+  Timer? _replayTimer;
+
+  Future<void> _startReplay() async {
+    final gameId = args.gameId!;
+    final gameResult = await _onlineGameService.fetchGame(gameId);
+    gameResult.when(
+      success: (snap) => snapshot.value = snap,
+      failure: (_) {},
+    );
+    final movesResult = await _onlineGameService.fetchMoves(gameId);
+    movesResult.when(
+      success: (moves) {
+        _replayMoves = moves;
+        replayTotal.value = moves.length;
+        boardVersion.value++;
+      },
+      failure: (_) {},
+    );
+  }
+
+  void replayNext() {
+    if (replayIndex.value >= _replayMoves.length) {
+      _stopReplayAutoplay();
+      return;
+    }
+    engine.applyMove(_replayMoves[replayIndex.value]);
+    replayIndex.value++;
+    selectedSquare.value = null;
+    boardVersion.value++;
+    if (replayIndex.value >= _replayMoves.length) {
+      _stopReplayAutoplay();
+    }
+  }
+
+  void replayPrev() {
+    if (replayIndex.value == 0) {
+      return;
+    }
+    _stopReplayAutoplay();
+    engine.undoMove();
+    replayIndex.value--;
+    selectedSquare.value = null;
+    boardVersion.value++;
+  }
+
+  void replayTogglePlay() {
+    if (replayPlaying.value) {
+      _stopReplayAutoplay();
+      return;
+    }
+    if (replayIndex.value >= _replayMoves.length) {
+      // Restart from the beginning.
+      while (replayIndex.value > 0) {
+        engine.undoMove();
+        replayIndex.value--;
+      }
+      boardVersion.value++;
+    }
+    replayPlaying.value = true;
+    _replayTimer = Timer.periodic(
+      const Duration(milliseconds: 900),
+      (_) => replayNext(),
+    );
+  }
+
+  void _stopReplayAutoplay() {
+    _replayTimer?.cancel();
+    _replayTimer = null;
+    replayPlaying.value = false;
+  }
+
   OnlineGamePlayer? playerOfColor(PieceColor color) {
     final players = snapshot.value?.players;
     if (players == null) {
@@ -233,7 +315,9 @@ class GameBoardController extends GetxController {
       'preset': args.rules.preset.name,
       'level': args.aiLevel?.name ?? 'none',
     });
-    if (isOnline) {
+    if (isReplay) {
+      _startReplay();
+    } else if (isOnline) {
       _startOnline();
       _startWatchersFeed(args.gameId!);
       _startEmotesFeed(args.gameId!);
@@ -369,6 +453,7 @@ class GameBoardController extends GetxController {
     _emotesSubscription?.cancel();
     _bottomEmoteTimer?.cancel();
     _topEmoteTimer?.cancel();
+    _replayTimer?.cancel();
     _clockTimer?.cancel();
     _watchersSubscription?.cancel();
     _watchHeartbeatTimer?.cancel();
@@ -545,7 +630,7 @@ class GameBoardController extends GetxController {
   }
 
   void onSquareTapped(int square) {
-    if (!isHumanTurn) {
+    if (isReplay || !isHumanTurn) {
       return;
     }
     final selected = selectedSquare.value;

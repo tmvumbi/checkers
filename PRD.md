@@ -323,6 +323,33 @@ genuinely shared physical devices. Server-side, `game_players` /
 path, so client bypasses don't work. `--unblock` revokes the block and its
 device flags; block rows are kept for audit.
 
+### 5.11 Tournaments (added 2026-08-20)
+
+A **Tournament** tab sits between Watch and Top 30 with two entry points:
+join the lobby, or browse current + completed tournaments (10 per page,
+load more; completed rows show the winner's name and photo, running rows
+show the current stage).
+
+- **Lobby**: realtime presence with 15s heartbeats; quitting the app,
+  starting a game, or losing connectivity drops the player (stale >45s).
+  A pg_cron job fires at :00 and :30; with >=4 present it starts a
+  tournament with an even number of players (earliest joiners first).
+- **Format**: if the field is a power of two (>=4), a straight knockout
+  with random pairings each round; semifinal losers play for 3rd place.
+  Otherwise an elimination round runs first (random pairs, 3/1/0 points)
+  and the largest power of two qualifies, ranked by points, then ELO,
+  then lobby join order. Knockout draws resolve by the same order.
+- **Games** reuse the standard online machinery (games/game_players,
+  clocks, spectating, recording, emotes) and are created already started;
+  timeouts advance the bracket automatically via a games trigger
+  (`_on_tournament_game_finished` -> `_advance_tournament`).
+- **UI**: bracket page with a fixtures view (stage columns, live/winner
+  match cards) and a table view (elimination standings + per-stage
+  results), podium banner when finished, an in-app "how tournaments
+  work" explainer, and auto-navigation into the player's own match.
+- **Replays**: finished tournament games open in a replay board
+  (prev / play / next through the recorded moves).
+
 ---
 
 ## 6. UX specification

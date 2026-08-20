@@ -10,4 +10,6 @@ abstract final class AppRoutes {
   static const String messages = '/messages';
   static const String messageLink = '/messages/link';
   static const String blocked = '/blocked';
+  static const String tournamentLobby = '/tournament-lobby';
+  static const String tournament = '/tournament';
 }

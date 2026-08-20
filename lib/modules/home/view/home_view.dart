@@ -3,7 +3,9 @@ import 'package:get/get.dart';
 
 import '../../../core/constants/app_locales.dart';
 import '../../../data/models/online_game.dart';
+import '../../../data/models/tournament.dart';
 import '../../../routes/app_routes.dart';
+import '../../../shared/tournament_display.dart';
 import '../../../services/block_service.dart';
 import '../../../shared/widgets/checkers_ad_banner.dart';
 import '../../../shared/seat_display.dart';
@@ -151,6 +153,7 @@ class _HomeTabBody extends StatelessWidget {
     final body = switch (tab) {
       HomeTab.play => const _PlayTab(),
       HomeTab.watch => const _WatchTab(),
+      HomeTab.tournament => const _TournamentTab(),
       HomeTab.leaderboard => const _LeaderboardTab(),
       HomeTab.more => const _MoreTab(),
     };
@@ -476,6 +479,269 @@ class _WatchTab extends GetView<HomeController> {
         },
       );
     });
+  }
+}
+
+class _TournamentTab extends GetView<HomeController> {
+  const _TournamentTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final brand = theme.extension<CheckersThemeExtension>()!;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: CheckersGradientButton(
+                  key: const Key('tournament-join-button'),
+                  label: TranslationKeys.joinTournament.tr,
+                  minHeight: 52,
+                  onPressed: () {
+                    if (_playBlockedForTournament()) {
+                      return;
+                    }
+                    controller.openTournamentLobby();
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              CheckersSquareIconButton(
+                key: const Key('tournament-instructions-button'),
+                icon: Icons.info_outline,
+                dimension: 52,
+                iconSize: 28,
+                tooltip: TranslationKeys.tournamentHowTitle.tr,
+                onPressed: () => showTournamentInstructions(context),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Obx(() {
+            if (controller.tournamentsLoading.value) {
+              return Center(
+                child: CircularProgressIndicator(color: brand.brandGold),
+              );
+            }
+            final tournaments = controller.tournaments;
+            if (tournaments.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.account_tree_outlined,
+                        size: 56,
+                        color: theme.colorScheme.onPrimary.withValues(
+                          alpha: 0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        TranslationKeys.tournamentsEmpty.tr,
+                        key: const Key('tournaments-empty'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme.colorScheme.onPrimary.withValues(
+                            alpha: 0.7,
+                          ),
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                for (final tournament in tournaments)
+                  _TournamentRow(tournament: tournament, theme: theme),
+                if (controller.hasMoreTournaments.value)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: TextButton(
+                      key: const Key('tournaments-load-more'),
+                      onPressed: controller.loadMoreTournaments,
+                      child: Text(
+                        TranslationKeys.loadMore.tr,
+                        style: TextStyle(
+                          color: brand.brandGold,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  bool _playBlockedForTournament() {
+    if (!Get.isRegistered<BlockService>()) {
+      return false;
+    }
+    if (Get.find<BlockService>().status.value.canPlay) {
+      return false;
+    }
+    showCheckersSnackbar(TranslationKeys.blockedCannotPlay.tr);
+    return true;
+  }
+}
+
+class _TournamentRow extends GetView<HomeController> {
+  const _TournamentRow({required this.tournament, required this.theme});
+
+  final TournamentSummary tournament;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final brand = theme.extension<CheckersThemeExtension>()!;
+    return InkWell(
+      key: Key('tournament-row-${tournament.id}'),
+      onTap: () => controller.openTournament(tournament),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.shadow.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: theme.colorScheme.onPrimary.withValues(alpha: 0.6),
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    TranslationKeys.tournamentNumber.trParams({
+                      'number': '${tournament.number}',
+                    }),
+                    style: theme.textTheme.bodyLarge!.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    TranslationKeys.tournamentPlayersCount.trParams({
+                      'count': '${tournament.participantCount}',
+                    }),
+                    style: theme.textTheme.bodyLarge!.copyWith(
+                      color: theme.colorScheme.onPrimary.withValues(
+                        alpha: 0.7,
+                      ),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (tournament.isFinished)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.emoji_events, size: 20, color: brand.brandGold),
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: brand.brandGold.withValues(alpha: 0.9),
+                        width: 2,
+                      ),
+                      color: theme.colorScheme.shadow.withValues(alpha: 0.4),
+                      image: tournament.winnerPhotoUrl == null
+                          ? null
+                          : DecorationImage(
+                              image: NetworkImage(tournament.winnerPhotoUrl!),
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                    child: tournament.winnerPhotoUrl == null
+                        ? Icon(
+                            Icons.person,
+                            size: 16,
+                            color: theme.colorScheme.onPrimary.withValues(
+                              alpha: 0.7,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 6),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 110),
+                    child: Text(
+                      tournament.winnerNickname ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: brand.brandGold,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: brand.brandGold, width: 1.5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      tournamentStageLabel(tournament.stage),
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: brand.brandGold,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -998,6 +1264,13 @@ class _HomeBottomNavigation extends GetView<HomeController> {
             ),
             const _BottomNavigationDivider(),
             _BottomNavigationItem(
+              tab: HomeTab.tournament,
+              icon: Icons.account_tree_outlined,
+              label: TranslationKeys.tabTournament.tr,
+              isSelected: selected == HomeTab.tournament,
+            ),
+            const _BottomNavigationDivider(),
+            _BottomNavigationItem(
               tab: HomeTab.leaderboard,
               icon: Icons.emoji_events_outlined,
               label: TranslationKeys.tabTop30.tr,
@@ -1048,14 +1321,18 @@ class _BottomNavigationItem extends GetView<HomeController> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 30, color: color),
+              Icon(icon, size: 28, color: color),
               if (label != null) ...[
                 const SizedBox(height: 2),
-                Text(
-                  label!,
-                  style: theme.textTheme.bodyLarge!.copyWith(
-                    fontSize: 15,
-                    color: color,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label!,
+                    maxLines: 1,
+                    style: theme.textTheme.bodyLarge!.copyWith(
+                      fontSize: 13,
+                      color: color,
+                    ),
                   ),
                 ),
               ],

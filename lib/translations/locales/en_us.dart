@@ -201,4 +201,50 @@ const Map<String, String> enUs = {
   TranslationKeys.rateAppLater: 'Later',
   TranslationKeys.rateAppDecline: 'No thanks',
   TranslationKeys.sendEmote: 'Send an emoji',
+  TranslationKeys.tabTournament: 'Tournament',
+  TranslationKeys.joinTournament: 'Join a Tournament',
+  TranslationKeys.tournamentsEmpty:
+      'No tournaments yet. Join the lobby to start the first one!',
+  TranslationKeys.tournamentNumber: 'Tournament #@number',
+  TranslationKeys.tournamentPlayersCount: '@count players',
+  TranslationKeys.tournamentLive: 'Live',
+  TranslationKeys.stageElimination: 'Elimination round',
+  TranslationKeys.stageQuarterfinals: 'Quarterfinals',
+  TranslationKeys.stageSemifinals: 'Semifinals',
+  TranslationKeys.stageFinal: 'Final',
+  TranslationKeys.stageThirdPlace: '3rd place',
+  TranslationKeys.stageRoundOf: 'Round of @count',
+  TranslationKeys.tournamentHowTitle: 'How tournaments work',
+  TranslationKeys.tournamentHowBody:
+      'A new tournament starts every 30 minutes, as soon as at least 4 '
+      'players are waiting in the lobby. An even number of players is '
+      'selected, and the earliest to join are prioritised.\n\n'
+      'If the number of participants is a power of two (4, 8, 16…), the '
+      'knockout begins right away: pairings are drawn randomly each round, '
+      'winners advance, and the semifinal losers play for 3rd place.\n\n'
+      'Otherwise the tournament opens with an elimination round: random '
+      'pairs, a win is worth 3 points, a draw 1 point each, a loss 0. The '
+      'largest power of two that fits the field then qualifies, ranked by '
+      'points, then ELO rating, then earliest lobby join.\n\n'
+      'Drawn knockout games are decided in the same order: elimination '
+      'points, then ELO, then join time.\n\n'
+      'Leaving the app, starting another game or losing your connection '
+      'removes you from the lobby. Games use the usual clocks (15s per '
+      'move + 5min bank), so a missing player forfeits on time.',
+  TranslationKeys.tournamentHowFooter: 'Good luck!',
+  TranslationKeys.tournamentLobbyTitle: 'Tournament Lobby',
+  TranslationKeys.tournamentNextStart: 'Next tournament starts in',
+  TranslationKeys.tournamentMinPlayers:
+      'Starts every 30 minutes with at least 4 players.',
+  TranslationKeys.tournamentLobbyPlayers: 'Players in the lobby: @count',
+  TranslationKeys.tournamentJoinFailed:
+      'Could not join the tournament lobby.',
+  TranslationKeys.tournamentYourMatchReady: 'Your match is ready — play!',
+  TranslationKeys.tournamentFixtures: 'Fixtures',
+  TranslationKeys.tournamentTable: 'Table',
+  TranslationKeys.tournamentStandings: 'Standings',
+  TranslationKeys.tournamentPts: 'pts',
+  TranslationKeys.replayPrevious: 'Previous move',
+  TranslationKeys.replayPlay: 'Play / pause',
+  TranslationKeys.replayNext: 'Next move',
 };
