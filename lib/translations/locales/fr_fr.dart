@@ -260,6 +260,7 @@ const Map<String, String> frFr = {
   TranslationKeys.tournamentTable: 'Tableau',
   TranslationKeys.tournamentStandings: 'Classement',
   TranslationKeys.tournamentPts: 'pts',
+  TranslationKeys.tournamentMatchNumber: 'Match n°@number',
   TranslationKeys.replayPrevious: 'Coup précédent',
   TranslationKeys.replayPlay: 'Lecture / pause',
   TranslationKeys.replayNext: 'Coup suivant',

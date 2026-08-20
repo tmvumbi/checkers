@@ -199,6 +199,7 @@ abstract final class TranslationKeys {
   static const String tournamentTable = 'tournament_table';
   static const String tournamentStandings = 'tournament_standings';
   static const String tournamentPts = 'tournament_pts';
+  static const String tournamentMatchNumber = 'tournament_match_number';
   static const String replayPrevious = 'replay_previous';
   static const String replayPlay = 'replay_play';
   static const String replayNext = 'replay_next';

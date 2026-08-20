@@ -123,13 +123,27 @@ if t["status"] != "knockout" or t["stage"] != "sf":
     fail(f"expected knockout sf after elimination, got {t}")
 qualified = rest("GET",
     f"/rest/v1/tournament_players?tournament_id=eq.{tid}"
-    f"&eliminated=eq.false&select=uid,points", players[0]["token"])
+    f"&eliminated=eq.false&select=uid,points,rating,join_order",
+    players[0]["token"])
 if len(qualified) != 4:
     fail(f"expected 4 qualifiers, got {len(qualified)}")
 winners_pts = sorted(q["points"] for q in qualified)
 if winners_pts[-3:] != [3, 3, 3]:
     fail(f"expected three 3-point winners qualified, got {winners_pts}")
 ok("top 4 qualified by points -> semifinals created")
+
+# Knockout entry is seeded from the standings: 1v4 and 2v3, no re-draw.
+seeds = [q["uid"] for q in sorted(
+    qualified,
+    key=lambda q: (-q["points"], -q["rating"], q["join_order"]))]
+sf = rest("GET",
+    f"/rest/v1/tournament_matches?tournament_id=eq.{tid}&stage=eq.sf"
+    f"&select=match_index,p1_uid,p2_uid&order=match_index",
+    players[0]["token"])
+if (sf[0]["p1_uid"], sf[0]["p2_uid"]) != (seeds[0], seeds[3]) or \
+   (sf[1]["p1_uid"], sf[1]["p2_uid"]) != (seeds[1], seeds[2]):
+    fail(f"expected seeded sf pairing 1v4 / 2v3, got {sf} for seeds {seeds}")
+ok("knockout entry seeded from standings (1v4, 2v3)")
 
 resolve_stage("sf", 2)
 
@@ -160,5 +174,62 @@ ranks = rest("GET",
 if [r["final_rank"] for r in ranks] != [1, 2, 3, 4]:
     fail(f"expected final ranks 1-4, got {ranks}")
 ok(f"tournament finished; podium set (winner {t['winner_uid'][:8]}…)")
+
+# Scenario 2: 8 players (power of two) -> straight knockout, and later
+# rounds must follow the bracket: winner m1 vs winner m2, etc.
+players2 = []
+for i in range(8):
+    s = rest("POST", "/auth/v1/signup", body={})
+    token, uid = s["access_token"], s["user"]["id"]
+    rest("POST", "/rest/v1/profiles", token,
+         {"id": uid, "nickname": f"KoBot{i}", "is_anonymous": True})
+    joined = rest("POST", "/rest/v1/rpc/join_tournament_lobby", token, {})
+    if not (joined or {}).get("joined"):
+        fail(f"scenario 2 lobby join failed: {joined}")
+    players2.append({"token": token, "uid": uid})
+    time.sleep(0.2)
+res = admin_sql("select public.try_start_tournament()")
+started = res[0]["try_start_tournament"]
+if not started.get("started") or started.get("players") != 8:
+    fail(f"scenario 2 did not start with 8: {started}")
+tid = started["tournament_id"]
+players = players2  # by_uid/resolve_stage now act on scenario 2
+t = rest("GET", f"/rest/v1/tournaments?id=eq.{tid}&select=*",
+         players[0]["token"])[0]
+if t["status"] != "knockout" or t["stage"] != "qf":
+    fail(f"expected straight quarterfinals for 8 players, got {t}")
+ok("8-player field skips elimination -> quarterfinals")
+
+qf = rest("GET",
+    f"/rest/v1/tournament_matches?tournament_id=eq.{tid}&stage=eq.qf"
+    f"&select=match_index,p1_uid&order=match_index", players[0]["token"])
+resolve_stage("qf", 4)
+sf = rest("GET",
+    f"/rest/v1/tournament_matches?tournament_id=eq.{tid}&stage=eq.sf"
+    f"&select=match_index,p1_uid,p2_uid&order=match_index",
+    players[0]["token"])
+qf_winners = [m["p1_uid"] for m in qf]  # p1 always won (p2 resigned)
+if (sf[0]["p1_uid"], sf[0]["p2_uid"]) != (qf_winners[0], qf_winners[1]) or \
+   (sf[1]["p1_uid"], sf[1]["p2_uid"]) != (qf_winners[2], qf_winners[3]):
+    fail(f"semifinals do not follow the bracket: {sf} vs {qf_winners}")
+ok("semifinals follow the bracket (w1 v w2, w3 v w4) — no re-draw")
+
+resolve_stage("sf", 2)
+finals = rest("GET",
+    f"/rest/v1/tournament_matches?tournament_id=eq.{tid}"
+    f"&stage=in.(f,third)&select=stage,p1_uid,p2_uid",
+    players[0]["token"])
+f_match = next(m for m in finals if m["stage"] == "f")
+if (f_match["p1_uid"], f_match["p2_uid"]) != (qf_winners[0], qf_winners[2]):
+    fail(f"final does not follow the bracket: {f_match}")
+ok("final follows the bracket (sf1 winner v sf2 winner)")
+
+resolve_stage("f", 1)
+resolve_stage("third", 1)
+t = rest("GET", f"/rest/v1/tournaments?id=eq.{tid}&select=*",
+         players[0]["token"])[0]
+if t["status"] != "finished":
+    fail(f"scenario 2 not finished: {t}")
+ok("8-player knockout finished cleanly")
 
 print("ALL TOURNAMENT FLOW CHECKS PASSED")

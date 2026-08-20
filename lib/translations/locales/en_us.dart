@@ -244,6 +244,7 @@ const Map<String, String> enUs = {
   TranslationKeys.tournamentTable: 'Table',
   TranslationKeys.tournamentStandings: 'Standings',
   TranslationKeys.tournamentPts: 'pts',
+  TranslationKeys.tournamentMatchNumber: 'Match @number',
   TranslationKeys.replayPrevious: 'Previous move',
   TranslationKeys.replayPlay: 'Play / pause',
   TranslationKeys.replayNext: 'Next move',
