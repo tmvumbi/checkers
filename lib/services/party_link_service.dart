@@ -37,10 +37,22 @@ class PartyLinkService extends GetxService {
     final links = _appLinks ?? AppLinks();
     links.getInitialLink().then((uri) {
       if (uri != null) {
-        _handleUri(uri);
+        _handleInitialUri(uri);
       }
     });
     _subscription = links.uriLinkStream.listen(_handleUri, onError: (_) {});
+  }
+
+  /// Cold start: wait for the landing flow to finish routing first, or
+  /// its offAllNamed(home) would wipe the deep link's navigation.
+  Future<void> _handleInitialUri(Uri uri) async {
+    for (var i = 0; i < 20; i++) {
+      if (Get.currentRoute == AppRoutes.home) {
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+    await _handleUri(uri);
   }
 
   String? gameIdFromUri(Uri uri) {
