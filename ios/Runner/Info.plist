@@ -22,7 +22,9 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
-		<key>CFBundleURLTypes</key>
+		<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a profile photo for your player avatar.</string>
+	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>

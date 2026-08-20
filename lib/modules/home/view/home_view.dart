@@ -416,6 +416,35 @@ class _LeaderboardTab extends GetView<HomeController> {
                   Icon(Icons.emoji_events, color: rankColor, size: 22),
                   const SizedBox(width: 8),
                 ],
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isPodium
+                          ? rankColor
+                          : theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                      width: 2,
+                    ),
+                    color: theme.colorScheme.shadow.withValues(alpha: 0.4),
+                    image: player.photoUrl == null
+                        ? null
+                        : DecorationImage(
+                            image: NetworkImage(player.photoUrl!),
+                            fit: BoxFit.cover,
+                          ),
+                  ),
+                  child: player.photoUrl == null
+                      ? Icon(
+                          Icons.person,
+                          size: 20,
+                          color: theme.colorScheme.onPrimary
+                              .withValues(alpha: 0.7),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

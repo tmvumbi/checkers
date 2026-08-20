@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -28,12 +30,30 @@ class EditProfileView extends GetView<EditProfileController> {
                 child: CheckersStaggeredEntrance(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      TranslationKeys.editProfileTitle.tr,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineMedium!.copyWith(
-                        color: brandTheme.brandGold,
-                      ),
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          TranslationKeys.editProfileTitle.tr,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineMedium!.copyWith(
+                            color: brandTheme.brandGold,
+                          ),
+                        ),
+                        if (Navigator.of(context).canPop())
+                          Positioned(
+                            right: -8,
+                            child: IconButton(
+                              key: const Key('edit-profile-close'),
+                              onPressed: controller.close,
+                              icon: Icon(
+                                Icons.close,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                              tooltip: TranslationKeys.close.tr,
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -47,7 +67,51 @@ class EditProfileView extends GetView<EditProfileController> {
                     ),
                     const SizedBox(height: 24),
                     _AvatarPreview(theme: theme),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 10),
+                    Obx(() {
+                      return Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          TextButton.icon(
+                            key: const Key('edit-profile-change-photo'),
+                            onPressed: controller.pickPhoto,
+                            icon: Icon(
+                              Icons.photo_library_outlined,
+                              size: 18,
+                              color: brandTheme.brandGold,
+                            ),
+                            label: Text(
+                              TranslationKeys.changePhoto.tr,
+                              style: TextStyle(
+                                color: brandTheme.brandGold,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (controller.hasVisiblePhoto)
+                            TextButton.icon(
+                              key: const Key('edit-profile-remove-photo'),
+                              onPressed: controller.removePhoto,
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: theme.colorScheme.onPrimary
+                                    .withValues(alpha: 0.8),
+                              ),
+                              label: Text(
+                                TranslationKeys.removePhoto.tr,
+                                style: TextStyle(
+                                  color: theme.colorScheme.onPrimary
+                                      .withValues(alpha: 0.8),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    }),
+                    const SizedBox(height: 14),
                     DecoratedBox(
                       decoration: BoxDecoration(
                         color: theme.colorScheme.shadow.withValues(alpha: 0.3),
@@ -124,29 +188,36 @@ class _AvatarPreview extends GetView<EditProfileController> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      final pendingPath = controller.pendingPhotoPath.value;
       final photoUrl = controller.photoUrl.value;
+      final removed = controller.removePhotoRequested.value;
+      final ImageProvider? image = pendingPath != null
+          ? FileImage(File(pendingPath))
+          : (photoUrl != null && !removed ? NetworkImage(photoUrl) : null);
       return Center(
-        child: Container(
-          width: 108,
-          height: 108,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: theme.colorScheme.onPrimary, width: 3),
-            color: theme.colorScheme.shadow.withValues(alpha: 0.35),
-            image: photoUrl == null
-                ? null
-                : DecorationImage(
-                    image: NetworkImage(photoUrl),
-                    fit: BoxFit.cover,
-                  ),
+        child: InkWell(
+          key: const Key('edit-profile-avatar'),
+          onTap: controller.pickPhoto,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 108,
+            height: 108,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: theme.colorScheme.onPrimary, width: 3),
+              color: theme.colorScheme.shadow.withValues(alpha: 0.35),
+              image: image == null
+                  ? null
+                  : DecorationImage(image: image, fit: BoxFit.cover),
+            ),
+            child: image == null
+                ? Icon(
+                    Icons.add_a_photo_outlined,
+                    size: 44,
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                  )
+                : null,
           ),
-          child: photoUrl == null
-              ? Icon(
-                  Icons.person,
-                  size: 56,
-                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
-                )
-              : null,
         ),
       );
     });
