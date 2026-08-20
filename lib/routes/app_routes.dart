@@ -9,4 +9,5 @@ abstract final class AppRoutes {
   static const String howToPlay = '/how-to-play';
   static const String messages = '/messages';
   static const String messageLink = '/messages/link';
+  static const String blocked = '/blocked';
 }

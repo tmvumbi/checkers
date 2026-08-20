@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_locales.dart';
 import '../../../data/models/online_game.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/block_service.dart';
 import '../../../shared/widgets/checkers_ad_banner.dart';
 import '../../../shared/seat_display.dart';
 import '../../../shared/widgets/checkers_background.dart';
@@ -126,7 +127,22 @@ class _PlayTab extends GetView<HomeController> {
     );
   }
 
+  /// Soft-blocked players may watch but not play (server enforces too).
+  bool _playBlocked() {
+    if (!Get.isRegistered<BlockService>()) {
+      return false;
+    }
+    if (Get.find<BlockService>().status.value.canPlay) {
+      return false;
+    }
+    showCheckersSnackbar(TranslationKeys.blockedCannotPlay.tr);
+    return true;
+  }
+
   void _showPlayPcModal(BuildContext context) {
+    if (_playBlocked()) {
+      return;
+    }
     showCheckersModal<void>(
       context: context,
       builder: (dialogContext) => const PlayPcModalContent(),
@@ -134,6 +150,9 @@ class _PlayTab extends GetView<HomeController> {
   }
 
   void _showPlayPeopleModal(BuildContext context) {
+    if (_playBlocked()) {
+      return;
+    }
     showCheckersModal<void>(
       context: context,
       builder: (dialogContext) => const PlayPeopleModalContent(),

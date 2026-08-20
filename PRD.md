@@ -303,6 +303,26 @@ AdMob via `google_mobile_ads`, mirroring kopo's `AdService` minus subscriptions:
 - AdMob apps: Android `ca-app-pub-3437010247383226~1693679988`,
   iOS `ca-app-pub-3437010247383226~4798460676`.
 
+### 5.10 Moderation: player blocking (added 2026-08-20)
+
+Admins block players from the backend (`scripts/block_player.sh`), for N days
+or permanently:
+
+- **soft**: the player connects and watches games but cannot play (Play
+  actions show a restriction notice; the server rejects any seat).
+- **full**: the player only sees a blocked screen with the duration.
+
+Enforcement is device-linked: the app registers stable OS identifiers
+(Android SSAID; on iOS a keychain-persisted UUID + identifierForVendor) via
+`sync_device_blocks`, and blocking a player flags all their known devices —
+so a signed-out or freshly re-registered account on the same device inherits
+the block. Only high-entropy OS ids are used (no fingerprinting) and
+fleet-wide degenerate values are rejected, keeping false positives to
+genuinely shared physical devices. Server-side, `game_players` /
+`game_watchers` insert triggers reject blocked uids on every play/watch
+path, so client bypasses don't work. `--unblock` revokes the block and its
+device flags; block rows are kept for audit.
+
 ---
 
 ## 6. UX specification

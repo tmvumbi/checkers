@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../services/ad_service.dart';
 import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
+import '../services/block_service.dart';
 import '../services/checkers_ai_service.dart';
 import '../services/invite_listener_service.dart';
 import '../services/online_game_service.dart';
@@ -30,6 +31,7 @@ class InitialBinding extends Bindings {
       SupabasePlayerMessageService(),
       permanent: true,
     );
+    Get.put<BlockService>(BlockService(), permanent: true);
     Get.put<TrackingConsentService>(
       AppTrackingTransparencyService(),
       permanent: true,

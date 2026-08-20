@@ -187,4 +187,11 @@ const Map<String, String> enUs = {
   TranslationKeys.messagesEmpty: 'No messages yet.',
   TranslationKeys.messageLinkLoadError: "Could not load this message's link.",
   TranslationKeys.morePrivacyOptions: 'Privacy Options',
+  TranslationKeys.blockedTitle: 'Account blocked',
+  TranslationKeys.blockedPermanentMessage:
+      'Your access to Checkers has been permanently blocked.',
+  TranslationKeys.blockedUntilMessage:
+      'Your access to Checkers has been blocked until @date.',
+  TranslationKeys.blockedCannotPlay:
+      'Your account is restricted: you can watch games but not play.',
 };

@@ -164,4 +164,8 @@ abstract final class TranslationKeys {
   static const String messagesEmpty = 'messages_empty';
   static const String messageLinkLoadError = 'message_link_load_error';
   static const String morePrivacyOptions = 'more_privacy_options';
+  static const String blockedTitle = 'blocked_title';
+  static const String blockedPermanentMessage = 'blocked_permanent_message';
+  static const String blockedUntilMessage = 'blocked_until_message';
+  static const String blockedCannotPlay = 'blocked_cannot_play';
 }

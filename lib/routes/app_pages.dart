@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../modules/app_update/view/app_update_required_view.dart';
+import '../modules/blocked/view/blocked_view.dart';
 import '../modules/edit_profile/binding/edit_profile_binding.dart';
 import '../modules/edit_profile/view/edit_profile_view.dart';
 import '../modules/game_board/binding/game_board_binding.dart';
@@ -64,6 +65,10 @@ abstract final class AppPages {
     GetPage<dynamic>(
       name: AppRoutes.messageLink,
       page: MessageLinkView.new,
+    ),
+    GetPage<dynamic>(
+      name: AppRoutes.blocked,
+      page: BlockedView.new,
     ),
   ];
 }

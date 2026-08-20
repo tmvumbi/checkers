@@ -197,4 +197,12 @@ const Map<String, String> frFr = {
   TranslationKeys.messageLinkLoadError:
       'Impossible de charger le lien de ce message.',
   TranslationKeys.morePrivacyOptions: 'Options de confidentialité',
+  TranslationKeys.blockedTitle: 'Compte bloqué',
+  TranslationKeys.blockedPermanentMessage:
+      'Votre accès à Jeu de Dame a été bloqué définitivement.',
+  TranslationKeys.blockedUntilMessage:
+      "Votre accès à Jeu de Dame a été bloqué jusqu'au @date.",
+  TranslationKeys.blockedCannotPlay:
+      'Votre compte est restreint : vous pouvez regarder des parties '
+      'mais pas jouer.',
 };

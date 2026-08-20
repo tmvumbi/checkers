@@ -11,8 +11,10 @@ import '../../../core/locale_preference.dart';
 import '../../../core/update_gate.dart';
 import '../../../core/network/api_result.dart';
 import '../../../routes/app_routes.dart';
+import '../../../data/models/block_status.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/block_service.dart';
 import '../../../services/profile_service.dart';
 import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../translations/translation_keys.dart';
@@ -53,8 +55,25 @@ class LandingController extends GetxController {
     }
     final user = _authService.currentUser;
     if (user != null) {
+      if (await _isFullyBlocked()) {
+        return;
+      }
       Get.offAllNamed<void>(AppRoutes.home);
     }
+  }
+
+  /// Syncs device identifiers + block status; routes to the blocked wall
+  /// and returns true when the player is fully blocked.
+  Future<bool> _isFullyBlocked() async {
+    if (!Get.isRegistered<BlockService>()) {
+      return false;
+    }
+    final status = await Get.find<BlockService>().sync();
+    if (status.level != BlockLevel.full) {
+      return false;
+    }
+    Get.offAllNamed<void>(AppRoutes.blocked, arguments: status);
+    return true;
   }
 
   Future<UpdateGate> _evaluateUpdateGate() async {
@@ -109,6 +128,9 @@ class LandingController extends GetxController {
     isBusy.value = false;
     result.when(
       success: (user) async {
+        if (await _isFullyBlocked()) {
+          return;
+        }
         final profileResult = await _profileService.getProfile(user.uid);
         final hasNickname = profileResult.when(
           success: (profile) => (profile?.nickname ?? '').isNotEmpty,
