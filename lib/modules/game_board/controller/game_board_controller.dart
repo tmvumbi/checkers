@@ -101,10 +101,35 @@ class GameBoardController extends GetxController {
   StreamSubscription<List<GameWatcher>>? _watchersSubscription;
   Timer? _watchHeartbeatTimer;
 
+  // Emoji exchanges (online games; spectators see both sides).
+  static const List<String> emoteChoices = [
+    '😀', '😂', '😮', '😢', '😡', '👏', '🔥', '🤝', //
+  ];
+  final RxnString bottomEmote = RxnString();
+  final RxnString topEmote = RxnString();
+  final RxBool emotePickerOpen = false.obs;
+  StreamSubscription<List<GameEmote>>? _emotesSubscription;
+  final Set<String> _seenEmoteIds = <String>{};
+  Timer? _bottomEmoteTimer;
+  Timer? _topEmoteTimer;
+  bool _emoteBacklogPrimed = false;
+
+  bool get canSendEmotes =>
+      isOnline && !isWatching && !(snapshot.value?.vsPc ?? false);
+
   /// The backend game id this board corresponds to, if any.
   String? get watchableGameId => isOnline ? args.gameId : _streamedGameId;
 
   PieceColor get humanColor => args.humanColor;
+
+  /// How many enemy pieces [color] has captured so far.
+  int capturedBy(PieceColor color) {
+    final perSide = args.rules.boardSize == 10 ? 20 : 12;
+    final opponent = color == PieceColor.white
+        ? PieceColor.black
+        : PieceColor.white;
+    return perSide - engine.pieceCount(opponent);
+  }
 
   bool get isOnline =>
       args.mode == GameBoardMode.online || args.mode == GameBoardMode.watching;
@@ -211,6 +236,7 @@ class GameBoardController extends GetxController {
     if (isOnline) {
       _startOnline();
       _startWatchersFeed(args.gameId!);
+      _startEmotesFeed(args.gameId!);
       if (isWatching) {
         _startWatcherPresence(args.gameId!);
       }
@@ -264,6 +290,60 @@ class GameBoardController extends GetxController {
   }
 
   // -------------------------------------------------------------------
+  // Emoji exchanges
+  // -------------------------------------------------------------------
+
+  void _startEmotesFeed(String gameId) {
+    _emotesSubscription?.cancel();
+    _emoteBacklogPrimed = false;
+    _emotesSubscription = _onlineGameService.watchEmotes(gameId).listen((
+      emotes,
+    ) {
+      // The first emission is backlog from before this screen opened:
+      // remember it without showing anything.
+      if (!_emoteBacklogPrimed) {
+        _emoteBacklogPrimed = true;
+        _seenEmoteIds.addAll(emotes.map((emote) => emote.id));
+        return;
+      }
+      for (final emote in emotes) {
+        if (!_seenEmoteIds.add(emote.id)) {
+          continue;
+        }
+        _showEmote(emote);
+      }
+    }, onError: (Object _) {});
+  }
+
+  void _showEmote(GameEmote emote) {
+    final bottomUid = isWatching
+        ? playerOfColor(PieceColor.white)?.uid
+        : _authService.currentUser?.uid;
+    if (emote.uid == bottomUid) {
+      bottomEmote.value = emote.emoji;
+      _bottomEmoteTimer?.cancel();
+      _bottomEmoteTimer = Timer(const Duration(seconds: 4), () {
+        bottomEmote.value = null;
+      });
+    } else {
+      topEmote.value = emote.emoji;
+      _topEmoteTimer?.cancel();
+      _topEmoteTimer = Timer(const Duration(seconds: 4), () {
+        topEmote.value = null;
+      });
+    }
+  }
+
+  Future<void> sendEmote(String emoji) async {
+    final gameId = args.gameId;
+    if (gameId == null || !canSendEmotes) {
+      return;
+    }
+    emotePickerOpen.value = false;
+    await _onlineGameService.sendEmote(gameId, emoji);
+  }
+
+  // -------------------------------------------------------------------
   // Watcher presence
   // -------------------------------------------------------------------
 
@@ -286,6 +366,9 @@ class GameBoardController extends GetxController {
   void onClose() {
     _gameSubscription?.cancel();
     _adEventWorker?.dispose();
+    _emotesSubscription?.cancel();
+    _bottomEmoteTimer?.cancel();
+    _topEmoteTimer?.cancel();
     _clockTimer?.cancel();
     _watchersSubscription?.cancel();
     _watchHeartbeatTimer?.cancel();

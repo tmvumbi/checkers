@@ -194,4 +194,11 @@ const Map<String, String> enUs = {
       'Your access to Checkers has been blocked until @date.',
   TranslationKeys.blockedCannotPlay:
       'Your account is restricted: you can watch games but not play.',
+  TranslationKeys.rateAppPromptTitle: 'Rate Checkers',
+  TranslationKeys.rateAppPromptMessage:
+      'Would you like to rate Checkers in the app store?',
+  TranslationKeys.rateAppAccept: 'Rate now',
+  TranslationKeys.rateAppLater: 'Later',
+  TranslationKeys.rateAppDecline: 'No thanks',
+  TranslationKeys.sendEmote: 'Send an emoji',
 };

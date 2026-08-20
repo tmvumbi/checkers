@@ -205,4 +205,11 @@ const Map<String, String> frFr = {
   TranslationKeys.blockedCannotPlay:
       'Votre compte est restreint : vous pouvez regarder des parties '
       'mais pas jouer.',
+  TranslationKeys.rateAppPromptTitle: 'Noter Jeu de Dame',
+  TranslationKeys.rateAppPromptMessage:
+      'Voulez-vous noter Jeu de Dame dans la boutique ?',
+  TranslationKeys.rateAppAccept: 'Noter maintenant',
+  TranslationKeys.rateAppLater: 'Plus tard',
+  TranslationKeys.rateAppDecline: 'Non merci',
+  TranslationKeys.sendEmote: 'Envoyer un emoji',
 };

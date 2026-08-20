@@ -43,6 +43,31 @@ class LeaderboardPlayer {
   }
 }
 
+class GameEmote {
+  const GameEmote({
+    required this.id,
+    required this.uid,
+    required this.emoji,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String uid;
+  final String emoji;
+  final DateTime createdAt;
+
+  factory GameEmote.fromJson(Map<String, dynamic> json) {
+    return GameEmote(
+      id: json['id'] as String,
+      uid: json['uid'] as String,
+      emoji: (json['emoji'] as String?) ?? '',
+      createdAt:
+          DateTime.tryParse((json['created_at'] as String?) ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
 abstract class OnlineGameService {
   Future<ApiResult<({String gameId, int seat})>> joinOnlineGame(String preset);
   Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames();
@@ -69,6 +94,10 @@ abstract class OnlineGameService {
     int expectedPly,
   );
   Future<ApiResult<void>> undoPcMoves(String gameId, int count);
+
+  // In-game emoji exchanges.
+  Future<ApiResult<void>> sendEmote(String gameId, String emoji);
+  Stream<List<GameEmote>> watchEmotes(String gameId);
 
   // Spectator presence.
   Future<ApiResult<void>> watchHeartbeat(String gameId);
@@ -323,6 +352,29 @@ class SupabaseOnlineGameService implements OnlineGameService {
       () =>
           _client.rpc<dynamic>('unwatch_game', params: {'p_game_id': gameId}),
     );
+  }
+
+  @override
+  Future<ApiResult<void>> sendEmote(String gameId, String emoji) {
+    return _guard(() async {
+      await _client.rpc<void>(
+        'send_emote',
+        params: {'p_game_id': gameId, 'p_emoji': emoji},
+      );
+    });
+  }
+
+  @override
+  Stream<List<GameEmote>> watchEmotes(String gameId) {
+    return _client
+        .from('game_emotes')
+        .stream(primaryKey: ['id'])
+        .eq('game_id', gameId)
+        .map((rows) {
+          final emotes = [for (final row in rows) GameEmote.fromJson(row)];
+          emotes.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          return emotes;
+        });
   }
 
   @override

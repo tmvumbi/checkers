@@ -92,6 +92,10 @@ class CheckersEngine {
 
   int get occupied => whiteBB | blackBB;
 
+  /// Pieces of [color] still on the board.
+  int pieceCount(PieceColor color) =>
+      _popCount(color == PieceColor.white ? whiteBB : blackBB);
+
   void reset() {
     whiteBB = 0;
     blackBB = 0;

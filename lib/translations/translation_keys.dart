@@ -168,4 +168,10 @@ abstract final class TranslationKeys {
   static const String blockedPermanentMessage = 'blocked_permanent_message';
   static const String blockedUntilMessage = 'blocked_until_message';
   static const String blockedCannotPlay = 'blocked_cannot_play';
+  static const String rateAppPromptTitle = 'rate_app_prompt_title';
+  static const String rateAppPromptMessage = 'rate_app_prompt_message';
+  static const String rateAppAccept = 'rate_app_accept';
+  static const String rateAppLater = 'rate_app_later';
+  static const String rateAppDecline = 'rate_app_decline';
+  static const String sendEmote = 'send_emote';
 }

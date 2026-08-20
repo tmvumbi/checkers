@@ -43,10 +43,100 @@ class HomeView extends GetView<HomeController> {
                 bottom: 8,
                 child: _HomeBottomNavigation(),
               ),
+              // Positioned so the loose Stack keeps sizing to its bounds.
+              const Positioned(
+                left: 0,
+                top: 0,
+                width: 0,
+                height: 0,
+                child: _RateAppPromptListener(),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Opens the automatic rate-app modal once the controller flags it due.
+class _RateAppPromptListener extends GetView<HomeController> {
+  const _RateAppPromptListener();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.ratingPromptDue.value) {
+        controller.ratingPromptDue.value = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            _showRateAppModal(context, controller);
+          }
+        });
+      }
+      return const SizedBox.shrink();
+    });
+  }
+
+  void _showRateAppModal(BuildContext context, HomeController controller) {
+    showCheckersModal<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final brandTheme = theme.extension<CheckersThemeExtension>()!;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              TranslationKeys.rateAppPromptTitle.tr,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium!.copyWith(
+                color: brandTheme.brandGold,
+                fontSize: 24,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              TranslationKeys.rateAppPromptMessage.tr,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge!.copyWith(
+                color: theme.colorScheme.onPrimary,
+                fontSize: 15,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 20),
+            CheckersGradientButton(
+              key: const Key('rate-app-accept'),
+              label: TranslationKeys.rateAppAccept.tr,
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                controller.acceptRatingPrompt();
+              },
+            ),
+            const SizedBox(height: 10),
+            CheckersGradientButton(
+              key: const Key('rate-app-later'),
+              label: TranslationKeys.rateAppLater.tr,
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                controller.postponeRatingPrompt();
+              },
+            ),
+            const SizedBox(height: 10),
+            CheckersGradientButton(
+              key: const Key('rate-app-decline'),
+              label: TranslationKeys.rateAppDecline.tr,
+              gradientStyle: CheckersGradientButtonStyle.logo,
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                controller.declineRatingPrompt();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

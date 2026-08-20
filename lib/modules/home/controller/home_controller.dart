@@ -13,6 +13,7 @@ import '../../../modules/game_board/models/game_board_arguments.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/ad_service.dart';
 import '../../../services/analytics_service.dart';
+import '../../../services/app_rating_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/online_game_service.dart';
 import '../../../services/player_message_service.dart';
@@ -72,10 +73,53 @@ class HomeController extends GetxController {
 
   bool get isAnonymous => _authService.currentUser?.isAnonymous ?? true;
 
+  AppRatingService? get _appRatingService =>
+      Get.isRegistered<AppRatingService>()
+      ? Get.find<AppRatingService>()
+      : null;
+
+  /// Set when the automatic rate-app prompt should appear; the view
+  /// consumes it and opens the modal.
+  final RxBool ratingPromptDue = false.obs;
+
   @override
   void onReady() {
     super.onReady();
     refreshProfile();
+    _maybeQueueRatingPrompt();
+  }
+
+  Future<void> _maybeQueueRatingPrompt() async {
+    final rating = _appRatingService;
+    if (rating == null) {
+      return;
+    }
+    await rating.recordAppOpen();
+    if (await rating.shouldShowAutomaticPrompt()) {
+      ratingPromptDue.value = true;
+    }
+  }
+
+  Future<void> acceptRatingPrompt() async {
+    final rating = _appRatingService;
+    if (rating == null) {
+      return;
+    }
+    await rating.markRated();
+    await _analyticsService.logEvent('rate_app_accepted');
+    try {
+      await rating.openStore();
+    } catch (_) {}
+  }
+
+  Future<void> postponeRatingPrompt() async {
+    await _appRatingService?.markLater();
+    await _analyticsService.logEvent('rate_app_postponed');
+  }
+
+  Future<void> declineRatingPrompt() async {
+    await _appRatingService?.markDeclined();
+    await _analyticsService.logEvent('rate_app_declined');
   }
 
   Future<void> refreshProfile() async {

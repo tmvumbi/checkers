@@ -42,6 +42,7 @@ class GameBoardView extends GetView<GameBoardController> {
                       child: Center(child: const BoardWidget()),
                     ),
                   ),
+                  const _EmotePickerBar(),
                   _OwnHeader(),
                   const WatchersBar(),
                   const SizedBox(height: 4),
@@ -106,9 +107,7 @@ class _DrawOfferBanner extends GetView<GameBoardController> {
                       onPressed: () => controller.respondDraw(false),
                       child: Text(
                         TranslationKeys.decline.tr,
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimary,
-                        ),
+                        style: TextStyle(color: theme.colorScheme.onPrimary),
                       ),
                     ),
                   ],
@@ -228,9 +227,11 @@ class _OpponentHeader extends GetView<GameBoardController> {
             : controller.isOnline && !controller.opponentConnected.value
             ? TranslationKeys.opponentDisconnected.tr
             : (controller.aiThinking.value ||
-                    controller.activeAnimation.value != null
-                ? TranslationKeys.opponentTurn.tr
-                : (controller.isHumanTurn ? TranslationKeys.yourTurn.tr : ''));
+                      controller.activeAnimation.value != null
+                  ? TranslationKeys.opponentTurn.tr
+                  : (controller.isHumanTurn
+                        ? TranslationKeys.yourTurn.tr
+                        : ''));
 
         return Row(
           children: [
@@ -267,13 +268,18 @@ class _OpponentHeader extends GetView<GameBoardController> {
                 ],
               ),
             ),
+            _EmoteBubble(emote: controller.topEmote),
+            _CapturedCountChip(
+              byColor: controller.isWatching
+                  ? PieceColor.black
+                  : (controller.humanColor == PieceColor.white
+                        ? PieceColor.black
+                        : PieceColor.white),
+            ),
+            const SizedBox(width: 4),
             if (controller.isOnline &&
                 !(controller.snapshot.value?.vsPc ?? false))
-              _ClockDisplay(
-                isOwn: false,
-                theme: theme,
-                brand: brand,
-              )
+              _ClockDisplay(isOwn: false, theme: theme, brand: brand)
             else if (controller.isOnline)
               const SizedBox(width: 26, height: 26)
             else
@@ -322,7 +328,8 @@ class _ClockDisplay extends GetView<GameBoardController> {
       final bank = isOwn
           ? controller.ownBankMs.value
           : controller.opponentBankMs.value;
-      final isActive = snap != null &&
+      final isActive =
+          snap != null &&
           snap.isPlaying &&
           (snap.sideToMove == controller.humanColor) == isOwn;
       final turnRemaining = controller.turnRemainingMs.value;
@@ -385,7 +392,7 @@ class _OwnHeader extends GetView<GameBoardController> {
             final photoUrl = controller.isWatching
                 ? white?.photoUrl
                 : controller.ownPlayer?.photoUrl ??
-                    controller.ownProfilePhotoUrl.value;
+                      controller.ownProfilePhotoUrl.value;
             return _AvatarBadge(
               icon: controller.isWatching && (white?.isBot ?? false)
                   ? Icons.smart_toy
@@ -394,6 +401,12 @@ class _OwnHeader extends GetView<GameBoardController> {
               photoUrl: photoUrl,
             );
           }),
+          _CapturedCountChip(
+            byColor: controller.isWatching
+                ? PieceColor.white
+                : controller.humanColor,
+          ),
+          _EmoteBubble(emote: controller.bottomEmote),
           const SizedBox(width: 12),
           Expanded(
             child: Obx(() {
@@ -432,8 +445,7 @@ class _OwnHeader extends GetView<GameBoardController> {
                       _ClockDisplay(
                         isOwn: true,
                         theme: theme,
-                        brand:
-                            theme.extension<CheckersThemeExtension>()!,
+                        brand: theme.extension<CheckersThemeExtension>()!,
                       ),
                       const SizedBox(width: 10),
                     ],
@@ -441,62 +453,78 @@ class _OwnHeader extends GetView<GameBoardController> {
                   ],
                 );
               }
-              return Row(
-                children: [
-                  if (!controller.isOnline && controller.args.allowUndo) ...[
+              // scaleDown keeps the button row fitting on narrow phones.
+              return FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    if (!controller.isOnline && controller.args.allowUndo) ...[
+                      CheckersSquareIconButton(
+                        key: const Key('game-undo-button'),
+                        icon: Icons.undo,
+                        dimension: 46,
+                        iconSize: 26,
+                        tooltip: TranslationKeys.undoMove.tr,
+                        onPressed: canUndo ? controller.undoLastExchange : null,
+                      ),
+                      const SizedBox(width: 10),
+                    ],
                     CheckersSquareIconButton(
-                      key: const Key('game-undo-button'),
-                      icon: Icons.undo,
+                      key: const Key('game-resign-button'),
+                      icon: Icons.flag_outlined,
                       dimension: 46,
                       iconSize: 26,
-                      tooltip: TranslationKeys.undoMove.tr,
-                      onPressed:
-                          canUndo ? controller.undoLastExchange : null,
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                  CheckersSquareIconButton(
-                    key: const Key('game-resign-button'),
-                    icon: Icons.flag_outlined,
-                    dimension: 46,
-                    iconSize: 26,
-                    tooltip: TranslationKeys.resign.tr,
-                    onPressed: controller.result.value == GameResult.ongoing
-                        ? () => _confirmResign(context)
-                        : null,
-                  ),
-                  if (controller.isOnline) ...[
-                    const SizedBox(width: 10),
-                    CheckersSquareIconButton(
-                      key: const Key('game-draw-button'),
-                      icon: Icons.handshake_outlined,
-                      dimension: 46,
-                      iconSize: 26,
-                      tooltip: TranslationKeys.offerDraw.tr,
-                      onPressed: controller.canOfferDraw
-                          ? controller.offerDraw
+                      tooltip: TranslationKeys.resign.tr,
+                      onPressed: controller.result.value == GameResult.ongoing
+                          ? () => _confirmResign(context)
                           : null,
                     ),
-                  ],
-                  const SizedBox(width: 10),
-                  CheckersSquareIconButton(
-                    key: const Key('game-rules-button'),
-                    icon: Icons.info_outline,
-                    dimension: 46,
-                    iconSize: 26,
-                    tooltip: TranslationKeys.rules.tr,
-                    onPressed: () => _showRulesModal(context, controller),
-                  ),
-                  const Spacer(),
-                  if (controller.isOnline &&
-                      !(controller.snapshot.value?.vsPc ?? false))
-                    _ClockDisplay(
-                      isOwn: true,
-                      theme: Theme.of(context),
-                      brand: Theme.of(context)
-                          .extension<CheckersThemeExtension>()!,
+                    if (controller.isOnline) ...[
+                      const SizedBox(width: 10),
+                      CheckersSquareIconButton(
+                        key: const Key('game-draw-button'),
+                        icon: Icons.handshake_outlined,
+                        dimension: 46,
+                        iconSize: 26,
+                        tooltip: TranslationKeys.offerDraw.tr,
+                        onPressed: controller.canOfferDraw
+                            ? controller.offerDraw
+                            : null,
+                      ),
+                    ],
+                    const SizedBox(width: 10),
+                    CheckersSquareIconButton(
+                      key: const Key('game-rules-button'),
+                      icon: Icons.info_outline,
+                      dimension: 46,
+                      iconSize: 26,
+                      tooltip: TranslationKeys.rules.tr,
+                      onPressed: () => _showRulesModal(context, controller),
                     ),
-                ],
+                    if (controller.canSendEmotes) ...[
+                      const SizedBox(width: 10),
+                      CheckersSquareIconButton(
+                        key: const Key('game-emote-button'),
+                        icon: Icons.emoji_emotions_outlined,
+                        dimension: 46,
+                        iconSize: 26,
+                        tooltip: TranslationKeys.sendEmote.tr,
+                        onPressed: controller.emotePickerOpen.toggle,
+                      ),
+                    ],
+                    const SizedBox(width: 10),
+                    if (controller.isOnline &&
+                        !(controller.snapshot.value?.vsPc ?? false))
+                      _ClockDisplay(
+                        isOwn: true,
+                        theme: Theme.of(context),
+                        brand: Theme.of(
+                          context,
+                        ).extension<CheckersThemeExtension>()!,
+                      ),
+                  ],
+                ),
               );
             }),
           ),
@@ -602,6 +630,147 @@ class _LeaveWatchButton extends StatelessWidget {
   }
 }
 
+/// Explicit emoji fallback (Inter has no emoji glyphs). Note: iOS 17.4+
+/// *simulators* show tofu because Flutter cannot parse their new emoji
+/// font format — real devices render fine.
+const TextStyle _emojiStyle = TextStyle(
+  fontSize: 24,
+  fontFamilyFallback: ['Apple Color Emoji', 'Noto Color Emoji'],
+);
+
+/// Briefly floats a received emoji next to a player header.
+class _EmoteBubble extends StatelessWidget {
+  const _EmoteBubble({required this.emote});
+
+  final RxnString emote;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final emoji = emote.value;
+      return AnimatedScale(
+        scale: emoji == null ? 0 : 1,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutBack,
+        child: emoji == null
+            ? const SizedBox(width: 0, height: 34)
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(emoji, style: _emojiStyle.copyWith(fontSize: 28)),
+              ),
+      );
+    });
+  }
+}
+
+/// Horizontal emoji picker shown above the bottom header while open.
+class _EmotePickerBar extends GetView<GameBoardController> {
+  const _EmotePickerBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Obx(() {
+      if (!controller.emotePickerOpen.value) {
+        return const SizedBox.shrink();
+      }
+      return Container(
+        key: const Key('emote-picker'),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.shadow.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final emoji in GameBoardController.emoteChoices)
+                InkWell(
+                  key: Key('emote-$emoji'),
+                  customBorder: const CircleBorder(),
+                  onTap: () => controller.sendEmote(emoji),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    child: Text(emoji, style: _emojiStyle),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+/// "Pieces taken" chip: a mini disc in the captured side's colors + count.
+class _CapturedCountChip extends GetView<GameBoardController> {
+  const _CapturedCountChip({required this.byColor});
+
+  /// The player whose captures are counted.
+  final PieceColor byColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Obx(() {
+      controller.boardVersion.value;
+      final count = controller.capturedBy(byColor);
+      final capturedIsWhite = byColor == PieceColor.black;
+      return Container(
+        key: Key('captured-count-${byColor.name}'),
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.shadow.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: theme.colorScheme.onPrimary.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: capturedIsWhite
+                    ? AppColors.pieceLight
+                    : AppColors.pieceDark,
+                border: Border.all(
+                  color: capturedIsWhite
+                      ? AppColors.pieceLightEdge
+                      : AppColors.pieceDarkEdge,
+                  width: 2,
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              '×$count',
+              style: theme.textTheme.bodyLarge!.copyWith(
+                color: theme.colorScheme.onPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
 class _AvatarBadge extends StatelessWidget {
   const _AvatarBadge({
     required this.icon,
@@ -626,10 +795,7 @@ class _AvatarBadge extends StatelessWidget {
         color: theme.colorScheme.shadow.withValues(alpha: 0.35),
         image: url == null
             ? null
-            : DecorationImage(
-                image: NetworkImage(url),
-                fit: BoxFit.cover,
-              ),
+            : DecorationImage(image: NetworkImage(url), fit: BoxFit.cover),
       ),
       child: url == null
           ? Icon(icon, color: theme.colorScheme.onPrimary)
@@ -725,10 +891,7 @@ class _GameOverBanner extends GetView<GameBoardController> {
             decoration: BoxDecoration(
               color: theme.colorScheme.shadow.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: theme.colorScheme.onPrimary,
-                width: 2,
-              ),
+              border: Border.all(color: theme.colorScheme.onPrimary, width: 2),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -757,8 +920,7 @@ class _GameOverBanner extends GetView<GameBoardController> {
                 else if (controller.isOnline)
                   Obx(() {
                     final waiting = controller.rematchRequested.value;
-                    final opponentWants =
-                        controller.opponentWantsRematch.value;
+                    final opponentWants = controller.opponentWantsRematch.value;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -768,9 +930,7 @@ class _GameOverBanner extends GetView<GameBoardController> {
                             child: Text(
                               TranslationKeys.opponentWantsRematch.tr,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge!
+                              style: Theme.of(context).textTheme.bodyLarge!
                                   .copyWith(
                                     color: Theme.of(context)
                                         .extension<CheckersThemeExtension>()!
@@ -784,8 +944,7 @@ class _GameOverBanner extends GetView<GameBoardController> {
                           label: waiting
                               ? TranslationKeys.rematchWaiting.tr
                               : TranslationKeys.rematch.tr,
-                          onPressed:
-                              waiting ? null : controller.requestRematch,
+                          onPressed: waiting ? null : controller.requestRematch,
                         ),
                       ],
                     );

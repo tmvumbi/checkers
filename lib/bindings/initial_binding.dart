@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../services/ad_service.dart';
 import '../services/analytics_service.dart';
+import '../services/app_rating_service.dart';
 import '../services/auth_service.dart';
 import '../services/block_service.dart';
 import '../services/checkers_ai_service.dart';
@@ -32,6 +33,7 @@ class InitialBinding extends Bindings {
       permanent: true,
     );
     Get.put<BlockService>(BlockService(), permanent: true);
+    Get.lazyPut<AppRatingService>(RateMyAppRatingService.new, fenix: true);
     Get.put<TrackingConsentService>(
       AppTrackingTransparencyService(),
       permanent: true,
