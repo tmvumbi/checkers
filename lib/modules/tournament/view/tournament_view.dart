@@ -231,16 +231,29 @@ class _Podium extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brand = theme.extension<CheckersThemeExtension>()!;
-    final medals = <(String, String?)>[
-      ('🥇', detail.summary.winnerUid),
-      ('🥈', detail.players
-          .where((p) => p.finalRank == 2)
-          .map((p) => p.uid)
-          .firstOrNull),
-      ('🥉', detail.players
-          .where((p) => p.finalRank == 3)
-          .map((p) => p.uid)
-          .firstOrNull),
+    // Icon-drawn medals (emoji don't render on iOS simulators).
+    final medals = <(Color, String, String?)>[
+      (
+        const Color(0xFFFFC801),
+        TranslationKeys.podiumFirst.tr,
+        detail.summary.winnerUid,
+      ),
+      (
+        const Color(0xFFC0C6CF),
+        TranslationKeys.podiumSecond.tr,
+        detail.players
+            .where((p) => p.finalRank == 2)
+            .map((p) => p.uid)
+            .firstOrNull,
+      ),
+      (
+        const Color(0xFFCD7F32),
+        TranslationKeys.podiumThird.tr,
+        detail.players
+            .where((p) => p.finalRank == 3)
+            .map((p) => p.uid)
+            .firstOrNull,
+      ),
     ];
     return Container(
       key: const Key('tournament-podium'),
@@ -256,14 +269,28 @@ class _Podium extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final (medal, uid) in medals)
+          for (final (color, label, uid) in medals)
             if (uid != null)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
                   children: [
-                    Text(medal, style: const TextStyle(fontSize: 18)),
+                    Icon(Icons.emoji_events, size: 19, color: color),
                     const SizedBox(width: 8),
+                    SizedBox(
+                      width: 86,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         detail.players
