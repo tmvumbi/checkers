@@ -436,6 +436,15 @@ class _OwnHeader extends GetView<GameBoardController> {
                       ),
                       const SizedBox(width: 12),
                       CheckersSquareIconButton(
+                        key: const Key('replay-close'),
+                        icon: Icons.close,
+                        dimension: 44,
+                        iconSize: 26,
+                        tooltip: TranslationKeys.close.tr,
+                        onPressed: Get.back<void>,
+                      ),
+                      const SizedBox(width: 8),
+                      CheckersSquareIconButton(
                         key: const Key('replay-prev'),
                         icon: Icons.skip_previous,
                         dimension: 44,
