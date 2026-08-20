@@ -243,14 +243,25 @@ class _OpponentHeader extends GetView<GameBoardController> {
 
         return Row(
           children: [
-            _AvatarBadge(
-              icon:
-                  (!controller.isOnline && !controller.isReplay) ||
-                      (opponent?.isBot ?? false)
-                  ? Icons.smart_toy
-                  : Icons.person,
-              borderColor: theme.colorScheme.onPrimary,
-              photoUrl: opponent?.photoUrl,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _AvatarBadge(
+                  icon:
+                      (!controller.isOnline && !controller.isReplay) ||
+                          (opponent?.isBot ?? false)
+                      ? Icons.smart_toy
+                      : Icons.person,
+                  borderColor: theme.colorScheme.onPrimary,
+                  photoUrl: opponent?.photoUrl,
+                ),
+                // Emote bubble hangs just below the avatar.
+                Positioned(
+                  left: 8,
+                  top: 52,
+                  child: _EmoteChatBubble(emote: controller.topEmote),
+                ),
+              ],
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -278,7 +289,6 @@ class _OpponentHeader extends GetView<GameBoardController> {
                 ],
               ),
             ),
-            _EmoteBubble(emote: controller.topEmote),
             _CapturedCountChip(
               byColor: controller.spectatorLayout
                   ? PieceColor.black
@@ -747,6 +757,54 @@ class _EmoteGlyph extends StatelessWidget {
       return Text(emoji, style: TextStyle(fontSize: size * 0.85));
     }
     return Image.asset(asset, width: size, height: size);
+  }
+}
+
+/// Chat-style bubble hanging below the opponent's avatar: rounded
+/// rectangle with a square top-left corner pointing at the photo.
+class _EmoteChatBubble extends StatelessWidget {
+  const _EmoteChatBubble({required this.emote});
+
+  final RxnString emote;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Obx(() {
+      final emoji = emote.value;
+      return AnimatedScale(
+        scale: emoji == null ? 0 : 1,
+        alignment: Alignment.topLeft,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutBack,
+        child: emoji == null
+            ? const SizedBox.shrink()
+            : Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.shadow.withValues(alpha: 0.92),
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                    bottomRight: Radius.circular(14),
+                  ),
+                  border: Border.all(
+                    color: theme.colorScheme.onPrimary.withValues(
+                      alpha: 0.55,
+                    ),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.shadow.withValues(alpha: 0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: _EmoteGlyph(emoji: emoji, size: 26),
+              ),
+      );
+    });
   }
 }
 
