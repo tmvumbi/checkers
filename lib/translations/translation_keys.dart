@@ -203,6 +203,9 @@ abstract final class TranslationKeys {
   static const String podiumFirst = 'podium_first';
   static const String podiumSecond = 'podium_second';
   static const String podiumThird = 'podium_third';
+  static const String podiumFirstShort = 'podium_first_short';
+  static const String podiumSecondShort = 'podium_second_short';
+  static const String podiumThirdShort = 'podium_third_short';
   static const String replayPrevious = 'replay_previous';
   static const String replayPlay = 'replay_play';
   static const String replayNext = 'replay_next';

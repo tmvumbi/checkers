@@ -10,6 +10,7 @@ import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
 import '../controller/tournament_controller.dart';
 import 'widgets/bracket_view.dart';
+import 'widgets/podium_view.dart';
 
 class TournamentView extends GetView<TournamentController> {
   const TournamentView({super.key});
@@ -71,7 +72,7 @@ class TournamentView extends GetView<TournamentController> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                     child: summary.isFinished
-                        ? _Podium(detail: detail, theme: theme)
+                        ? TournamentPodium(detail: detail)
                         : Row(
                             children: [
                               Container(
@@ -217,100 +218,6 @@ class _ViewToggle extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Podium extends StatelessWidget {
-  const _Podium({required this.detail, required this.theme});
-
-  final TournamentDetail detail;
-  final ThemeData theme;
-
-  @override
-  Widget build(BuildContext context) {
-    final brand = theme.extension<CheckersThemeExtension>()!;
-    // Icon-drawn medals (emoji don't render on iOS simulators).
-    final medals = <(Color, String, String?)>[
-      (
-        const Color(0xFFFFC801),
-        TranslationKeys.podiumFirst.tr,
-        detail.summary.winnerUid,
-      ),
-      (
-        const Color(0xFFC0C6CF),
-        TranslationKeys.podiumSecond.tr,
-        detail.players
-            .where((p) => p.finalRank == 2)
-            .map((p) => p.uid)
-            .firstOrNull,
-      ),
-      (
-        const Color(0xFFCD7F32),
-        TranslationKeys.podiumThird.tr,
-        detail.players
-            .where((p) => p.finalRank == 3)
-            .map((p) => p.uid)
-            .firstOrNull,
-      ),
-    ];
-    return Container(
-      key: const Key('tournament-podium'),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.shadow.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: brand.brandGold.withValues(alpha: 0.8),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final (color, label, uid) in medals)
-            if (uid != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    Icon(Icons.emoji_events, size: 19, color: color),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 86,
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge!.copyWith(
-                          color: color,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        detail.players
-                                .where((p) => p.uid == uid)
-                                .map((p) => p.nickname)
-                                .firstOrNull ??
-                            '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge!.copyWith(
-                          color: theme.colorScheme.onPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-        ],
       ),
     );
   }
