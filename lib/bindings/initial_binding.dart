@@ -6,6 +6,7 @@ import '../services/checkers_ai_service.dart';
 import '../services/invite_listener_service.dart';
 import '../services/online_game_service.dart';
 import '../services/party_link_service.dart';
+import '../services/player_message_service.dart';
 import '../services/presence_service.dart';
 import '../services/profile_photo_service.dart';
 import '../services/profile_service.dart';
@@ -23,6 +24,10 @@ class InitialBinding extends Bindings {
     Get.lazyPut<AiService>(IsolateAiService.new, fenix: true);
     Get.lazyPut<OnlineGameService>(SupabaseOnlineGameService.new, fenix: true);
     Get.put<PresenceService>(PresenceService(), permanent: true);
+    Get.put<PlayerMessageService>(
+      SupabasePlayerMessageService(),
+      permanent: true,
+    );
     Get.put<InviteListenerService>(InviteListenerService(), permanent: true);
     Get.put<PartyLinkService>(PartyLinkService(), permanent: true);
   }

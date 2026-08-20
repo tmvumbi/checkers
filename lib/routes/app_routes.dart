@@ -7,4 +7,6 @@ abstract final class AppRoutes {
   static const String invitePlayers = '/invite-players';
   static const String gameBoard = '/game-board';
   static const String howToPlay = '/how-to-play';
+  static const String messages = '/messages';
+  static const String messageLink = '/messages/link';
 }

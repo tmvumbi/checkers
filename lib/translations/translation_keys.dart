@@ -159,4 +159,8 @@ abstract final class TranslationKeys {
   static const String winReasonResignation = 'win_reason_resignation';
   static const String winReasonTimeout = 'win_reason_timeout';
   static const String winReasonAbandonment = 'win_reason_abandonment';
+  static const String messages = 'messages';
+  static const String messagesTitle = 'messages_title';
+  static const String messagesEmpty = 'messages_empty';
+  static const String messageLinkLoadError = 'message_link_load_error';
 }

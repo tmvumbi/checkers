@@ -14,6 +14,7 @@ import '../../../routes/app_routes.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/online_game_service.dart';
+import '../../../services/player_message_service.dart';
 import '../../../services/profile_service.dart';
 import '../../../translations/translation_keys.dart';
 
@@ -25,18 +26,33 @@ class HomeController extends GetxController {
     ProfileService? profileService,
     AnalyticsService? analyticsService,
     OnlineGameService? onlineGameService,
+    PlayerMessageService? playerMessageService,
   }) : _authService = authService ?? Get.find(),
        _profileService = profileService ?? Get.find(),
        _analyticsService = analyticsService ?? Get.find(),
-       _onlineGameServiceOverride = onlineGameService;
+       _onlineGameServiceOverride = onlineGameService,
+       _playerMessageServiceOverride = playerMessageService;
 
   final AuthService _authService;
   final ProfileService _profileService;
   final AnalyticsService _analyticsService;
   final OnlineGameService? _onlineGameServiceOverride;
+  final PlayerMessageService? _playerMessageServiceOverride;
 
   OnlineGameService get _onlineGameService =>
       _onlineGameServiceOverride ?? Get.find();
+
+  // Absent in test harnesses that don't register the global service.
+  PlayerMessageService? get _playerMessageService =>
+      _playerMessageServiceOverride ??
+      (Get.isRegistered<PlayerMessageService>()
+          ? Get.find<PlayerMessageService>()
+          : null);
+
+  bool get hasPlayerMessages =>
+      _playerMessageService?.messages.isNotEmpty ?? false;
+  int get playerUnreadMessageCount =>
+      _playerMessageService?.unreadMessageCount.value ?? 0;
 
   final Rx<HomeTab> tab = HomeTab.play.obs;
   final Rxn<UserProfile> profile = Rxn<UserProfile>();
@@ -121,6 +137,7 @@ class HomeController extends GetxController {
 
   void changeLocale(Locale locale) {
     LocalePreference.save(locale);
+    _playerMessageService?.setLanguage(locale);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Get.updateLocale(locale);
     });

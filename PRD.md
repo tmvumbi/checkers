@@ -263,6 +263,17 @@ Reuse kopo's More tab minus monetization:
 
 Removed vs kopo: Remove Ads, Privacy Options (UMP), Other Games, Facebook page.
 
+### 5.6.1 Admin → player messages (kopo parity)
+
+Admins can send messages to players: **public** broadcasts (per language) or
+**private** messages targeted at one uid. Stored in `player_messages`
+(Supabase, RLS scopes rows to public + own private; realtime), each row has
+HTML text and/or an image, an optional link (opens in an in-app webview), a
+publish/expiry window, and an enabled flag. The Play-tab header shows a mail
+button with an unread badge only when active messages exist; opening the
+Messages page marks them read (read ids persisted locally per language).
+Admins insert rows via `scripts/send_player_message.sh`.
+
 ### 5.7 How to Play
 
 Native animated explainer (kopo's `how_to_play` module pattern, no video): board & setup, man moves, captures & mandatory capture, majority rule, king moves (flying vs one-step per current settings), promotion, draws, clocks. Content adapts to the currently selected preset. Localized EN/FR.

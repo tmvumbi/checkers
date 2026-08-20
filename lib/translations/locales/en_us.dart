@@ -182,4 +182,8 @@ const Map<String, String> enUs = {
   TranslationKeys.winReasonResignation: 'By resignation',
   TranslationKeys.winReasonTimeout: 'On time',
   TranslationKeys.winReasonAbandonment: 'Opponent left the game',
+  TranslationKeys.messages: 'Messages',
+  TranslationKeys.messagesTitle: 'Messages',
+  TranslationKeys.messagesEmpty: 'No messages yet.',
+  TranslationKeys.messageLinkLoadError: "Could not load this message's link.",
 };

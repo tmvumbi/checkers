@@ -12,6 +12,9 @@ import '../modules/invite_players/binding/invite_players_binding.dart';
 import '../modules/invite_players/view/invite_players_view.dart';
 import '../modules/landing/binding/landing_binding.dart';
 import '../modules/landing/view/landing_view.dart';
+import '../modules/messages/binding/messages_binding.dart';
+import '../modules/messages/view/message_link_view.dart';
+import '../modules/messages/view/messages_view.dart';
 import '../modules/online_lobby/binding/online_lobby_binding.dart';
 import '../modules/online_lobby/view/online_lobby_view.dart';
 import 'app_routes.dart';
@@ -52,6 +55,15 @@ abstract final class AppPages {
     GetPage<dynamic>(
       name: AppRoutes.appUpdateRequired,
       page: AppUpdateRequiredView.new,
+    ),
+    GetPage<dynamic>(
+      name: AppRoutes.messages,
+      page: MessagesView.new,
+      binding: MessagesBinding(),
+    ),
+    GetPage<dynamic>(
+      name: AppRoutes.messageLink,
+      page: MessageLinkView.new,
     ),
   ];
 }

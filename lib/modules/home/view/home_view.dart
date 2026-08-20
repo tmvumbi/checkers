@@ -11,6 +11,7 @@ import '../../../shared/widgets/checkers_gradient_button.dart';
 import '../../../shared/widgets/checkers_logo_mark.dart';
 import '../../../shared/widgets/checkers_modal.dart';
 import '../../../shared/widgets/checkers_snackbar.dart';
+import '../../../shared/widgets/checkers_square_icon_button.dart';
 import '../../../shared/widgets/checkers_staggered_entrance.dart';
 import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
@@ -212,6 +213,12 @@ class _HomeProfileHeader extends GetView<HomeController> {
                 ],
               ),
             ),
+          if (controller.hasPlayerMessages) ...[
+            const SizedBox(width: 10),
+            _HomeMessagesButton(
+              unreadMessageCount: controller.playerUnreadMessageCount,
+            ),
+          ],
         ],
       );
     });
@@ -925,6 +932,61 @@ class _BottomNavigationDivider extends StatelessWidget {
       width: 1,
       height: 40,
       color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.4),
+    );
+  }
+}
+
+class _HomeMessagesButton extends StatelessWidget {
+  const _HomeMessagesButton({required this.unreadMessageCount});
+
+  final int unreadMessageCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final brandTheme = theme.extension<CheckersThemeExtension>()!;
+    final label = unreadMessageCount > 99 ? '99+' : '$unreadMessageCount';
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CheckersSquareIconButton(
+          key: const Key('home-messages-button'),
+          icon: Icons.mail_outline,
+          dimension: 48,
+          iconSize: 28,
+          onPressed: () => Get.toNamed<void>(AppRoutes.messages),
+          tooltip: TranslationKeys.messages.tr,
+        ),
+        if (unreadMessageCount > 0)
+          Positioned(
+            right: -5,
+            top: -5,
+            child: Container(
+              key: const Key('home-messages-badge'),
+              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: brandTheme.brandGold,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: theme.colorScheme.onPrimary,
+                  width: 1.5,
+                ),
+              ),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge!.copyWith(
+                  color: theme.colorScheme.shadow,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

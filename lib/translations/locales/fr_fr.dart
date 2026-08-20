@@ -191,4 +191,9 @@ const Map<String, String> frFr = {
   TranslationKeys.winReasonResignation: 'Par abandon',
   TranslationKeys.winReasonTimeout: 'Au temps',
   TranslationKeys.winReasonAbandonment: "L'adversaire a quitté la partie",
+  TranslationKeys.messages: 'Messages',
+  TranslationKeys.messagesTitle: 'Messages',
+  TranslationKeys.messagesEmpty: 'Aucun message pour le moment.',
+  TranslationKeys.messageLinkLoadError:
+      'Impossible de charger le lien de ce message.',
 };
