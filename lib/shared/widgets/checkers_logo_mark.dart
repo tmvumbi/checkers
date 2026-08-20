@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_fonts.dart';
+import '../../core/constants/app_strings.dart';
 import '../../themes/app_theme.dart';
 import '../../translations/translation_keys.dart';
 
@@ -63,40 +64,59 @@ class _CheckersLogoMarkState extends State<CheckersLogoMark>
         SizedBox(height: widget.compact ? 10 : 16),
         ScaleTransition(
           scale: _wordmarkScale,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: brandTheme.logoGradient,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: theme.colorScheme.onPrimary, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.shadow.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.compact ? 14 : 22,
-                vertical: widget.compact ? 6 : 10,
-              ),
-              // FittedBox keeps longer wordmarks (FR "JEU DE DAME") on one
-              // line on narrow screens.
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  TranslationKeys.appWordmark.tr,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontFamily: AppFonts.iosevkaCharon,
-                    fontSize: widget.compact ? 22 : 30,
-                    letterSpacing: widget.compact ? 3 : 5,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: brandTheme.logoGradient,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
                     color: theme.colorScheme.onPrimary,
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.shadow.withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: widget.compact ? 14 : 22,
+                    vertical: widget.compact ? 6 : 10,
+                  ),
+                  // FittedBox keeps longer wordmarks (FR "JEU DE DAME") on one
+                  // line on narrow screens.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      TranslationKeys.appWordmark.tr,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontFamily: AppFonts.iosevkaCharon,
+                        fontSize: widget.compact ? 22 : 30,
+                        letterSpacing: widget.compact ? 3 : 5,
+                        color: theme.colorScheme.onPrimary,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 4),
+              Text(
+                'v${AppStrings.currentAppVersion}',
+                key: const Key('app-version-label'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: brandTheme.brandGold,
+                  fontSize: widget.compact ? 11 : 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ],

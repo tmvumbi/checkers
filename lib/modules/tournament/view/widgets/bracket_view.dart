@@ -34,32 +34,107 @@ class TournamentBracket extends GetView<TournamentController> {
           height: layout.size.height,
           child: Stack(
             children: [
+              // Connector lines fade in once the cards have landed.
               Positioned.fill(
-                child: CustomPaint(
-                  painter: _ConnectorPainter(
-                    connectors: layout.connectors,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onPrimary.withValues(alpha: 0.45),
+                child: _RevealItem(
+                  index: layout.cards.length,
+                  slide: false,
+                  child: CustomPaint(
+                    painter: _ConnectorPainter(
+                      connectors: layout.connectors,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onPrimary.withValues(alpha: 0.45),
+                    ),
                   ),
                 ),
               ),
-              for (final placed in layout.cards)
+              for (final (index, placed) in layout.cards.indexed)
                 Positioned(
                   left: placed.offset.dx,
                   top: placed.offset.dy,
                   width: _cardWidth,
                   height: _cardHeight,
-                  child: _BracketMatchCard(
-                    detail: detail,
-                    match: placed.match,
-                    matchNumber: placed.number,
+                  child: _RevealItem(
+                    index: index,
+                    child: _BracketMatchCard(
+                      detail: detail,
+                      match: placed.match,
+                      matchNumber: placed.number,
+                    ),
                   ),
                 ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Staggered pop-in used by the bracket cards (and, last, the lines).
+class _RevealItem extends StatefulWidget {
+  const _RevealItem({
+    required this.index,
+    required this.child,
+    this.slide = true,
+  });
+
+  final int index;
+  final Widget child;
+  final bool slide;
+
+  @override
+  State<_RevealItem> createState() => _RevealItemState();
+}
+
+class _RevealItemState extends State<_RevealItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+  late final Animation<double> _t = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutBack,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(Duration(milliseconds: 70 * widget.index), () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _t,
+      child: widget.child,
+      builder: (context, child) {
+        final value = _t.value;
+        return Opacity(
+          opacity: _controller.value.clamp(0, 1),
+          child: widget.slide
+              ? Transform.translate(
+                  offset: Offset(0, (1 - value) * 18),
+                  child: Transform.scale(
+                    scale: 0.92 + 0.08 * value,
+                    child: child,
+                  ),
+                )
+              : child,
+        );
+      },
     );
   }
 }
@@ -126,9 +201,7 @@ class _BracketLayout {
         }
         if (feederCenters.isNotEmpty) {
           y =
-              feederCenters
-                  .map((c) => c.dy)
-                  .reduce((a, b) => a + b) /
+              feederCenters.map((c) => c.dy).reduce((a, b) => a + b) /
                   feederCenters.length -
               _cardHeight / 2;
         } else {
@@ -159,9 +232,7 @@ class _BracketLayout {
     // Third-place match sits under the final.
     final third = detail.matches.where((m) => m.stage == 'third').toList();
     if (third.isNotEmpty) {
-      final finalCard = cards
-          .where((p) => p.match.stage == 'f')
-          .toList();
+      final finalCard = cards.where((p) => p.match.stage == 'f').toList();
       final x = finalCard.isEmpty
           ? stages.length * (_cardWidth + _columnGap)
           : finalCard.first.offset.dx;
@@ -253,9 +324,7 @@ class _BracketMatchCard extends GetView<TournamentController> {
                   ? Icon(
                       Icons.person,
                       size: 12,
-                      color: theme.colorScheme.onPrimary.withValues(
-                        alpha: 0.7,
-                      ),
+                      color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
                     )
                   : null,
             ),
@@ -312,9 +381,7 @@ class _BracketMatchCard extends GetView<TournamentController> {
                 gradient: LinearGradient(
                   colors: [AppColors.gold, Color(0xFFD99C00)],
                 ),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(7),
-                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(7)),
               ),
               child: Text(
                 tournamentStageLabel(match.stage).toUpperCase(),
