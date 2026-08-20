@@ -3,9 +3,9 @@ import 'package:flutter_confetti/flutter_confetti.dart';
 import 'package:get/get.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../../../data/models/online_game.dart';
 import '../../../engine/checkers_engine.dart';
 import '../../../engine/rules_config.dart';
+import '../../../shared/seat_display.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
 import '../../../shared/widgets/checkers_modal.dart';
@@ -123,31 +123,6 @@ class _DrawOfferBanner extends GetView<GameBoardController> {
   }
 }
 
-/// Localized difficulty label from either the enum or a backend string.
-String _levelLabel(String? levelName) {
-  return switch (levelName) {
-    'easy' => TranslationKeys.difficultyEasy.tr,
-    'medium' => TranslationKeys.difficultyMedium.tr,
-    'hard' => TranslationKeys.difficultyHard.tr,
-    _ => '',
-  };
-}
-
-/// Display name for a seat: bots render as "PC (level)".
-String _seatName(
-  OnlineGamePlayer? player, {
-  required String? aiLevel,
-}) {
-  if (player == null) {
-    return '…';
-  }
-  if (player.isBot) {
-    final label = _levelLabel(aiLevel);
-    return label.isEmpty ? 'PC' : 'PC ($label)';
-  }
-  return player.nickname;
-}
-
 void _showRulesModal(BuildContext context, GameBoardController controller) {
   final rules = controller.args.rules;
   final presetLabel = switch (rules.preset) {
@@ -238,11 +213,11 @@ class _OpponentHeader extends GetView<GameBoardController> {
             ? controller.playerOfColor(PieceColor.black)
             : controller.opponentPlayer;
         final name = controller.isOnline
-            ? _seatName(
+            ? seatDisplayName(
                 opponent,
                 aiLevel: controller.snapshot.value?.aiLevel,
               )
-            : 'PC (${_levelLabel(controller.args.aiLevel!.name)})';
+            : 'PC (${difficultyLabel(controller.args.aiLevel!.name)})';
         final subtitle = controller.isWatching
             ? ''
             : controller.isOnline && !controller.opponentConnected.value
@@ -419,7 +394,7 @@ class _OwnHeader extends GetView<GameBoardController> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        _seatName(
+                        seatDisplayName(
                           white,
                           aiLevel: controller.snapshot.value?.aiLevel,
                         ),

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../core/constants/app_locales.dart';
 import '../../../routes/app_routes.dart';
+import '../../../shared/seat_display.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_flag_icon.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
@@ -290,7 +291,10 @@ class _WatchTab extends GetView<HomeController> {
                 children: [
                   Expanded(
                     child: Text(
-                      white.isEmpty ? '…' : white.first.nickname,
+                      seatDisplayName(
+                        white.isEmpty ? null : white.first,
+                        aiLevel: game.aiLevel,
+                      ),
                       textAlign: TextAlign.end,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -312,7 +316,10 @@ class _WatchTab extends GetView<HomeController> {
                   ),
                   Expanded(
                     child: Text(
-                      black.isEmpty ? '…' : black.first.nickname,
+                      seatDisplayName(
+                        black.isEmpty ? null : black.first,
+                        aiLevel: game.aiLevel,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyLarge!.copyWith(
