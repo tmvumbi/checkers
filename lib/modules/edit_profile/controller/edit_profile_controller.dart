@@ -7,6 +7,7 @@ import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/profile_photo_service.dart';
 import '../../../services/profile_service.dart';
+import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../translations/translation_keys.dart';
 
 class EditProfileController extends GetxController {
@@ -123,7 +124,7 @@ class EditProfileController extends GetxController {
       );
       if (uploadFailed) {
         isSaving.value = false;
-        Get.snackbar('', TranslationKeys.profileSaveFailed.tr);
+        showCheckersSnackbar(TranslationKeys.profileSaveFailed.tr);
         return;
       }
     } else if (removePhotoRequested.value) {
@@ -149,7 +150,7 @@ class EditProfileController extends GetxController {
     result.when(
       success: (_) => Get.offAllNamed<void>(AppRoutes.home),
       failure: (_) {
-        Get.snackbar('', TranslationKeys.profileSaveFailed.tr);
+        showCheckersSnackbar(TranslationKeys.profileSaveFailed.tr);
       },
     );
   }

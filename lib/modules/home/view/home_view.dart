@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/constants/app_locales.dart';
+import '../../../data/models/online_game.dart';
 import '../../../routes/app_routes.dart';
 import '../../../shared/seat_display.dart';
 import '../../../shared/widgets/checkers_background.dart';
@@ -9,6 +10,7 @@ import '../../../shared/widgets/checkers_flag_icon.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
 import '../../../shared/widgets/checkers_logo_mark.dart';
 import '../../../shared/widgets/checkers_modal.dart';
+import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../shared/widgets/checkers_staggered_entrance.dart';
 import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
@@ -289,6 +291,11 @@ class _WatchTab extends GetView<HomeController> {
               ),
               child: Row(
                 children: [
+                  _SeatAvatar(
+                    player: white.isEmpty ? null : white.first,
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       seatDisplayName(
@@ -327,6 +334,11 @@ class _WatchTab extends GetView<HomeController> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  _SeatAvatar(
+                    player: black.isEmpty ? null : black.first,
+                    theme: theme,
                   ),
                 ],
               ),
@@ -603,8 +615,7 @@ class _MoreTab extends GetView<HomeController> {
                 if (dialogContext.mounted) {
                   Navigator.of(dialogContext).pop();
                 }
-                Get.snackbar(
-                  '',
+                showCheckersSnackbar(
                   sent
                       ? TranslationKeys.feedbackThanks.tr
                       : TranslationKeys.feedbackFailed.tr,
@@ -652,8 +663,7 @@ class _MoreTab extends GetView<HomeController> {
                 Navigator.of(dialogContext).pop();
                 final deleted = await controller.deleteAccount();
                 if (!deleted) {
-                  Get.snackbar(
-                    '',
+                  showCheckersSnackbar(
                     TranslationKeys.deleteAccountFailed.tr,
                   );
                 }
@@ -915,6 +925,43 @@ class _BottomNavigationDivider extends StatelessWidget {
       width: 1,
       height: 40,
       color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.4),
+    );
+  }
+}
+
+class _SeatAvatar extends StatelessWidget {
+  const _SeatAvatar({required this.player, required this.theme});
+
+  final OnlineGamePlayer? player;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = player?.photoUrl;
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+          width: 2,
+        ),
+        color: theme.colorScheme.shadow.withValues(alpha: 0.4),
+        image: photoUrl == null
+            ? null
+            : DecorationImage(
+                image: NetworkImage(photoUrl),
+                fit: BoxFit.cover,
+              ),
+      ),
+      child: photoUrl == null
+          ? Icon(
+              (player?.isBot ?? false) ? Icons.smart_toy : Icons.person,
+              size: 18,
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+            )
+          : null,
     );
   }
 }

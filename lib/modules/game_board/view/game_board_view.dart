@@ -230,8 +230,11 @@ class _OpponentHeader extends GetView<GameBoardController> {
         return Row(
           children: [
             _AvatarBadge(
-              icon: controller.isOnline ? Icons.person : Icons.smart_toy,
+              icon: !controller.isOnline || (opponent?.isBot ?? false)
+                  ? Icons.smart_toy
+                  : Icons.person,
               borderColor: theme.colorScheme.onPrimary,
+              photoUrl: opponent?.photoUrl,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -369,10 +372,23 @@ class _OwnHeader extends GetView<GameBoardController> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          _AvatarBadge(
-            icon: Icons.person,
-            borderColor: AppColors.gold,
-          ),
+          Obx(() {
+            controller.boardVersion.value;
+            final white = controller.isWatching
+                ? controller.playerOfColor(PieceColor.white)
+                : null;
+            final photoUrl = controller.isWatching
+                ? white?.photoUrl
+                : controller.ownPlayer?.photoUrl ??
+                    controller.ownProfilePhotoUrl.value;
+            return _AvatarBadge(
+              icon: controller.isWatching && (white?.isBot ?? false)
+                  ? Icons.smart_toy
+                  : Icons.person,
+              borderColor: AppColors.gold,
+              photoUrl: photoUrl,
+            );
+          }),
           const SizedBox(width: 12),
           Expanded(
             child: Obx(() {
@@ -582,14 +598,20 @@ class _LeaveWatchButton extends StatelessWidget {
 }
 
 class _AvatarBadge extends StatelessWidget {
-  const _AvatarBadge({required this.icon, required this.borderColor});
+  const _AvatarBadge({
+    required this.icon,
+    required this.borderColor,
+    this.photoUrl,
+  });
 
   final IconData icon;
   final Color borderColor;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final url = photoUrl;
     return Container(
       width: 46,
       height: 46,
@@ -597,8 +619,16 @@ class _AvatarBadge extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: borderColor, width: 2),
         color: theme.colorScheme.shadow.withValues(alpha: 0.35),
+        image: url == null
+            ? null
+            : DecorationImage(
+                image: NetworkImage(url),
+                fit: BoxFit.cover,
+              ),
       ),
-      child: Icon(icon, color: theme.colorScheme.onPrimary),
+      child: url == null
+          ? Icon(icon, color: theme.colorScheme.onPrimary)
+          : null,
     );
   }
 }

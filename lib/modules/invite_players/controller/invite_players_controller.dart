@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../routes/app_routes.dart';
+import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../translations/translation_keys.dart';
 import '../../online_lobby/controller/online_lobby_controller.dart';
 
@@ -110,7 +111,7 @@ class InvitePlayersController extends GetxController {
       );
     } catch (_) {
       invitingUid.value = null;
-      Get.snackbar('', TranslationKeys.inviteFailed.tr);
+      showCheckersSnackbar(TranslationKeys.inviteFailed.tr);
     }
   }
 
@@ -137,7 +138,7 @@ class InvitePlayersController extends GetxController {
         ),
       );
     } catch (_) {
-      Get.snackbar('', TranslationKeys.inviteFailed.tr);
+      showCheckersSnackbar(TranslationKeys.inviteFailed.tr);
     }
   }
 

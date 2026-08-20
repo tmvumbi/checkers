@@ -14,6 +14,7 @@ import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/checkers_ai_service.dart';
 import '../../../services/online_game_service.dart';
+import '../../../services/profile_service.dart';
 import '../models/game_board_arguments.dart';
 
 /// Board-square animation step for multi-hop capture rendering.
@@ -31,6 +32,7 @@ class GameBoardController extends GetxController {
     AnalyticsService? analyticsService,
     OnlineGameService? onlineGameService,
     AuthService? authService,
+    ProfileService? profileService,
     Duration? aiMinThinkTime,
   }) : args =
            arguments ??
@@ -44,6 +46,7 @@ class GameBoardController extends GetxController {
        _analyticsService = analyticsService ?? Get.find(),
        _onlineGameServiceOverride = onlineGameService,
        _authServiceOverride = authService,
+       _profileServiceOverride = profileService,
        _aiMinThinkTime = aiMinThinkTime ?? const Duration(milliseconds: 800);
 
   final GameBoardArguments args;
@@ -51,6 +54,7 @@ class GameBoardController extends GetxController {
   final AnalyticsService _analyticsService;
   final OnlineGameService? _onlineGameServiceOverride;
   final AuthService? _authServiceOverride;
+  final ProfileService? _profileServiceOverride;
   final Duration _aiMinThinkTime;
 
   // Resolved lazily so PC-mode tests need not register online services.
@@ -118,6 +122,41 @@ class GameBoardController extends GetxController {
     return null;
   }
 
+  /// Own profile photo for the local seat badge; snapshot players carry
+  /// photos for online seats, but local PC games have no snapshot.
+  final RxnString ownProfilePhotoUrl = RxnString();
+
+  Future<void> _loadOwnProfilePhoto() async {
+    try {
+      final uid = _authService.currentUser?.uid;
+      if (uid == null) {
+        return;
+      }
+      final ProfileService profiles = _profileServiceOverride ?? Get.find();
+      final result = await profiles.getProfile(uid);
+      result.when(
+        success: (profile) => ownProfilePhotoUrl.value = profile?.photoUrl,
+        failure: (_) {},
+      );
+    } catch (_) {
+      // No auth/profile service wired (offline/unit-test contexts).
+    }
+  }
+
+  OnlineGamePlayer? get ownPlayer {
+    final uid = _authService.currentUser?.uid;
+    final players = snapshot.value?.players;
+    if (uid == null || players == null) {
+      return null;
+    }
+    for (final player in players) {
+      if (player.uid == uid) {
+        return player;
+      }
+    }
+    return null;
+  }
+
   OnlineGamePlayer? get opponentPlayer {
     final uid = _authService.currentUser?.uid;
     final players = snapshot.value?.players;
@@ -150,6 +189,9 @@ class GameBoardController extends GetxController {
   @override
   void onReady() {
     super.onReady();
+    if (!isWatching) {
+      _loadOwnProfilePhoto();
+    }
     _analyticsService.logEvent('game_started', {
       'mode': args.mode.name,
       'preset': args.rules.preset.name,

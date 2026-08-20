@@ -14,6 +14,7 @@ import '../../../routes/app_routes.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/profile_service.dart';
+import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../translations/translation_keys.dart';
 
 class LandingController extends GetxController {
@@ -123,7 +124,7 @@ class LandingController extends GetxController {
         if (error.code.endsWith('cancelled')) {
           return;
         }
-        Get.snackbar('', TranslationKeys.signInFailed.tr);
+        showCheckersSnackbar(TranslationKeys.signInFailed.tr);
       },
     );
   }
