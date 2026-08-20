@@ -307,15 +307,6 @@ class _OwnHeader extends GetView<GameBoardController> {
                 final theme = Theme.of(context);
                 return Row(
                   children: [
-                    CheckersSquareIconButton(
-                      key: const Key('game-leave-watch'),
-                      icon: Icons.arrow_back,
-                      dimension: 46,
-                      iconSize: 26,
-                      tooltip: TranslationKeys.backHome.tr,
-                      onPressed: Get.back<void>,
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         white?.nickname ?? '…',
@@ -328,13 +319,16 @@ class _OwnHeader extends GetView<GameBoardController> {
                         ),
                       ),
                     ),
-                    if (!(controller.snapshot.value?.vsPc ?? false))
+                    if (!(controller.snapshot.value?.vsPc ?? false)) ...[
                       _ClockDisplay(
                         isOwn: true,
                         theme: theme,
                         brand:
                             theme.extension<CheckersThemeExtension>()!,
                       ),
+                      const SizedBox(width: 10),
+                    ],
+                    const _LeaveWatchButton(),
                   ],
                 );
               }
@@ -437,6 +431,55 @@ class _OwnHeader extends GetView<GameBoardController> {
           ],
         );
       },
+    );
+  }
+}
+
+class _LeaveWatchButton extends StatelessWidget {
+  const _LeaveWatchButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.onPrimary.withValues(alpha: 0.72),
+          width: 2,
+        ),
+        color: theme.colorScheme.shadow.withValues(alpha: 0.35),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('game-leave-watch'),
+          onTap: Get.back<void>,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.logout,
+                  size: 22,
+                  color: theme.colorScheme.onPrimary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  TranslationKeys.leaveGame.tr,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
