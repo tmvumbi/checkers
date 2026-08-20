@@ -1,9 +1,14 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/constants/app_locales.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/locale_preference.dart';
+import '../../../core/update_gate.dart';
 import '../../../core/network/api_result.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/analytics_service.dart';
@@ -25,7 +30,8 @@ class LandingController extends GetxController {
   final AnalyticsService _analyticsService;
 
   final RxBool isBusy = false.obs;
-  final Rx<Locale> locale = AppLocales.english.obs;
+  late final Rx<Locale> locale =
+      AppLocales.supportedLocaleFor(Get.locale).obs;
 
   bool get supportsAppleSignIn => _authService.supportsAppleSignIn;
 
@@ -36,8 +42,12 @@ class LandingController extends GetxController {
   }
 
   Future<void> _checkVersionThenContinue() async {
-    if (await _isUpdateRequired()) {
-      Get.offAllNamed<void>(AppRoutes.appUpdateRequired);
+    final gate = await _evaluateUpdateGate();
+    if (gate.updateRequired) {
+      Get.offAllNamed<void>(
+        AppRoutes.appUpdateRequired,
+        arguments: gate.storeUrl,
+      );
       return;
     }
     final user = _authService.currentUser;
@@ -46,38 +56,29 @@ class LandingController extends GetxController {
     }
   }
 
-  Future<bool> _isUpdateRequired() async {
+  Future<UpdateGate> _evaluateUpdateGate() async {
     try {
       final row = await Supabase.instance.client
           .from('app_config')
           .select('config')
           .eq('id', 'public')
           .maybeSingle();
-      final minVersion =
-          ((row?['config'] as Map?)?['min_app_version'] as String?) ?? '0.0.0';
-      return compareVersions(AppStrings.currentAppVersion, minVersion) < 0;
+      final config =
+          (row?['config'] as Map?)?.cast<String, dynamic>() ?? const {};
+      return UpdateGate.evaluate(
+        config,
+        isIOS: !kIsWeb && Platform.isIOS,
+        currentVersion: AppStrings.currentAppVersion,
+      );
     } catch (_) {
       // Never block play on a config fetch failure.
-      return false;
+      return const UpdateGate(updateRequired: false);
     }
-  }
-
-  /// Compares dotted versions; negative when [a] is older than [b].
-  static int compareVersions(String a, String b) {
-    final partsA = a.split('.').map(int.tryParse).toList();
-    final partsB = b.split('.').map(int.tryParse).toList();
-    for (var i = 0; i < 3; i++) {
-      final valueA = i < partsA.length ? (partsA[i] ?? 0) : 0;
-      final valueB = i < partsB.length ? (partsB[i] ?? 0) : 0;
-      if (valueA != valueB) {
-        return valueA - valueB;
-      }
-    }
-    return 0;
   }
 
   void changeLocale(Locale newLocale) {
     locale.value = newLocale;
+    LocalePreference.save(newLocale);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Get.updateLocale(newLocale);
     });

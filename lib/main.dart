@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'bindings/initial_binding.dart';
 import 'core/config/supabase_config.dart';
 import 'core/constants/app_strings.dart';
+import 'core/locale_preference.dart';
 import 'routes/app_pages.dart';
 import 'routes/app_routes.dart';
 import 'themes/app_theme.dart';
@@ -13,6 +14,7 @@ import 'translations/app_translations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final savedLocale = await LocalePreference.load();
   await Supabase.initialize(
     url: SupabaseConfig.url,
     // The self-hosted stack issues legacy JWT keys; publishableKey does not
@@ -20,18 +22,20 @@ Future<void> main() async {
     // ignore: deprecated_member_use
     anonKey: SupabaseConfig.anonKey,
   );
-  runApp(const CheckersApp());
+  runApp(CheckersApp(locale: savedLocale));
 }
 
 class CheckersApp extends StatelessWidget {
   const CheckersApp({
     this.initialBinding,
     this.initialRoute = AppRoutes.landing,
+    this.locale,
     super.key,
   });
 
   final Bindings? initialBinding;
   final String initialRoute;
+  final Locale? locale;
 
   static const SystemUiOverlayStyle _systemUiOverlayStyle =
       SystemUiOverlayStyle(
@@ -53,7 +57,7 @@ class CheckersApp extends StatelessWidget {
         initialRoute: initialRoute,
         getPages: AppPages.pages,
         translations: AppTranslations(),
-        locale: const Locale('en', 'US'),
+        locale: locale ?? const Locale('en', 'US'),
         fallbackLocale: const Locale('en', 'US'),
         theme: AppTheme.light,
         themeMode: ThemeMode.light,

@@ -60,6 +60,7 @@ abstract final class TranslationKeys {
   static const String deleteAccountFailed = 'delete_account_failed';
   static const String updateRequiredTitle = 'update_required_title';
   static const String updateRequiredMessage = 'update_required_message';
+  static const String updateNow = 'update_now';
 
   // Watch & leaderboard
   static const String watchersTitle = 'watchers_title';

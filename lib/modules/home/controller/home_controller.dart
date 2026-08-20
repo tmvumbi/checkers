@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/constants/app_locales.dart';
+import '../../../core/locale_preference.dart';
 import '../../../data/models/online_game.dart';
 import '../../../data/models/user_profile.dart';
 import '../../../modules/game_board/models/game_board_arguments.dart';
@@ -119,6 +120,7 @@ class HomeController extends GetxController {
   }
 
   void changeLocale(Locale locale) {
+    LocalePreference.save(locale);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Get.updateLocale(locale);
     });

@@ -63,6 +63,7 @@ const Map<String, String> enUs = {
   TranslationKeys.updateRequiredMessage:
       'This version of Checkers is no longer supported. Please update to '
       'keep playing.',
+  TranslationKeys.updateNow: 'Update now',
 
   TranslationKeys.watchersTitle: 'Watching now',
   TranslationKeys.watchersLabel: 'Watchers',

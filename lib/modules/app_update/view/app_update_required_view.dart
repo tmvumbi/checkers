@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/widgets/checkers_background.dart';
+import '../../../shared/widgets/checkers_gradient_button.dart';
 import '../../../shared/widgets/checkers_logo_mark.dart';
 import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
@@ -13,6 +15,7 @@ class AppUpdateRequiredView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final brand = theme.extension<CheckersThemeExtension>()!;
+    final storeUrl = Get.arguments as String?;
 
     return Scaffold(
       body: CheckersBackground(
@@ -43,6 +46,17 @@ class AppUpdateRequiredView extends StatelessWidget {
                       height: 1.4,
                     ),
                   ),
+                  if (storeUrl != null && storeUrl.isNotEmpty) ...[
+                    const SizedBox(height: 28),
+                    CheckersGradientButton(
+                      key: const Key('update-now-button'),
+                      label: TranslationKeys.updateNow.tr,
+                      onPressed: () => launchUrl(
+                        Uri.parse(storeUrl),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
