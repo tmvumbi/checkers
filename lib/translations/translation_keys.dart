@@ -62,6 +62,8 @@ abstract final class TranslationKeys {
   static const String watchersTitle = 'watchers_title';
   static const String watchersLabel = 'watchers_label';
   static const String leaveGame = 'leave_game';
+  static const String optionOn = 'option_on';
+  static const String optionOff = 'option_off';
   static const String loadMore = 'load_more';
   static const String watchEmpty = 'watch_empty';
   static const String leaderboardEmpty = 'leaderboard_empty';

@@ -3,8 +3,9 @@ import 'package:flutter_confetti/flutter_confetti.dart';
 import 'package:get/get.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../../../engine/ai/ai_config.dart';
+import '../../../data/models/online_game.dart';
 import '../../../engine/checkers_engine.dart';
+import '../../../engine/rules_config.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
 import '../../../shared/widgets/checkers_modal.dart';
@@ -122,6 +123,107 @@ class _DrawOfferBanner extends GetView<GameBoardController> {
   }
 }
 
+/// Localized difficulty label from either the enum or a backend string.
+String _levelLabel(String? levelName) {
+  return switch (levelName) {
+    'easy' => TranslationKeys.difficultyEasy.tr,
+    'medium' => TranslationKeys.difficultyMedium.tr,
+    'hard' => TranslationKeys.difficultyHard.tr,
+    _ => '',
+  };
+}
+
+/// Display name for a seat: bots render as "PC (level)".
+String _seatName(
+  OnlineGamePlayer? player, {
+  required String? aiLevel,
+}) {
+  if (player == null) {
+    return '…';
+  }
+  if (player.isBot) {
+    final label = _levelLabel(aiLevel);
+    return label.isEmpty ? 'PC' : 'PC ($label)';
+  }
+  return player.nickname;
+}
+
+void _showRulesModal(BuildContext context, GameBoardController controller) {
+  final rules = controller.args.rules;
+  final presetLabel = switch (rules.preset) {
+    RulesPreset.international => TranslationKeys.presetInternational.tr,
+    RulesPreset.brazilian => TranslationKeys.presetBrazilian.tr,
+    RulesPreset.american => TranslationKeys.presetAmerican.tr,
+    RulesPreset.custom => TranslationKeys.presetCustom.tr,
+  };
+  final allowUndo = controller.isOnline
+      ? (controller.snapshot.value?.allowUndo ?? false)
+      : controller.args.allowUndo;
+  final showUndoRow =
+      controller.args.mode == GameBoardMode.pc ||
+      (controller.snapshot.value?.vsPc ?? false);
+
+  String onOff(bool value) =>
+      value ? TranslationKeys.optionOn.tr : TranslationKeys.optionOff.tr;
+
+  showCheckersModal<void>(
+    context: context,
+    builder: (dialogContext) {
+      final theme = Theme.of(dialogContext);
+      final brand = theme.extension<CheckersThemeExtension>()!;
+
+      Widget row(String label, String value) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              Text(
+                value,
+                style: theme.textTheme.bodyLarge!.copyWith(
+                  color: brand.brandGold,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CheckersModalHeader(
+            title: TranslationKeys.rules.tr,
+            closeKey: const Key('rules-modal-close'),
+            onClose: () => Navigator.of(dialogContext).pop(),
+          ),
+          const SizedBox(height: 8),
+          row('', presetLabel),
+          row(
+            TranslationKeys.boardSize.tr,
+            '${rules.boardSize}x${rules.boardSize}',
+          ),
+          row(TranslationKeys.backwardCapture.tr, onOff(rules.backwardCapture)),
+          row(TranslationKeys.flyingKing.tr, onOff(rules.flyingKing)),
+          if (showUndoRow)
+            row(TranslationKeys.allowUndoMoves.tr, onOff(allowUndo)),
+        ],
+      );
+    },
+  );
+}
+
 class _OpponentHeader extends GetView<GameBoardController> {
   @override
   Widget build(BuildContext context) {
@@ -136,12 +238,11 @@ class _OpponentHeader extends GetView<GameBoardController> {
             ? controller.playerOfColor(PieceColor.black)
             : controller.opponentPlayer;
         final name = controller.isOnline
-            ? (opponent?.nickname ?? '…')
-            : 'PC — ${switch (controller.args.aiLevel!) {
-                AiLevel.easy => TranslationKeys.difficultyEasy.tr,
-                AiLevel.medium => TranslationKeys.difficultyMedium.tr,
-                AiLevel.hard => TranslationKeys.difficultyHard.tr,
-              }}';
+            ? _seatName(
+                opponent,
+                aiLevel: controller.snapshot.value?.aiLevel,
+              )
+            : 'PC (${_levelLabel(controller.args.aiLevel!.name)})';
         final subtitle = controller.isWatching
             ? ''
             : controller.isOnline && !controller.opponentConnected.value
@@ -307,9 +408,21 @@ class _OwnHeader extends GetView<GameBoardController> {
                 final theme = Theme.of(context);
                 return Row(
                   children: [
+                    CheckersSquareIconButton(
+                      key: const Key('game-rules-button'),
+                      icon: Icons.info_outline,
+                      dimension: 46,
+                      iconSize: 26,
+                      tooltip: TranslationKeys.rules.tr,
+                      onPressed: () => _showRulesModal(context, controller),
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        white?.nickname ?? '…',
+                        _seatName(
+                          white,
+                          aiLevel: controller.snapshot.value?.aiLevel,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyLarge!.copyWith(
@@ -369,6 +482,15 @@ class _OwnHeader extends GetView<GameBoardController> {
                           : null,
                     ),
                   ],
+                  const SizedBox(width: 10),
+                  CheckersSquareIconButton(
+                    key: const Key('game-rules-button'),
+                    icon: Icons.info_outline,
+                    dimension: 46,
+                    iconSize: 26,
+                    tooltip: TranslationKeys.rules.tr,
+                    onPressed: () => _showRulesModal(context, controller),
+                  ),
                   const Spacer(),
                   if (controller.isOnline &&
                       !(controller.snapshot.value?.vsPc ?? false))

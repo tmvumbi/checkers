@@ -39,7 +39,7 @@ void main() {
     controller.onSquareTapped(move.to);
 
     // Wait out both animation windows (human + AI).
-    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    await Future<void>.delayed(const Duration(milliseconds: 3500));
     expect(controller.engine.moveHistory.length, 2);
     expect(controller.engine.sideToMove, PieceColor.white);
   });
@@ -59,7 +59,7 @@ void main() {
     final move = controller.legalMoves.first;
     controller.onSquareTapped(move.from);
     controller.onSquareTapped(move.to);
-    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    await Future<void>.delayed(const Duration(milliseconds: 3500));
     expect(controller.engine.moveHistory.length, 2);
     expect(controller.canUndo, isTrue);
 
@@ -73,7 +73,7 @@ void main() {
     final move = controller.legalMoves.first;
     controller.onSquareTapped(move.from);
     controller.onSquareTapped(move.to);
-    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    await Future<void>.delayed(const Duration(milliseconds: 3500));
     expect(controller.engine.moveHistory.length, 2);
     expect(controller.canUndo, isFalse);
   });

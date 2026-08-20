@@ -68,6 +68,8 @@ const Map<String, String> frFr = {
   TranslationKeys.watchersTitle: 'Spectateurs',
   TranslationKeys.watchersLabel: 'Spectateurs',
   TranslationKeys.leaveGame: 'Quitter',
+  TranslationKeys.optionOn: 'Activé',
+  TranslationKeys.optionOff: 'Désactivé',
   TranslationKeys.loadMore: 'Voir plus',
   TranslationKeys.watchEmpty:
       'Aucune partie en direct pour le moment. Revenez bientôt !',
