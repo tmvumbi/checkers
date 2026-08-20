@@ -216,12 +216,20 @@ class _OpponentHeader extends GetView<GameBoardController> {
         final opponent = controller.spectatorLayout
             ? controller.playerOfColor(PieceColor.black)
             : controller.opponentPlayer;
-        final name = controller.isOnline || controller.isReplay
+        var name = controller.isOnline || controller.isReplay
             ? seatDisplayName(
                 opponent,
                 aiLevel: controller.snapshot.value?.aiLevel,
               )
             : 'PC (${difficultyLabel(controller.args.aiLevel!.name)})';
+        // Human opponents carry their ELO next to the nickname.
+        final rating = controller.opponentRating.value;
+        if (rating != null &&
+            controller.isOnline &&
+            !controller.spectatorLayout &&
+            opponent?.isBot != true) {
+          name = '$name ($rating)';
+        }
         final subtitle = controller.spectatorLayout
             ? ''
             : controller.isOnline && !controller.opponentConnected.value

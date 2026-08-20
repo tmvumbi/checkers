@@ -252,6 +252,31 @@ class GameBoardController extends GetxController {
     }
   }
 
+  /// Live ELO of the human opponent, shown next to their nickname.
+  final RxnInt opponentRating = RxnInt();
+  String? _ratingFetchedFor;
+
+  void _maybeFetchOpponentRating(OnlineGameSnapshot snap) {
+    if (!isOnline || isWatching || snap.vsPc) {
+      return;
+    }
+    final uid = opponentPlayer?.uid;
+    if (uid == null || uid == _ratingFetchedFor) {
+      return;
+    }
+    _ratingFetchedFor = uid;
+    Future(() async {
+      try {
+        final ProfileService profiles = _profileServiceOverride ?? Get.find();
+        final result = await profiles.getProfile(uid);
+        result.when(
+          success: (profile) => opponentRating.value = profile?.rating,
+          failure: (_) {},
+        );
+      } catch (_) {}
+    });
+  }
+
   OnlineGamePlayer? get ownPlayer {
     final uid = _authService.currentUser?.uid;
     final players = snapshot.value?.players;
@@ -519,6 +544,7 @@ class GameBoardController extends GetxController {
   Future<void> _onSnapshot(OnlineGameSnapshot snap) async {
     snapshot.value = snap;
     opponentConnected.value = opponentPlayer?.connected ?? true;
+    _maybeFetchOpponentRating(snap);
 
     // Draw-offer bookkeeping.
     final offer = snap.drawOfferColor;
