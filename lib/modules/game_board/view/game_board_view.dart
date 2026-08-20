@@ -713,13 +713,34 @@ class _LeaveWatchButton extends StatelessWidget {
   }
 }
 
-/// Explicit emoji fallback (Inter has no emoji glyphs). Note: iOS 17.4+
-/// *simulators* show tofu because Flutter cannot parse their new emoji
-/// font format — real devices render fine.
-const TextStyle _emojiStyle = TextStyle(
-  fontSize: 24,
-  fontFamilyFallback: ['Apple Color Emoji', 'Noto Color Emoji'],
-);
+/// Emotes render from bundled Noto emoji PNGs: identical, full-color on
+/// every platform (the engine can't draw color-emoji fonts on iOS sims).
+const Map<String, String> _emoteAssets = {
+  '😀': 'assets/images/emotes/emoji_u1f600.png',
+  '😂': 'assets/images/emotes/emoji_u1f602.png',
+  '😮': 'assets/images/emotes/emoji_u1f62e.png',
+  '😢': 'assets/images/emotes/emoji_u1f622.png',
+  '😡': 'assets/images/emotes/emoji_u1f621.png',
+  '👏': 'assets/images/emotes/emoji_u1f44f.png',
+  '🔥': 'assets/images/emotes/emoji_u1f525.png',
+  '🤝': 'assets/images/emotes/emoji_u1f91d.png',
+};
+
+class _EmoteGlyph extends StatelessWidget {
+  const _EmoteGlyph({required this.emoji, required this.size});
+
+  final String emoji;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = _emoteAssets[emoji];
+    if (asset == null) {
+      return Text(emoji, style: TextStyle(fontSize: size * 0.85));
+    }
+    return Image.asset(asset, width: size, height: size);
+  }
+}
 
 /// Briefly floats a received emoji next to a player header.
 class _EmoteBubble extends StatelessWidget {
@@ -739,7 +760,7 @@ class _EmoteBubble extends StatelessWidget {
             ? const SizedBox(width: 0, height: 34)
             : Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(emoji, style: _emojiStyle.copyWith(fontSize: 28)),
+                child: _EmoteGlyph(emoji: emoji, size: 30),
               ),
       );
     });
@@ -783,7 +804,7 @@ class _EmotePickerBar extends GetView<GameBoardController> {
                       horizontal: 6,
                       vertical: 4,
                     ),
-                    child: Text(emoji, style: _emojiStyle),
+                    child: _EmoteGlyph(emoji: emoji, size: 26),
                   ),
                 ),
             ],
