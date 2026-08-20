@@ -33,7 +33,16 @@ class WatchersBar extends GetView<GameBoardController> {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            Text(
+              TranslationKeys.watchersLabel.tr,
+              style: theme.textTheme.bodyLarge!.copyWith(
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.6),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 6),
             Icon(
               Icons.visibility_outlined,
               size: 16,

@@ -60,6 +60,7 @@ abstract final class TranslationKeys {
 
   // Watch & leaderboard
   static const String watchersTitle = 'watchers_title';
+  static const String watchersLabel = 'watchers_label';
   static const String loadMore = 'load_more';
   static const String watchEmpty = 'watch_empty';
   static const String leaderboardEmpty = 'leaderboard_empty';

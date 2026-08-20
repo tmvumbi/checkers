@@ -307,6 +307,15 @@ class _OwnHeader extends GetView<GameBoardController> {
                 final theme = Theme.of(context);
                 return Row(
                   children: [
+                    CheckersSquareIconButton(
+                      key: const Key('game-leave-watch'),
+                      icon: Icons.arrow_back,
+                      dimension: 46,
+                      iconSize: 26,
+                      tooltip: TranslationKeys.backHome.tr,
+                      onPressed: Get.back<void>,
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         white?.nickname ?? '…',

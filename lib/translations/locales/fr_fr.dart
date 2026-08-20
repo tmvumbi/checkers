@@ -66,6 +66,7 @@ const Map<String, String> frFr = {
       'mettre à jour pour continuer à jouer.',
 
   TranslationKeys.watchersTitle: 'Spectateurs',
+  TranslationKeys.watchersLabel: 'Spectateurs',
   TranslationKeys.loadMore: 'Voir plus',
   TranslationKeys.watchEmpty:
       'Aucune partie en direct pour le moment. Revenez bientôt !',

@@ -64,6 +64,7 @@ const Map<String, String> enUs = {
       'keep playing.',
 
   TranslationKeys.watchersTitle: 'Watching now',
+  TranslationKeys.watchersLabel: 'Watchers',
   TranslationKeys.loadMore: 'Load more',
   TranslationKeys.watchEmpty:
       'No live games right now. Check back in a moment!',

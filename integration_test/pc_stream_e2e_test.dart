@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:checkers/core/config/supabase_config.dart';
 import 'package:checkers/main.dart' as app;
 import 'package:checkers/modules/game_board/controller/game_board_controller.dart';
