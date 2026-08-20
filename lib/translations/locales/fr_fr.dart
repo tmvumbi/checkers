@@ -264,6 +264,16 @@ const Map<String, String> frFr = {
   TranslationKeys.podiumFirst: 'Vainqueur',
   TranslationKeys.podiumSecond: '2e place',
   TranslationKeys.podiumThird: '3e place',
+  TranslationKeys.tournamentMissedTick:
+      'Pas assez de joueurs — prochaine tentative à @time.',
+  TranslationKeys.tournamentInviteTitle: 'Inviter au tournoi',
+  TranslationKeys.tournamentSendInvites: 'Envoyer les invitations (@count)',
+  TranslationKeys.tournamentInvitesSent: '@count invitation(s) envoyée(s).',
+  TranslationKeys.shareTournamentText:
+      'Rejoins mon tournoi de Jeu de Dame : @url',
+  TranslationKeys.tournamentInviteReceivedTitle: 'Invitation au tournoi',
+  TranslationKeys.tournamentInviteReceivedMessage:
+      '@name vous invite à rejoindre un tournoi !',
   TranslationKeys.podiumFirstShort: '1er',
   TranslationKeys.podiumSecondShort: '2e',
   TranslationKeys.podiumThirdShort: '3e',

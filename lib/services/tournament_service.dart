@@ -57,10 +57,14 @@ class SupabaseTournamentService implements TournamentService {
     return client.from('tournament_lobby').stream(primaryKey: ['uid']).map((
       rows,
     ) {
-      final players = [
-        for (final row in rows) TournamentLobbyPlayer.fromJson(row),
-      ];
-      players.sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
+      // Dedupe defensively: the stream can briefly hold the initial
+      // fetch and the realtime insert of the same row.
+      final byUid = <String, TournamentLobbyPlayer>{
+        for (final row in rows)
+          row['uid'] as String: TournamentLobbyPlayer.fromJson(row),
+      };
+      final players = byUid.values.toList()
+        ..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
       return players;
     });
   }

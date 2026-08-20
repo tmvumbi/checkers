@@ -248,6 +248,16 @@ const Map<String, String> enUs = {
   TranslationKeys.podiumFirst: 'Winner',
   TranslationKeys.podiumSecond: '2nd place',
   TranslationKeys.podiumThird: '3rd place',
+  TranslationKeys.tournamentMissedTick:
+      'Not enough players — next attempt at @time.',
+  TranslationKeys.tournamentInviteTitle: 'Invite to the Tournament',
+  TranslationKeys.tournamentSendInvites: 'Send invites (@count)',
+  TranslationKeys.tournamentInvitesSent: '@count invitation(s) sent.',
+  TranslationKeys.shareTournamentText:
+      'Join my Checkers tournament: @url',
+  TranslationKeys.tournamentInviteReceivedTitle: 'Tournament invite',
+  TranslationKeys.tournamentInviteReceivedMessage:
+      '@name invites you to join a tournament!',
   TranslationKeys.podiumFirstShort: '1st',
   TranslationKeys.podiumSecondShort: '2nd',
   TranslationKeys.podiumThirdShort: '3rd',

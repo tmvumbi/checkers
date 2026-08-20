@@ -36,6 +36,11 @@ class TournamentLobbyController extends GetxController {
   final RxString countdown = ''.obs;
   final RxBool joining = true.obs;
 
+  /// Transient "not enough players" notice after a missed start tick.
+  final RxnString missedTickNotice = RxnString();
+  Timer? _missedTickTimer;
+  int _lastRemainingSeconds = 0;
+
   StreamSubscription<List<TournamentLobbyPlayer>>? _lobbySubscription;
   Timer? _heartbeatTimer;
   Timer? _pollTimer;
@@ -84,6 +89,24 @@ class TournamentLobbyController extends GetxController {
     final mm = remaining.inMinutes.toString().padLeft(2, '0');
     final ss = (remaining.inSeconds % 60).toString().padLeft(2, '0');
     countdown.value = '$mm:$ss';
+
+    // The remaining time jumping back up means a start tick just passed;
+    // if the room was too small, say so instead of failing silently.
+    if (remaining.inSeconds > _lastRemainingSeconds &&
+        _lastRemainingSeconds > 0 &&
+        players.length < 4) {
+      final next = now.add(remaining);
+      final hh = next.hour.toString().padLeft(2, '0');
+      final nm = next.minute.toString().padLeft(2, '0');
+      missedTickNotice.value = TranslationKeys.tournamentMissedTick.trParams({
+        'time': '$hh:$nm',
+      });
+      _missedTickTimer?.cancel();
+      _missedTickTimer = Timer(const Duration(seconds: 10), () {
+        missedTickNotice.value = null;
+      });
+    }
+    _lastRemainingSeconds = remaining.inSeconds;
   }
 
   Future<void> _checkStarted() async {
@@ -146,6 +169,7 @@ class TournamentLobbyController extends GetxController {
     _heartbeatTimer?.cancel();
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
+    _missedTickTimer?.cancel();
     // Quitting the screen (or the app killing it) leaves the lobby; a
     // stale heartbeat covers crashes and lost connections server-side.
     _tournamentService.leaveLobby();

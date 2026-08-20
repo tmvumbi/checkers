@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../routes/app_routes.dart';
 import '../../../shared/tournament_display.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
@@ -98,7 +99,49 @@ class TournamentLobbyView extends GetView<TournamentLobbyController> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  Obx(() {
+                    final notice = controller.missedTickNotice.value;
+                    if (notice == null) {
+                      return const SizedBox(height: 16);
+                    }
+                    return Container(
+                      key: const Key('lobby-missed-tick'),
+                      margin: const EdgeInsets.only(top: 10, bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.shadow.withValues(
+                          alpha: 0.55,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.orangeAccent.withValues(alpha: 0.9),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.hourglass_bottom,
+                            size: 18,
+                            color: Colors.orangeAccent,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              notice,
+                              style: theme.textTheme.bodyLarge!.copyWith(
+                                color: theme.colorScheme.onPrimary,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                   Obx(
                     () => Text(
                       TranslationKeys.tournamentLobbyPlayers.trParams({
@@ -202,6 +245,14 @@ class TournamentLobbyView extends GetView<TournamentLobbyController> {
                     }),
                   ),
                   const SizedBox(height: 8),
+                  CheckersGradientButton(
+                    key: const Key('lobby-invite-button'),
+                    label: TranslationKeys.tournamentInviteTitle.tr,
+                    minHeight: 50,
+                    onPressed: () =>
+                        Get.toNamed<void>(AppRoutes.tournamentInvite),
+                  ),
+                  const SizedBox(height: 10),
                   CheckersGradientButton(
                     key: const Key('lobby-leave-button'),
                     label: TranslationKeys.lobbyLeave.tr,

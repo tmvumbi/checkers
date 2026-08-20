@@ -12,4 +12,5 @@ abstract final class AppRoutes {
   static const String blocked = '/blocked';
   static const String tournamentLobby = '/tournament-lobby';
   static const String tournament = '/tournament';
+  static const String tournamentInvite = '/tournament-invite';
 }

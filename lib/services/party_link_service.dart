@@ -60,7 +60,33 @@ class PartyLinkService extends GetxService {
     return null;
   }
 
+  /// `https://checkers.contribution.club/tournament` and
+  /// `checkers://tournament` open the tournament lobby.
+  bool isTournamentUri(Uri uri) {
+    final isHttp =
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host == AppStrings.partyLinkHost;
+    final isCustom = uri.scheme == AppStrings.partyLinkScheme;
+    if (!isHttp && !isCustom) {
+      return false;
+    }
+    final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    if (isCustom && uri.host == 'tournament') {
+      return true;
+    }
+    return segments.isNotEmpty && segments.first == 'tournament';
+  }
+
   Future<void> _handleUri(Uri uri) async {
+    if (isTournamentUri(uri)) {
+      try {
+        if (client.auth.currentSession == null) {
+          await client.auth.signInAnonymously();
+        }
+        Get.toNamed<void>(AppRoutes.tournamentLobby);
+      } catch (_) {}
+      return;
+    }
     final gameId = gameIdFromUri(uri);
     if (gameId == null) {
       return;

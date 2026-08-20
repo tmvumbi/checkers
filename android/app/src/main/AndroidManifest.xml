@@ -23,11 +23,17 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- app_links handles all deep links; disable Flutter's
+                 built-in navigator-based deep linking. -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Party invite links: https://checkers.contribution.club/party/<id> -->
+            <!-- Invite links: https://checkers.contribution.club/party/<id>
+                 and https://checkers.contribution.club/tournament -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -35,13 +41,18 @@
                 <data android:scheme="https"
                     android:host="checkers.contribution.club"
                     android:pathPrefix="/party"/>
+                <data android:scheme="https"
+                    android:host="checkers.contribution.club"
+                    android:pathPrefix="/tournament"/>
             </intent-filter>
-            <!-- Custom-scheme fallback: checkers://party/<id> -->
+            <!-- Custom-scheme fallbacks: checkers://party/<id>,
+                 checkers://tournament -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="checkers" android:host="party"/>
+                <data android:scheme="checkers" android:host="tournament"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
