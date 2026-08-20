@@ -1,6 +1,7 @@
 import '../translation_keys.dart';
 
 const Map<String, String> frFr = {
+  TranslationKeys.appWordmark: 'JEU DE DAME',
   TranslationKeys.landingTagline: 'Le jeu de dames, ensemble.',
   TranslationKeys.continueWithGoogle: 'Continuer avec Google',
   TranslationKeys.continueWithApple: 'Continuer avec Apple',

@@ -1,4 +1,7 @@
 abstract final class TranslationKeys {
+  // Branding
+  static const String appWordmark = 'app_wordmark';
+
   // Landing
   static const String landingTagline = 'landing_tagline';
   static const String continueWithGoogle = 'continue_with_google';

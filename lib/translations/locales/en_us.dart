@@ -1,6 +1,7 @@
 import '../translation_keys.dart';
 
 const Map<String, String> enUs = {
+  TranslationKeys.appWordmark: 'CHECKERS',
   TranslationKeys.landingTagline: 'Draughts & checkers, together.',
   TranslationKeys.continueWithGoogle: 'Continue with Google',
   TranslationKeys.continueWithApple: 'Continue with Apple',

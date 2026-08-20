@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_fonts.dart';
 import '../../themes/app_theme.dart';
+import '../../translations/translation_keys.dart';
 
 /// Animated brand mark, in the spirit of kopo's card-fan logo: a 2x2 board
 /// tile with two pieces pops in with an elastic curve while the wordmark
@@ -79,13 +81,19 @@ class _CheckersLogoMarkState extends State<CheckersLogoMark>
                 horizontal: widget.compact ? 14 : 22,
                 vertical: widget.compact ? 6 : 10,
               ),
-              child: Text(
-                'CHECKERS',
-                style: TextStyle(
-                  fontFamily: AppFonts.iosevkaCharon,
-                  fontSize: widget.compact ? 22 : 30,
-                  letterSpacing: widget.compact ? 3 : 5,
-                  color: theme.colorScheme.onPrimary,
+              // FittedBox keeps longer wordmarks (FR "JEU DE DAME") on one
+              // line on narrow screens.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  TranslationKeys.appWordmark.tr,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontFamily: AppFonts.iosevkaCharon,
+                    fontSize: widget.compact ? 22 : 30,
+                    letterSpacing: widget.compact ? 3 : 5,
+                    color: theme.colorScheme.onPrimary,
+                  ),
                 ),
               ),
             ),
