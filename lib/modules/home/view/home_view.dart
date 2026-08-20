@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_locales.dart';
 import '../../../data/models/online_game.dart';
 import '../../../routes/app_routes.dart';
+import '../../../shared/widgets/checkers_ad_banner.dart';
 import '../../../shared/seat_display.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_flag_icon.dart';
@@ -56,12 +57,24 @@ class _HomeTabBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (tab) {
+    final body = switch (tab) {
       HomeTab.play => const _PlayTab(),
       HomeTab.watch => const _WatchTab(),
       HomeTab.leaderboard => const _LeaderboardTab(),
       HomeTab.more => const _MoreTab(),
     };
+    if (tab == HomeTab.play) {
+      return body;
+    }
+    return Column(
+      children: [
+        const CheckersAdBanner(
+          key: Key('home-ad-banner'),
+          size: CheckersAdBannerSize.compactAdaptive,
+        ),
+        Expanded(child: body),
+      ],
+    );
   }
 }
 
@@ -542,6 +555,28 @@ class _MoreTab extends GetView<HomeController> {
                 key: const Key('more-feedback-button'),
                 label: TranslationKeys.moreFeedback.tr,
                 onPressed: () => _showFeedbackModal(context),
+              ),
+              // GDPR-only: consent form re-entry, required by AdMob policy.
+              Builder(
+                builder: (_) {
+                  final adService = controller.adServiceOrNull;
+                  if (adService == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return Obx(() {
+                    if (!adService.isPrivacyOptionsRequired.value) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: CheckersGradientButton(
+                        key: const Key('more-privacy-options-button'),
+                        label: TranslationKeys.morePrivacyOptions.tr,
+                        onPressed: adService.showPrivacyOptions,
+                      ),
+                    );
+                  });
+                },
               ),
               const SizedBox(height: 14),
               CheckersGradientButton(

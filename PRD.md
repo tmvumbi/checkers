@@ -34,7 +34,7 @@ Completed online games are recorded permanently in the database (with full move 
 
 ### 1.2 Non-goals (explicitly out of scope for v1)
 
-- **Advertisement** (AdMob, UMP consent, ATT) — kopo's `AdService`, `KopoAdBanner`, and related config are **not** ported.
+- ~~**Advertisement**~~ — *added post-v1 (2026-08-20) at the owner's request; see §5.9.*
 - **Subscriptions / IAP** ("Remove Ads" paywall, entitlements, receipt validation) — not ported.
 - 3+ player modes (checkers is strictly 2-player; kopo's 4-player seat logic collapses to 2 seats).
 - Tournaments, chat, puzzles, opening books, endgame tablebases (possible later).
@@ -285,6 +285,23 @@ Every online game (rated and private) is recorded permanently:
 - Final result + reason (`checkmate`-equivalent: no pieces / blocked, resignation, timeout, abandonment, draw + which draw rule, draw by agreement).
 - Full move list (per-ply `{from, to, captured[], promoted, ms_spent}`), rules config, players, ratings before/after, timestamps.
 - This powers: Watch-tab live spectating (moves stream in as they're recorded), future replays, PDN export, and anti-abuse review.
+
+### 5.9 Advertisement (added 2026-08-20, kopo parity)
+
+AdMob via `google_mobile_ads`, mirroring kopo's `AdService` minus subscriptions:
+
+- **Banners** (adaptive, compact): home Watch / Top 30 / More tabs, the game
+  board, and the Messages page. They collapse when unavailable.
+- **Interstitials**: an event counter increments on bottom-nav transitions and
+  finished PC games; every **15th** event shows an interstitial (kopo used 5).
+- **Consent**: UMP consent form (GDPR message shared with kopo's, apps added)
+  + iOS ATT prompt; EEA users get a "Privacy Options" entry in More.
+- **Remote config**: `app_config.config.ads` — `enabled`, `interstitialFrequency`,
+  per-platform banner/interstitial unit ids. Kill switch: set `enabled` false.
+- Debug builds always use Google's sample ad units; `--dart-define=CHECKERS_DISABLE_ADS=true`
+  disables ads entirely (local testing / e2e).
+- AdMob apps: Android `ca-app-pub-3437010247383226~1693679988`,
+  iOS `ca-app-pub-3437010247383226~4798460676`.
 
 ---
 

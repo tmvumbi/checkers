@@ -3,6 +3,9 @@
         android:label="checkers"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3437010247383226~1693679988" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

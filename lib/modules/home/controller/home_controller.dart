@@ -11,6 +11,7 @@ import '../../../data/models/online_game.dart';
 import '../../../data/models/user_profile.dart';
 import '../../../modules/game_board/models/game_board_arguments.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/ad_service.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/online_game_service.dart';
@@ -48,6 +49,11 @@ class HomeController extends GetxController {
       (Get.isRegistered<PlayerMessageService>()
           ? Get.find<PlayerMessageService>()
           : null);
+
+  AdService? get _adService =>
+      Get.isRegistered<AdService>() ? Get.find<AdService>() : null;
+
+  AdService? get adServiceOrNull => _adService;
 
   bool get hasPlayerMessages =>
       _playerMessageService?.messages.isNotEmpty ?? false;
@@ -91,6 +97,9 @@ class HomeController extends GetxController {
     }
     tab.value = newTab;
     _analyticsService.logEvent('home_tab_selected', {'tab': newTab.name});
+    unawaited(
+      _adService?.recordBottomNavigationTransition() ?? Future<void>.value(),
+    );
 
     _watchRefreshTimer?.cancel();
     if (newTab == HomeTab.watch) {

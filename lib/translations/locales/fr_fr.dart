@@ -196,4 +196,5 @@ const Map<String, String> frFr = {
   TranslationKeys.messagesEmpty: 'Aucun message pour le moment.',
   TranslationKeys.messageLinkLoadError:
       'Impossible de charger le lien de ce message.',
+  TranslationKeys.morePrivacyOptions: 'Options de confidentialité',
 };

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../services/ad_service.dart';
 import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
 import '../services/checkers_ai_service.dart';
@@ -10,6 +11,7 @@ import '../services/player_message_service.dart';
 import '../services/presence_service.dart';
 import '../services/profile_photo_service.dart';
 import '../services/profile_service.dart';
+import '../services/tracking_consent_service.dart';
 
 class InitialBinding extends Bindings {
   @override
@@ -28,6 +30,11 @@ class InitialBinding extends Bindings {
       SupabasePlayerMessageService(),
       permanent: true,
     );
+    Get.put<TrackingConsentService>(
+      AppTrackingTransparencyService(),
+      permanent: true,
+    );
+    Get.put<AdService>(GoogleAdService(), permanent: true);
     Get.put<InviteListenerService>(InviteListenerService(), permanent: true);
     Get.put<PartyLinkService>(PartyLinkService(), permanent: true);
   }

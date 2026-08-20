@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../engine/checkers_engine.dart';
 import '../../../engine/rules_config.dart';
 import '../../../shared/seat_display.dart';
+import '../../../shared/widgets/checkers_ad_banner.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
 import '../../../shared/widgets/checkers_modal.dart';
@@ -29,6 +30,10 @@ class GameBoardView extends GetView<GameBoardController> {
             children: [
               Column(
                 children: [
+                  const CheckersAdBanner(
+                    key: Key('game-board-ad-banner'),
+                    size: CheckersAdBannerSize.compactAdaptive,
+                  ),
                   const SizedBox(height: 8),
                   _OpponentHeader(),
                   Expanded(

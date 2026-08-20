@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../data/models/player_message.dart';
 import '../../../routes/app_routes.dart';
+import '../../../shared/widgets/checkers_ad_banner.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_square_icon_button.dart';
 import '../../../themes/app_theme.dart';
@@ -23,53 +24,66 @@ class MessagesView extends GetView<MessagesController> {
         // The scroll view shrink-wraps, so force the backdrop full-screen.
         child: SizedBox.expand(
           child: SafeArea(
-            child: Obx(() {
-              final messages = controller.messages.toList(growable: false);
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 40),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 430),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                TranslationKeys.messagesTitle.tr,
-                                style: theme.textTheme.headlineMedium!.copyWith(
-                                  color: brandTheme.brandGold,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            CheckersSquareIconButton(
-                              key: const Key('messages-close-button'),
-                              dimension: 48,
-                              icon: Icons.close,
-                              iconSize: 26,
-                              onPressed: () => Get.back<void>(),
-                              tooltip: TranslationKeys.close.tr,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        if (messages.isEmpty)
-                          _MessagesEmptyState(theme: theme)
-                        else
-                          for (final message in messages)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _PlayerMessageCard(message: message),
-                            ),
-                      ],
-                    ),
-                  ),
+            child: Column(
+              children: [
+                const CheckersAdBanner(
+                  key: Key('messages-ad-banner'),
+                  size: CheckersAdBannerSize.compactAdaptive,
                 ),
-              );
-            }),
+                Expanded(
+                  child: Obx(() {
+                    final messages = controller.messages.toList(
+                      growable: false,
+                    );
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 18, 24, 40),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 430),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      TranslationKeys.messagesTitle.tr,
+                                      style: theme.textTheme.headlineMedium!
+                                          .copyWith(
+                                            color: brandTheme.brandGold,
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                  ),
+                                  CheckersSquareIconButton(
+                                    key: const Key('messages-close-button'),
+                                    dimension: 48,
+                                    icon: Icons.close,
+                                    iconSize: 26,
+                                    onPressed: () => Get.back<void>(),
+                                    tooltip: TranslationKeys.close.tr,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              if (messages.isEmpty)
+                                _MessagesEmptyState(theme: theme)
+                              else
+                                for (final message in messages)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _PlayerMessageCard(message: message),
+                                  ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
         ),
       ),

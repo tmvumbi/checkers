@@ -186,4 +186,5 @@ const Map<String, String> enUs = {
   TranslationKeys.messagesTitle: 'Messages',
   TranslationKeys.messagesEmpty: 'No messages yet.',
   TranslationKeys.messageLinkLoadError: "Could not load this message's link.",
+  TranslationKeys.morePrivacyOptions: 'Privacy Options',
 };

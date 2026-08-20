@@ -163,4 +163,5 @@ abstract final class TranslationKeys {
   static const String messagesTitle = 'messages_title';
   static const String messagesEmpty = 'messages_empty';
   static const String messageLinkLoadError = 'message_link_load_error';
+  static const String morePrivacyOptions = 'more_privacy_options';
 }

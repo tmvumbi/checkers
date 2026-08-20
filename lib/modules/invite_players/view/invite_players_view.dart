@@ -58,9 +58,7 @@ class InvitePlayersView extends GetView<InvitePlayersController> {
                 child: Obx(() {
                   if (controller.loading.value) {
                     return Center(
-                      child: CircularProgressIndicator(
-                        color: brand.brandGold,
-                      ),
+                      child: CircularProgressIndicator(color: brand.brandGold),
                     );
                   }
                   final players = controller.players;
@@ -88,95 +86,101 @@ class InvitePlayersView extends GetView<InvitePlayersController> {
                       final player = players[index];
                       final inviting =
                           controller.invitingUid.value == player.uid;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.shadow.withValues(
-                            alpha: 0.3,
+                      // The whole row sends the invite, not just the label.
+                      return InkWell(
+                        key: Key('invite-player-${player.uid}'),
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: inviting
+                            ? null
+                            : () => controller.invite(player),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
                           ),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: theme.colorScheme.onPrimary.withValues(
-                              alpha: 0.6,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.shadow.withValues(
+                              alpha: 0.3,
                             ),
-                            width: 2,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: theme.colorScheme.onPrimary.withValues(
+                                alpha: 0.6,
+                              ),
+                              width: 2,
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: theme.colorScheme.onPrimary,
-                                  width: 2,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: theme.colorScheme.onPrimary,
+                                    width: 2,
+                                  ),
+                                  image: player.photoUrl == null
+                                      ? null
+                                      : DecorationImage(
+                                          image: NetworkImage(player.photoUrl!),
+                                          fit: BoxFit.cover,
+                                        ),
                                 ),
-                                image: player.photoUrl == null
-                                    ? null
-                                    : DecorationImage(
-                                        image:
-                                            NetworkImage(player.photoUrl!),
-                                        fit: BoxFit.cover,
-                                      ),
+                                child: player.photoUrl == null
+                                    ? Icon(
+                                        Icons.person,
+                                        size: 24,
+                                        color: theme.colorScheme.onPrimary
+                                            .withValues(alpha: 0.7),
+                                      )
+                                    : null,
                               ),
-                              child: player.photoUrl == null
-                                  ? Icon(
-                                      Icons.person,
-                                      size: 24,
-                                      color: theme.colorScheme.onPrimary
-                                          .withValues(alpha: 0.7),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    player.nickname,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyLarge!
-                                        .copyWith(
-                                          color:
-                                              theme.colorScheme.onPrimary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                  Text(
-                                    '${player.rating}',
-                                    style: theme.textTheme.bodyLarge!
-                                        .copyWith(
-                                          color: brand.brandGold,
-                                          fontSize: 13,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton(
-                              key: Key('invite-player-${player.uid}'),
-                              onPressed: inviting
-                                  ? null
-                                  : () => controller.invite(player),
-                              child: Text(
-                                TranslationKeys.invite.tr,
-                                style: TextStyle(
-                                  color: brand.brandGold,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      player.nickname,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyLarge!
+                                          .copyWith(
+                                            color: theme.colorScheme.onPrimary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    Text(
+                                      '${player.rating}',
+                                      style: theme.textTheme.bodyLarge!
+                                          .copyWith(
+                                            color: brand.brandGold,
+                                            fontSize: 13,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          ],
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: Text(
+                                  TranslationKeys.invite.tr,
+                                  style: TextStyle(
+                                    color: brand.brandGold.withValues(
+                                      alpha: inviting ? 0.4 : 1,
+                                    ),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

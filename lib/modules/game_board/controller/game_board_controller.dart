@@ -10,6 +10,7 @@ import '../../../engine/checkers_engine.dart';
 import '../../../engine/move.dart';
 import '../../../engine/rules_config.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/ad_service.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/checkers_ai_service.dart';
@@ -85,6 +86,7 @@ class GameBoardController extends GetxController {
   int _drawOffersMade = 0;
 
   StreamSubscription<OnlineGameSnapshot>? _gameSubscription;
+  Worker? _adEventWorker;
   Timer? _clockTimer;
   int _serverOffsetMs = 0;
   bool _timeoutClaimed = false;
@@ -192,6 +194,15 @@ class GameBoardController extends GetxController {
     if (!isWatching) {
       _loadOwnProfilePhoto();
     }
+    // Finished PC games count toward the interstitial cadence (kopo parity).
+    _adEventWorker = ever<GameResult>(result, (gameResult) {
+      if (gameResult == GameResult.ongoing ||
+          args.mode != GameBoardMode.pc ||
+          !Get.isRegistered<AdService>()) {
+        return;
+      }
+      unawaited(Get.find<AdService>().recordPcGameFinished());
+    });
     _analyticsService.logEvent('game_started', {
       'mode': args.mode.name,
       'preset': args.rules.preset.name,
@@ -274,6 +285,7 @@ class GameBoardController extends GetxController {
   @override
   void onClose() {
     _gameSubscription?.cancel();
+    _adEventWorker?.dispose();
     _clockTimer?.cancel();
     _watchersSubscription?.cancel();
     _watchHeartbeatTimer?.cancel();
