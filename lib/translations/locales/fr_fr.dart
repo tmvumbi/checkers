@@ -266,6 +266,16 @@ const Map<String, String> frFr = {
   TranslationKeys.podiumThird: '3e place',
   TranslationKeys.tournamentMissedTick:
       'Pas assez de joueurs — prochaine tentative à @time.',
+  TranslationKeys.tournamentLeaveNotify:
+      'Quitter et me prévenir avant le début',
+  TranslationKeys.tournamentNotifySet:
+      'Vous serez prévenu 1 minute avant le début du tournoi.',
+  TranslationKeys.tournamentNotifyUnavailable:
+      'Les notifications sont indisponibles sur cet appareil.',
+  TranslationKeys.tournamentSoonTitle: 'Le tournoi commence !',
+  TranslationKeys.tournamentSoonMessage:
+      'Un tournoi commence dans 1 minute. Rejoindre le salon ?',
+  TranslationKeys.tournamentSoonJoin: 'Rejoindre le salon',
   TranslationKeys.tournamentInviteTitle: 'Inviter au tournoi',
   TranslationKeys.tournamentSendInvites: 'Envoyer les invitations (@count)',
   TranslationKeys.tournamentInvitesSent: '@count invitation(s) envoyée(s).',

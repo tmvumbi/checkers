@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 
 import '../services/ad_service.dart';
@@ -13,13 +14,19 @@ import '../services/player_message_service.dart';
 import '../services/presence_service.dart';
 import '../services/profile_photo_service.dart';
 import '../services/profile_service.dart';
+import '../services/push_notification_service.dart';
 import '../services/tournament_service.dart';
 import '../services/tracking_consent_service.dart';
 
 class InitialBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<AnalyticsService>(NoopAnalyticsService.new, fenix: true);
+    Get.lazyPut<AnalyticsService>(
+      () => Firebase.apps.isEmpty
+          ? NoopAnalyticsService()
+          : FirebaseAnalyticsService(),
+      fenix: true,
+    );
     Get.lazyPut<AuthService>(SupabaseAuthService.new, fenix: true);
     Get.lazyPut<ProfileService>(SupabaseProfileService.new, fenix: true);
     Get.lazyPut<ProfilePhotoService>(
@@ -42,6 +49,12 @@ class InitialBinding extends Bindings {
     );
     Get.put<AdService>(GoogleAdService(), permanent: true);
     Get.put<InviteListenerService>(InviteListenerService(), permanent: true);
+    if (Firebase.apps.isNotEmpty) {
+      Get.put<PushNotificationService>(
+        PushNotificationService(),
+        permanent: true,
+      );
+    }
     Get.put<PartyLinkService>(PartyLinkService(), permanent: true);
   }
 }

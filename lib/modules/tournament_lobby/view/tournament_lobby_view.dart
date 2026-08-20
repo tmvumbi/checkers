@@ -254,6 +254,13 @@ class TournamentLobbyView extends GetView<TournamentLobbyController> {
                   ),
                   const SizedBox(height: 10),
                   CheckersGradientButton(
+                    key: const Key('lobby-leave-notify-button'),
+                    label: TranslationKeys.tournamentLeaveNotify.tr,
+                    gradientStyle: CheckersGradientButtonStyle.logo,
+                    onPressed: controller.leaveAndNotify,
+                  ),
+                  const SizedBox(height: 10),
+                  CheckersGradientButton(
                     key: const Key('lobby-leave-button'),
                     label: TranslationKeys.lobbyLeave.tr,
                     gradientStyle: CheckersGradientButtonStyle.logo,

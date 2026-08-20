@@ -7,8 +7,10 @@ import '../../../data/models/tournament.dart';
 import '../../../engine/checkers_engine.dart';
 import '../../../modules/game_board/models/game_board_arguments.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/online_game_service.dart';
+import '../../../services/push_notification_service.dart';
 import '../../../services/tournament_service.dart';
 import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../translations/translation_keys.dart';
@@ -20,13 +22,16 @@ class TournamentLobbyController extends GetxController {
     TournamentService? tournamentService,
     OnlineGameService? onlineGameService,
     AuthService? authService,
+    AnalyticsService? analyticsService,
   }) : _tournamentService = tournamentService ?? Get.find(),
        _onlineGameServiceOverride = onlineGameService,
-       _authServiceOverride = authService;
+       _authServiceOverride = authService,
+       _analyticsService = analyticsService ?? Get.find();
 
   final TournamentService _tournamentService;
   final OnlineGameService? _onlineGameServiceOverride;
   final AuthService? _authServiceOverride;
+  final AnalyticsService _analyticsService;
 
   OnlineGameService get _onlineGameService =>
       _onlineGameServiceOverride ?? Get.find();
@@ -62,6 +67,7 @@ class TournamentLobbyController extends GetxController {
       return;
     }
     joining.value = false;
+    _analyticsService.logEvent('tournament_lobby_joined');
     _lobbySubscription = _tournamentService.watchLobby().listen(
       players.assignAll,
       onError: (Object _) {},
@@ -122,6 +128,7 @@ class TournamentLobbyController extends GetxController {
       return;
     }
     _navigatingToTournament = true;
+    _analyticsService.logEvent('tournament_started');
     final gameId = state.gameId;
     if (gameId != null) {
       await _openMyGame(gameId, state.tournamentId!);
@@ -161,6 +168,30 @@ class TournamentLobbyController extends GetxController {
 
   void leave() {
     Get.back<void>();
+  }
+
+  /// Leaves the lobby but registers this device for a push reminder one
+  /// minute before the next tournament starts.
+  Future<void> leaveAndNotify() async {
+    String? token;
+    if (Get.isRegistered<PushNotificationService>()) {
+      token = await Get.find<PushNotificationService>().requestToken();
+    }
+    if (token == null) {
+      Get.back<void>();
+      showCheckersSnackbar(TranslationKeys.tournamentNotifyUnavailable.tr);
+      return;
+    }
+    final result = await _tournamentService.optInNotify(token);
+    final ok = result.when(success: (_) => true, failure: (_) => false);
+    // Pop first: Get.back with a snackbar open dismisses the snackbar
+    // instead of the route.
+    Get.back<void>();
+    showCheckersSnackbar(
+      ok
+          ? TranslationKeys.tournamentNotifySet.tr
+          : TranslationKeys.tournamentNotifyUnavailable.tr,
+    );
   }
 
   @override

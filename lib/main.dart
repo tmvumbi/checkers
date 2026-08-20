@@ -1,9 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'bindings/initial_binding.dart';
+import 'firebase_options.dart';
 import 'core/config/supabase_config.dart';
 import 'core/constants/app_strings.dart';
 import 'core/locale_preference.dart';
@@ -14,6 +16,14 @@ import 'translations/app_translations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (_) {
+    // Analytics/push degrade gracefully when Firebase can't start
+    // (e.g. emulators without Play services).
+  }
   final savedLocale = await LocalePreference.load();
   await Supabase.initialize(
     url: SupabaseConfig.url,

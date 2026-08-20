@@ -8,6 +8,8 @@ abstract class TournamentService {
   Future<ApiResult<void>> joinLobby();
   Future<ApiResult<void>> touchLobby();
   Future<ApiResult<void>> leaveLobby();
+  Future<ApiResult<void>> optInNotify(String fcmToken);
+  Future<ApiResult<void>> cancelNotify();
   Stream<List<TournamentLobbyPlayer>> watchLobby();
   Future<ApiResult<MyTournamentState>> myTournamentState();
   Future<ApiResult<List<TournamentSummary>>> fetchTournaments({
@@ -50,6 +52,21 @@ class SupabaseTournamentService implements TournamentService {
   @override
   Future<ApiResult<void>> leaveLobby() {
     return _guard(() => client.rpc<void>('leave_tournament_lobby'));
+  }
+
+  @override
+  Future<ApiResult<void>> optInNotify(String fcmToken) {
+    return _guard(
+      () => client.rpc<void>(
+        'opt_in_tournament_notify',
+        params: {'p_token': fcmToken},
+      ),
+    );
+  }
+
+  @override
+  Future<ApiResult<void>> cancelNotify() {
+    return _guard(() => client.rpc<void>('cancel_tournament_notify'));
   }
 
   @override

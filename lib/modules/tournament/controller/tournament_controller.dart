@@ -7,6 +7,7 @@ import '../../../data/models/tournament.dart';
 import '../../../engine/checkers_engine.dart';
 import '../../../modules/game_board/models/game_board_arguments.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/online_game_service.dart';
 import '../../../services/tournament_service.dart';
@@ -21,15 +22,19 @@ class TournamentController extends GetxController {
     TournamentService? tournamentService,
     OnlineGameService? onlineGameService,
     AuthService? authService,
+    AnalyticsService? analyticsService,
   }) : tournamentId = tournamentId ?? (Get.arguments as String),
        _tournamentService = tournamentService ?? Get.find(),
        _onlineGameServiceOverride = onlineGameService,
-       _authServiceOverride = authService;
+       _authServiceOverride = authService,
+       _analyticsService = analyticsService ?? Get.find();
 
   final String tournamentId;
   final TournamentService _tournamentService;
   final OnlineGameService? _onlineGameServiceOverride;
   final AuthService? _authServiceOverride;
+  final AnalyticsService _analyticsService;
+  bool _endedLogged = false;
 
   OnlineGameService get _onlineGameService =>
       _onlineGameServiceOverride ?? Get.find();
@@ -80,8 +85,15 @@ class TournamentController extends GetxController {
     );
     result.when(
       success: (value) {
+        final wasFinished = detail.value?.summary.isFinished ?? true;
         detail.value = value;
         _checkMyPendingMatch(value);
+        if (!wasFinished && value.summary.isFinished && !_endedLogged) {
+          _endedLogged = true;
+          _analyticsService.logEvent('tournament_ended', {
+            'participants': value.summary.participantCount,
+          });
+        }
       },
       failure: (_) {},
     );

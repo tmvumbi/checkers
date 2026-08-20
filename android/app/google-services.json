@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "558217605941",
+    "project_id": "checkers-club",
+    "storage_bucket": "checkers-club.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:558217605941:android:a02ded512d0b9c455dd27c",
+        "android_client_info": {
+          "package_name": "club.contribution.checkers"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB03Hhi3ooOCdslihg1UcYk23fcsK2h9Sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

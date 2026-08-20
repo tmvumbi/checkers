@@ -204,6 +204,13 @@ abstract final class TranslationKeys {
   static const String podiumSecond = 'podium_second';
   static const String podiumThird = 'podium_third';
   static const String tournamentMissedTick = 'tournament_missed_tick';
+  static const String tournamentLeaveNotify = 'tournament_leave_notify';
+  static const String tournamentNotifySet = 'tournament_notify_set';
+  static const String tournamentNotifyUnavailable =
+      'tournament_notify_unavailable';
+  static const String tournamentSoonTitle = 'tournament_soon_title';
+  static const String tournamentSoonMessage = 'tournament_soon_message';
+  static const String tournamentSoonJoin = 'tournament_soon_join';
   static const String tournamentInviteTitle = 'tournament_invite_title';
   static const String tournamentSendInvites = 'tournament_send_invites';
   static const String tournamentInvitesSent = 'tournament_invites_sent';

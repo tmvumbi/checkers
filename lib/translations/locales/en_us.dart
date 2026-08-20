@@ -250,6 +250,15 @@ const Map<String, String> enUs = {
   TranslationKeys.podiumThird: '3rd place',
   TranslationKeys.tournamentMissedTick:
       'Not enough players — next attempt at @time.',
+  TranslationKeys.tournamentLeaveNotify: 'Leave & notify me before start',
+  TranslationKeys.tournamentNotifySet:
+      "You'll be notified 1 minute before the tournament starts.",
+  TranslationKeys.tournamentNotifyUnavailable:
+      'Notifications are unavailable on this device.',
+  TranslationKeys.tournamentSoonTitle: 'Tournament starting!',
+  TranslationKeys.tournamentSoonMessage:
+      'A tournament starts in 1 minute. Join the lobby now?',
+  TranslationKeys.tournamentSoonJoin: 'Join the lobby',
   TranslationKeys.tournamentInviteTitle: 'Invite to the Tournament',
   TranslationKeys.tournamentSendInvites: 'Send invites (@count)',
   TranslationKeys.tournamentInvitesSent: '@count invitation(s) sent.',
