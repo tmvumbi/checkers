@@ -14,6 +14,7 @@ import '../../../translations/translation_keys.dart';
 import '../controller/game_board_controller.dart';
 import '../models/game_board_arguments.dart';
 import 'widgets/board_widget.dart';
+import 'widgets/watchers_bar.dart';
 
 class GameBoardView extends GetView<GameBoardController> {
   const GameBoardView({super.key});
@@ -36,7 +37,8 @@ class GameBoardView extends GetView<GameBoardController> {
                     ),
                   ),
                   _OwnHeader(),
-                  const SizedBox(height: 8),
+                  const WatchersBar(),
+                  const SizedBox(height: 4),
                 ],
               ),
               const _DrawOfferBanner(),
@@ -181,12 +183,15 @@ class _OpponentHeader extends GetView<GameBoardController> {
                 ],
               ),
             ),
-            if (controller.isOnline)
+            if (controller.isOnline &&
+                !(controller.snapshot.value?.vsPc ?? false))
               _ClockDisplay(
                 isOwn: false,
                 theme: theme,
                 brand: brand,
               )
+            else if (controller.isOnline)
+              const SizedBox(width: 26, height: 26)
             else
               Obx(() {
                 if (!controller.aiThinking.value) {
@@ -314,12 +319,13 @@ class _OwnHeader extends GetView<GameBoardController> {
                         ),
                       ),
                     ),
-                    _ClockDisplay(
-                      isOwn: true,
-                      theme: theme,
-                      brand:
-                          theme.extension<CheckersThemeExtension>()!,
-                    ),
+                    if (!(controller.snapshot.value?.vsPc ?? false))
+                      _ClockDisplay(
+                        isOwn: true,
+                        theme: theme,
+                        brand:
+                            theme.extension<CheckersThemeExtension>()!,
+                      ),
                   ],
                 );
               }
@@ -361,7 +367,8 @@ class _OwnHeader extends GetView<GameBoardController> {
                     ),
                   ],
                   const Spacer(),
-                  if (controller.isOnline)
+                  if (controller.isOnline &&
+                      !(controller.snapshot.value?.vsPc ?? false))
                     _ClockDisplay(
                       isOwn: true,
                       theme: Theme.of(context),

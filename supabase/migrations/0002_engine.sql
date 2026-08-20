@@ -426,6 +426,19 @@ if (typeof globalThis !== 'undefined') {
       E.applyMove(state, canonical, config);
       return { state: state, move: canonical };
     }
+    case 'replay': {
+      // Rebuild a state from scratch (PC-game undo support).
+      var replayState = E.initialState(config);
+      var moves = payload.moves || [];
+      for (var i = 0; i < moves.length; i++) {
+        var legal = E.findLegalMove(replayState, config, moves[i]);
+        if (!legal) {
+          return { error: 'illegal_replay_move', at: i };
+        }
+        E.applyMove(replayState, legal, config);
+      }
+      return { state: replayState };
+    }
     default:
       return { error: 'unknown_action' };
   }

@@ -59,6 +59,8 @@ abstract final class TranslationKeys {
   static const String updateRequiredMessage = 'update_required_message';
 
   // Watch & leaderboard
+  static const String watchersTitle = 'watchers_title';
+  static const String loadMore = 'load_more';
   static const String watchEmpty = 'watch_empty';
   static const String leaderboardEmpty = 'leaderboard_empty';
   static const String spectatorWinner = 'spectator_winner';

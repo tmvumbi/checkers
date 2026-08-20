@@ -10,22 +10,25 @@ class OnlineGamePlayer {
     this.photoUrl,
     this.color,
     this.connected = true,
+    this.isBot = false,
     this.ratingBefore,
     this.ratingAfter,
   });
 
-  final String uid;
+  /// Null for bot seats in streamed PC games.
+  final String? uid;
   final int seat;
   final String nickname;
   final String? photoUrl;
   final PieceColor? color;
   final bool connected;
+  final bool isBot;
   final int? ratingBefore;
   final int? ratingAfter;
 
   factory OnlineGamePlayer.fromJson(Map<String, dynamic> json) {
     return OnlineGamePlayer(
-      uid: json['uid'] as String,
+      uid: json['uid'] as String?,
       seat: (json['seat'] as num).toInt(),
       nickname: (json['nickname'] as String?) ?? '',
       photoUrl: json['photo_url'] as String?,
@@ -35,8 +38,33 @@ class OnlineGamePlayer {
         _ => null,
       },
       connected: (json['connected'] as bool?) ?? true,
+      isBot: (json['is_bot'] as bool?) ?? false,
       ratingBefore: (json['rating_before'] as num?)?.toInt(),
       ratingAfter: (json['rating_after'] as num?)?.toInt(),
+    );
+  }
+}
+
+/// A spectator currently watching a game.
+class GameWatcher {
+  const GameWatcher({
+    required this.uid,
+    required this.nickname,
+    this.photoUrl,
+    required this.rating,
+  });
+
+  final String uid;
+  final String nickname;
+  final String? photoUrl;
+  final int rating;
+
+  factory GameWatcher.fromJson(Map<String, dynamic> json) {
+    return GameWatcher(
+      uid: json['uid'] as String,
+      nickname: (json['nickname'] as String?) ?? '',
+      photoUrl: json['photo_url'] as String?,
+      rating: (json['rating'] as num?)?.toInt() ?? 1200,
     );
   }
 }
@@ -61,6 +89,9 @@ class OnlineGameSnapshot {
     this.winnerUid,
     this.rematchRequestedBy,
     this.rematchGameId,
+    this.vsPc = false,
+    this.aiLevel,
+    this.allowUndo = false,
     this.players = const [],
   });
 
@@ -81,6 +112,9 @@ class OnlineGameSnapshot {
   final String? winnerUid;
   final String? rematchRequestedBy;
   final String? rematchGameId;
+  final bool vsPc;
+  final String? aiLevel;
+  final bool allowUndo;
   final List<OnlineGamePlayer> players;
 
   bool get isPlaying => status == 'playing';
@@ -125,6 +159,9 @@ class OnlineGameSnapshot {
       winnerUid: row['winner_uid'] as String?,
       rematchRequestedBy: row['rematch_requested_by'] as String?,
       rematchGameId: row['rematch_game_id'] as String?,
+      vsPc: (row['vs_pc'] as bool?) ?? false,
+      aiLevel: row['ai_level'] as String?,
+      allowUndo: (row['allow_undo'] as bool?) ?? false,
       players: players,
     );
   }

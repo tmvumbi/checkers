@@ -86,6 +86,18 @@ class GameBoardController extends GetxController {
   bool _timeoutClaimed = false;
   bool _applyingRemote = false;
 
+  // Streamed PC game (recorded server-side when signed in; PRD update).
+  String? _streamedGameId;
+  bool _streamingEnabled = true;
+
+  // Spectator presence for the watcher avatars row.
+  final RxList<GameWatcher> watchers = <GameWatcher>[].obs;
+  StreamSubscription<List<GameWatcher>>? _watchersSubscription;
+  Timer? _watchHeartbeatTimer;
+
+  /// The backend game id this board corresponds to, if any.
+  String? get watchableGameId => isOnline ? args.gameId : _streamedGameId;
+
   PieceColor get humanColor => args.humanColor;
 
   bool get isOnline =>
@@ -145,17 +157,96 @@ class GameBoardController extends GetxController {
     });
     if (isOnline) {
       _startOnline();
+      _startWatchersFeed(args.gameId!);
+      if (isWatching) {
+        _startWatcherPresence(args.gameId!);
+      }
     } else {
+      _startPcStreaming();
       _maybeTriggerAi();
     }
+  }
+
+  // -------------------------------------------------------------------
+  // Streamed PC games
+  // -------------------------------------------------------------------
+
+  Future<void> _startPcStreaming() async {
+    AuthUser? user;
+    try {
+      user = _authService.currentUser;
+    } catch (_) {
+      return; // No auth service wired (offline/unit-test contexts).
+    }
+    if (user == null) {
+      return;
+    }
+    final result = await _onlineGameService.startPcGame(
+      rules: args.rules,
+      aiLevel: args.aiLevel!.name,
+      allowUndo: args.allowUndo,
+      humanColor: humanColor.name,
+    );
+    result.when(
+      success: (gameId) {
+        _streamedGameId = gameId;
+        _streamingEnabled = true;
+        _startWatchersFeed(gameId);
+      },
+      failure: (_) => _streamingEnabled = false,
+    );
+  }
+
+  void _mirrorPcMove(Move move, int expectedPly) {
+    final gameId = _streamedGameId;
+    if (gameId == null || !_streamingEnabled) {
+      return;
+    }
+    _onlineGameService.submitPcMove(gameId, move, expectedPly).then((result) {
+      result.when(
+        success: (_) {},
+        failure: (_) => _streamingEnabled = false,
+      );
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // Watcher presence
+  // -------------------------------------------------------------------
+
+  void _startWatchersFeed(String gameId) {
+    _watchersSubscription?.cancel();
+    _watchersSubscription = _onlineGameService
+        .watchWatchers(gameId)
+        .listen((list) => watchers.value = list, onError: (_) {});
+  }
+
+  void _startWatcherPresence(String gameId) {
+    _onlineGameService.watchHeartbeat(gameId);
+    _watchHeartbeatTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _onlineGameService.watchHeartbeat(gameId),
+    );
   }
 
   @override
   void onClose() {
     _gameSubscription?.cancel();
     _clockTimer?.cancel();
+    _watchersSubscription?.cancel();
+    _watchHeartbeatTimer?.cancel();
     if (isOnline && !isWatching && args.gameId != null) {
       _onlineGameService.touchConnection(args.gameId!, false);
+    }
+    if (isWatching && args.gameId != null) {
+      _onlineGameService.unwatchGame(args.gameId!);
+    }
+    // Quitting a streamed PC game mid-way counts as resigning it.
+    final streamed = _streamedGameId;
+    if (streamed != null &&
+        _streamingEnabled &&
+        result.value == GameResult.ongoing) {
+      _onlineGameService.resignGame(streamed);
     }
     super.onClose();
   }
@@ -366,7 +457,11 @@ class GameBoardController extends GetxController {
     // One animation step per path segment; the view mirrors this timing.
     final segments = max(1, move.path.length);
     await Future<void>.delayed(Duration(milliseconds: 180 * segments + 120));
+    final plyBeforeApply = engine.moveHistory.length;
     engine.applyMove(move);
+    if (args.mode == GameBoardMode.pc) {
+      _mirrorPcMove(move, plyBeforeApply);
+    }
     activeAnimation.value = null;
     boardVersion.value++;
     if (!isOnline) {
@@ -418,6 +513,15 @@ class GameBoardController extends GetxController {
     boardVersion.value++;
     result.value = engine.result;
     resultReason.value = engine.resultReason;
+    final gameId = _streamedGameId;
+    if (gameId != null && _streamingEnabled) {
+      _onlineGameService.undoPcMoves(gameId, 2).then((response) {
+        response.when(
+          success: (_) {},
+          failure: (_) => _streamingEnabled = false,
+        );
+      });
+    }
   }
 
   void resign() {
@@ -434,6 +538,10 @@ class GameBoardController extends GetxController {
     );
     result.value = engine.result;
     resultReason.value = engine.resultReason;
+    final gameId = _streamedGameId;
+    if (gameId != null && _streamingEnabled) {
+      _onlineGameService.resignGame(gameId);
+    }
   }
 
   bool get canOfferDraw =>
@@ -499,6 +607,9 @@ class GameBoardController extends GetxController {
     result.value = engine.result;
     resultReason.value = engine.resultReason;
     boardVersion.value++;
+    watchers.clear();
+    _streamedGameId = null;
+    _startPcStreaming(); // The server abandons the previous streamed game.
     _maybeTriggerAi();
   }
 

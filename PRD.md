@@ -152,7 +152,7 @@ Entry: **Play** tab → **Play with PC** → modal: choose **difficulty** (Easy 
 - AI think time is padded to a minimum ~0.8s so moves feel deliberate; the moving piece animates along its jump path.
 - Undo: allowed vs PC (undoes the last human+AI move pair), unlimited. Not available online.
 - Game end: win → confetti + banner (kopo pattern); loss/draw → banner with the reason (e.g. "Draw — 25-move rule"). **Play again** button (no auto-restart countdown in v1; checkers games are long, unlike kopo hands).
-- PC games are **not** recorded to the backend and do **not** affect ELO. They are kept in a small local history (last 20) for later replay (v1.1).
+- **PC games are streamed to the backend when the player is signed in** *(updated 2026-08-14)*: the client mirrors every move (human and AI) to a `vs_pc` game record that the server re-validates with the same engine — so PC games appear live in the Watch tab. The record includes the AI level and whether "allow undoing moves" was enabled; undos roll the server state back via replay. Streamed PC games are **unrated**, carry no clocks, and abandoning one (or starting a new one) closes it server-side. If the device is offline the game simply plays locally without streaming.
 
 #### 5.1.1 Difficulty levels
 
@@ -234,7 +234,8 @@ Mechanics (server-authoritative, kopo's pattern):
 ### 5.4 Watch (live spectating)
 
 - The **Watch** tab lists live public games in real time (kopo's `watchableGames` pattern → a Supabase Realtime subscription on a `watchable_games` view/projection): players' avatars, nicknames, ratings, variant badge, move count. Client-side nickname search (kopo parity).
-- Tapping opens the **same board view in spectator mode**: no hand/action UI, both clocks visible, moves animate live. Spectators can trigger `claim_timeout` but nothing else.
+- Tapping opens the **same board view in spectator mode**: no hand/action UI, both clocks visible (hidden for streamed PC games, which have no clocks), moves animate live. Spectators can trigger `claim_timeout` but nothing else.
+- **Watcher presence** *(added 2026-08-14)*: spectators heartbeat into `game_watchers`; everyone on the board (players and spectators) sees a live row of up to 5 overlapping watcher avatars plus a "+X" bubble near the bottom. Tapping it opens a modal listing watchers 20 at a time (avatar, nickname, ELO) with load-more. Stale watchers are swept after 90 s.
 - Private (friend) games are **not** listed.
 - If the watched game ends or disappears, show the result, then a "no longer available" overlay (kopo parity).
 - **Replay of completed games** (from the recorded move lists): v1.1 — Watch tab gains a "Recent games" section with a move-by-move replay player.

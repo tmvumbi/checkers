@@ -65,6 +65,8 @@ const Map<String, String> frFr = {
       "Cette version de Checkers n'est plus prise en charge. Veuillez la "
       'mettre à jour pour continuer à jouer.',
 
+  TranslationKeys.watchersTitle: 'Spectateurs',
+  TranslationKeys.loadMore: 'Voir plus',
   TranslationKeys.watchEmpty:
       'Aucune partie en direct pour le moment. Revenez bientôt !',
   TranslationKeys.leaderboardEmpty:

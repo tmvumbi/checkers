@@ -6,6 +6,7 @@ import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
 import '../data/models/online_game.dart';
 import '../engine/move.dart';
+import '../engine/rules_config.dart';
 
 class LeaderboardPlayer {
   const LeaderboardPlayer({
@@ -54,6 +55,30 @@ abstract class OnlineGameService {
   Future<ApiResult<void>> leaveGame(String gameId);
   Future<ApiResult<void>> touchConnection(String gameId, bool connected);
   Future<ApiResult<List<Move>>> fetchMoves(String gameId);
+
+  // Streamed PC games (PRD update: visible in Watch when signed in).
+  Future<ApiResult<String>> startPcGame({
+    required RulesConfig rules,
+    required String aiLevel,
+    required bool allowUndo,
+    required String humanColor,
+  });
+  Future<ApiResult<void>> submitPcMove(
+    String gameId,
+    Move move,
+    int expectedPly,
+  );
+  Future<ApiResult<void>> undoPcMoves(String gameId, int count);
+
+  // Spectator presence.
+  Future<ApiResult<void>> watchHeartbeat(String gameId);
+  Future<ApiResult<void>> unwatchGame(String gameId);
+  Stream<List<GameWatcher>> watchWatchers(String gameId);
+  Future<ApiResult<List<GameWatcher>>> fetchWatchers(
+    String gameId, {
+    required int offset,
+    required int limit,
+  });
 
   Future<ApiResult<void>> offerDraw(String gameId);
   Future<ApiResult<void>> respondDraw(String gameId, bool accept);
@@ -235,6 +260,100 @@ class SupabaseOnlineGameService implements OnlineGameService {
         for (final row in response as List)
           LeaderboardPlayer.fromJson((row as Map).cast<String, dynamic>()),
       ];
+    });
+  }
+
+  @override
+  Future<ApiResult<String>> startPcGame({
+    required RulesConfig rules,
+    required String aiLevel,
+    required bool allowUndo,
+    required String humanColor,
+  }) {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>('start_pc_game', params: {
+        'p_board_size': rules.boardSize,
+        'p_backward_capture': rules.backwardCapture,
+        'p_flying_king': rules.flyingKing,
+        'p_majority_capture': rules.majorityCapture,
+        'p_ai_level': aiLevel,
+        'p_allow_undo': allowUndo,
+        'p_human_color': humanColor,
+      });
+      return (response as Map)['game_id'] as String;
+    });
+  }
+
+  @override
+  Future<ApiResult<void>> submitPcMove(
+    String gameId,
+    Move move,
+    int expectedPly,
+  ) {
+    return _guard(
+      () => _client.rpc<dynamic>('submit_pc_move', params: {
+        'p_game_id': gameId,
+        'p_move': move.toJson(),
+        'p_expected_ply': expectedPly,
+      }),
+    );
+  }
+
+  @override
+  Future<ApiResult<void>> undoPcMoves(String gameId, int count) {
+    return _guard(
+      () => _client.rpc<dynamic>('undo_pc_moves', params: {
+        'p_game_id': gameId,
+        'p_count': count,
+      }),
+    );
+  }
+
+  @override
+  Future<ApiResult<void>> watchHeartbeat(String gameId) {
+    return _guard(
+      () => _client
+          .rpc<dynamic>('watch_heartbeat', params: {'p_game_id': gameId}),
+    );
+  }
+
+  @override
+  Future<ApiResult<void>> unwatchGame(String gameId) {
+    return _guard(
+      () =>
+          _client.rpc<dynamic>('unwatch_game', params: {'p_game_id': gameId}),
+    );
+  }
+
+  @override
+  Stream<List<GameWatcher>> watchWatchers(String gameId) {
+    return _client
+        .from('game_watchers')
+        .stream(primaryKey: ['game_id', 'uid'])
+        .eq('game_id', gameId)
+        .map((rows) {
+          final watchers = [
+            for (final row in rows) GameWatcher.fromJson(row),
+          ];
+          watchers.sort((a, b) => a.uid.compareTo(b.uid));
+          return watchers;
+        });
+  }
+
+  @override
+  Future<ApiResult<List<GameWatcher>>> fetchWatchers(
+    String gameId, {
+    required int offset,
+    required int limit,
+  }) {
+    return _guard(() async {
+      final rows = await _client
+          .from('game_watchers')
+          .select()
+          .eq('game_id', gameId)
+          .order('joined_at', ascending: true)
+          .range(offset, offset + limit - 1);
+      return [for (final row in rows) GameWatcher.fromJson(row)];
     });
   }
 
