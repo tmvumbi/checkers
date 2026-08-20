@@ -86,6 +86,8 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
             children: [
               for (final level in AiLevel.values) ...[
                 Expanded(
+                  // FR "Difficile" needs more room than its siblings.
+                  flex: level == AiLevel.hard ? 6 : 5,
                   child: _ChoiceChip(
                     key: Key('play-pc-level-${level.name}'),
                     label: switch (level) {
@@ -177,6 +179,8 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
             children: [
               for (final side in _SideChoice.values) ...[
                 Expanded(
+                  // FR "Aléatoire" needs more room than "Blancs"/"Noirs".
+                  flex: side == _SideChoice.random ? 6 : 5,
                   child: _ChoiceChip(
                     key: Key('play-pc-side-${side.name}'),
                     label: switch (side) {
