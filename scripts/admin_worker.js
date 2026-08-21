@@ -48,6 +48,23 @@ async function sb(env, path, init = {}) {
   });
 }
 
+async function sbJson(env, path, init = {}) {
+  const response = await fetch(`${env.SUPABASE_URL}${path}`, {
+    ...init,
+    headers: {
+      apikey: env.SERVICE_KEY,
+      Authorization: `Bearer ${env.SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+      ...(init.headers ?? {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json();
+}
+
 async function handleApi(request, env, path) {
   const url = new URL(request.url);
   const method = request.method;
@@ -134,6 +151,124 @@ async function handleApi(request, env, path) {
     });
   }
 
+  if (path === "/messages" && method === "GET") {
+    return sb(
+      env,
+      "/rest/v1/player_messages?select=*&order=created_at.desc&limit=50",
+    );
+  }
+  if (path === "/messages" && method === "POST") {
+    const b = await request.json();
+    const days = parseInt(b.days) || 30;
+    return sb(env, "/rest/v1/player_messages", {
+      method: "POST",
+      body: JSON.stringify({
+        type: b.target_uid ? "private" : "public",
+        language: b.language,
+        target_uid: b.target_uid || null,
+        html_text: b.html_text || null,
+        image_url: b.image_url || null,
+        link_url: b.link_url || null,
+        expires_at: new Date(Date.now() + days * 86400000).toISOString(),
+      }),
+    });
+  }
+  if (path.startsWith("/messages/") && method === "PATCH") {
+    const id = path.split("/")[2];
+    return sb(env, `/rest/v1/player_messages?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(await request.json()),
+    });
+  }
+
+  if (path === "/players" && method === "GET") {
+    const q = (url.searchParams.get("search") ?? "").replace(/[%_\\,()]/g, "");
+    const pattern = encodeURIComponent("%" + q + "%");
+    return sb(
+      env,
+      `/rest/v1/profiles?select=id,nickname,rating&nickname=ilike.${pattern}&order=nickname&limit=20`,
+    );
+  }
+
+  if (path === "/blocks" && method === "GET") {
+    const blocks = await sbJson(
+      env,
+      "/rest/v1/player_blocks?select=*&revoked_at=is.null&order=created_at.desc&limit=100",
+    );
+    const uids = [...new Set(blocks.map((b) => b.uid))];
+    let names = {};
+    if (uids.length) {
+      const profiles = await sbJson(
+        env,
+        `/rest/v1/profiles?select=id,nickname&id=in.(${uids.join(",")})`,
+      );
+      names = Object.fromEntries(profiles.map((p) => [p.id, p.nickname]));
+    }
+    return Response.json(
+      blocks.map((b) => ({ ...b, nickname: names[b.uid] ?? "" })),
+    );
+  }
+  if (path === "/blocks" && method === "POST") {
+    const b = await request.json();
+    return sb(env, "/rest/v1/rpc/block_player", {
+      method: "POST",
+      body: JSON.stringify({
+        p_uid: b.uid,
+        p_level: b.level,
+        p_days: b.days ?? null,
+        p_reason: b.reason ?? null,
+      }),
+    });
+  }
+  if (path === "/unblock" && method === "POST") {
+    const b = await request.json();
+    return sb(env, "/rest/v1/rpc/unblock_player", {
+      method: "POST",
+      body: JSON.stringify({ p_uid: b.uid }),
+    });
+  }
+
+  if (path === "/ops" && method === "GET") {
+    const days = Math.min(
+      Math.max(parseInt(url.searchParams.get("days") ?? "7"), 1), 90);
+    const result = await sbJson(env, "/rest/v1/rpc/admin_operations_metrics", {
+      method: "POST",
+      body: JSON.stringify({ p_days: days }),
+    });
+    return Response.json(result);
+  }
+
+  if (path === "/settings" && method === "GET") {
+    const rows = await sbJson(
+      env,
+      "/rest/v1/app_config?id=eq.public&select=config",
+    );
+    const ads = rows[0]?.config?.ads ?? {};
+    return Response.json({
+      interstitialFrequency: ads.interstitialFrequency ?? 15,
+      adsEnabled: ads.enabled ?? true,
+    });
+  }
+  if (path === "/settings" && method === "PATCH") {
+    const b = await request.json();
+    const rows = await sbJson(
+      env,
+      "/rest/v1/app_config?id=eq.public&select=config",
+    );
+    const config = rows[0]?.config ?? {};
+    config.ads = {
+      ...(config.ads ?? {}),
+      ...(b.interstitialFrequency != null
+        ? { interstitialFrequency: b.interstitialFrequency }
+        : {}),
+      ...(b.adsEnabled != null ? { enabled: b.adsEnabled } : {}),
+    };
+    return sb(env, "/rest/v1/app_config?id=eq.public", {
+      method: "PATCH",
+      body: JSON.stringify({ config }),
+    });
+  }
+
   return Response.json({ error: "not found" }, { status: 404 });
 }
 
@@ -189,6 +324,17 @@ button.small { background: var(--panel2); color: var(--gold);
 img.thumb { height: 40px; border-radius: 6px; display: block; }
 .msg { margin-top: 10px; font-size: 14px; color: #7ce09a; min-height: 20px; }
 .msg.err { color: #e07c7c; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px; margin-bottom: 18px; }
+.stat { background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; }
+.stat .n { font-size: 30px; font-weight: 800; color: var(--gold); line-height: 1.1; }
+.stat .l { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.stat .sub { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+.chip { display: inline-block; padding: 2px 10px; border-radius: 99px;
+  font-size: 12px; background: var(--panel2); border: 1px solid var(--line);
+  margin: 2px 4px 2px 0; }
+.chip b { color: var(--gold); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -196,14 +342,22 @@ img.thumb { height: 40px; border-radius: 6px; display: block; }
   <h1>Checkers &mdash; Ads Admin</h1>
   <nav>
     <button data-tab="dash" class="on">Dashboard</button>
+    <button data-tab="ops">Operations</button>
     <button data-tab="camps">Campaigns</button>
     <button data-tab="custs">Customers</button>
+    <button data-tab="msgs">Messages</button>
+    <button data-tab="players">Players</button>
+    <button data-tab="settings">Settings</button>
   </nav>
 </header>
 <main>
   <section id="tab-dash"></section>
+  <section id="tab-ops" hidden></section>
   <section id="tab-camps" hidden></section>
   <section id="tab-custs" hidden></section>
+  <section id="tab-msgs" hidden></section>
+  <section id="tab-players" hidden></section>
+  <section id="tab-settings" hidden></section>
 </main>
 <script>
 const apiBase = location.origin + '/admin/api';
@@ -215,11 +369,16 @@ const esc = s => (s ?? '').toString().replace(/[&<>"]/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 let customers = [], campaigns = [], stats = [];
+let messages = [], blocks = [], settings = {};
+let ops = null, opsDays = 7;
 
 async function refresh() {
-  [customers, campaigns, stats] = await Promise.all([
-    api('/customers'), api('/campaigns'), api('/stats?days=30')]);
+  [customers, campaigns, stats, messages, blocks, settings] = await Promise.all([
+    api('/customers'), api('/campaigns'), api('/stats?days=30'),
+    api('/messages'), api('/blocks'), api('/settings')]);
   renderDash(); renderCamps(); renderCusts();
+  renderMsgs(); renderPlayers(); renderSettings();
+  loadOps();
 }
 
 function totals(id) {
@@ -266,10 +425,15 @@ const IMG_FIELDS = [
   ['piece_black_king_url', 'Black king'],
 ];
 
+let editingId = null;
+
 function renderCamps() {
   const el = document.getElementById('tab-camps');
+  const editing = campaigns.find(x => x.id === editingId) ?? null;
   const custOpts = customers.map(c =>
-    '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+    '<option value="' + c.id + '"'
+    + (editing && editing.customer_id === c.id ? ' selected' : '')
+    + '>' + esc(c.name) + '</option>').join('');
   const rows = campaigns.map(c => {
     const t = totals(c.id);
     return '<tr><td><img class="thumb" src="' + esc(c.banner_url) + '"></td>'
@@ -279,7 +443,8 @@ function renderCamps() {
       + '</div></td>'
       + '<td><span class="pill ' + (c.active ? 'on">active' : 'off">off') + '</span></td>'
       + '<td>' + t.prints + ' / ' + t.clicks + '</td>'
-      + '<td><button class="small" onclick="toggleCamp(\\'' + c.id + '\\',' + !c.active + ')">'
+      + '<td style="white-space:nowrap"><button class="small" onclick="startEdit(\\'' + c.id + '\\')">Edit</button> '
+      + '<button class="small" onclick="toggleCamp(\\'' + c.id + '\\',' + !c.active + ')">'
       + (c.active ? 'Deactivate' : 'Activate') + '</button></td></tr>';
   }).join('');
   el.innerHTML =
@@ -287,20 +452,54 @@ function renderCamps() {
     + '<th>Status</th><th>Prints / Clicks</th><th></th></tr>'
     + (rows || '<tr><td colspan="5" class="muted">No campaigns yet.</td></tr>')
     + '</table></div>'
-    + '<div class="card"><h2>New campaign</h2>'
+    + '<div class="card"><h2>'
+    + (editing ? 'Edit campaign — ' + esc(editing.name) : 'New campaign') + '</h2>'
     + '<div class="row"><div><label>Name</label><input id="c-name"></div>'
     + '<div><label>Customer</label><select id="c-cust">' + custOpts + '</select></div></div>'
     + '<div class="row"><div><label>Starts</label><input type="date" id="c-start"></div>'
     + '<div><label>Ends (empty = open)</label><input type="date" id="c-end"></div></div>'
     + '<div class="row"><div><label>Target URL</label><input id="c-url" placeholder="https://…"></div>'
     + '<div><label>Max daily prints (empty = unlimited)</label><input type="number" id="c-cap"></div></div>'
-    + IMG_FIELDS.map(([k, label]) =>
-        '<label>' + label + '</label><input type="file" accept="image/*" data-field="' + k + '">'
-      ).join('')
-    + '<label><input type="checkbox" id="c-active" checked> Active</label>'
-    + '<button class="primary" onclick="createCamp()">Create campaign</button>'
+    + IMG_FIELDS.map(([k, label]) => {
+        const current = editing && editing[k]
+          ? '<div style="display:flex;align-items:center;gap:10px;margin:4px 0 6px">'
+            + '<img class="thumb" src="' + esc(editing[k]) + '">'
+            + (k === 'banner_url'
+                ? '<span class="muted" style="font-size:12px">current — choose a file to replace</span>'
+                : '<label style="margin:0;display:inline;font-size:12px">'
+                  + '<input type="checkbox" data-clear="' + k + '"> remove</label>')
+            + '</div>'
+          : '';
+        return '<label>' + label + '</label>' + current
+          + '<input type="file" accept="image/*" data-field="' + k + '">';
+      }).join('')
+    + '<label><input type="checkbox" id="c-active"'
+    + (!editing || editing.active ? ' checked' : '') + '> Active</label>'
+    + '<button class="primary" onclick="saveCamp()">'
+    + (editing ? 'Save changes' : 'Create campaign') + '</button>'
+    + (editing
+        ? ' <button class="small" style="margin-left:10px" onclick="cancelEdit()">Cancel</button>'
+        : '')
     + '<div class="msg" id="c-msg"></div></div>';
-  document.getElementById('c-start').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('c-name').value = editing?.name ?? '';
+  document.getElementById('c-url').value = editing?.target_url ?? '';
+  document.getElementById('c-start').value =
+    editing?.starts_at ?? new Date().toISOString().slice(0, 10);
+  document.getElementById('c-end').value = editing?.ends_at ?? '';
+  document.getElementById('c-cap').value = editing?.max_daily_prints ?? '';
+}
+
+function startEdit(id) {
+  editingId = id;
+  renderCamps();
+  const name = document.getElementById('c-name');
+  name.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  name.focus();
+}
+
+function cancelEdit() {
+  editingId = null;
+  renderCamps();
 }
 
 async function uploadFile(file) {
@@ -310,10 +509,11 @@ async function uploadFile(file) {
   return (await r.json()).url;
 }
 
-async function createCamp() {
+async function saveCamp() {
   const msg = document.getElementById('c-msg');
-  msg.className = 'msg'; msg.textContent = 'Uploading…';
+  msg.className = 'msg'; msg.textContent = 'Saving…';
   try {
+    const editing = campaigns.find(x => x.id === editingId) ?? null;
     const body = {
       name: document.getElementById('c-name').value.trim(),
       customer_id: document.getElementById('c-cust').value || null,
@@ -326,13 +526,23 @@ async function createCamp() {
     if (!body.name || !body.target_url) throw new Error('Name and target URL are required.');
     for (const [field] of IMG_FIELDS) {
       const input = document.querySelector('input[data-field="' + field + '"]');
+      const clear = document.querySelector('input[data-clear="' + field + '"]');
       if (input.files[0]) body[field] = await uploadFile(input.files[0]);
+      else if (clear?.checked) body[field] = null;
     }
-    if (!body.banner_url) throw new Error('Banner image is required.');
-    await api('/campaigns', { method: 'POST', body: JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json' } });
-    msg.textContent = 'Campaign created.';
+    if (!editing && !body.banner_url) throw new Error('Banner image is required.');
+    if (editing) {
+      await api('/campaigns/' + editing.id, { method: 'PATCH',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' } });
+    } else {
+      await api('/campaigns', { method: 'POST', body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' } });
+    }
+    editingId = null;
     await refresh();
+    document.getElementById('c-msg').textContent =
+      editing ? 'Campaign updated.' : 'Campaign created.';
   } catch (e) {
     msg.className = 'msg err'; msg.textContent = e.message;
   }
@@ -380,10 +590,268 @@ async function createCust() {
   } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
 }
 
+async function loadOps() {
+  try {
+    ops = await api('/ops?days=' + opsDays);
+    renderOps();
+  } catch (e) { /* keep previous view on transient errors */ }
+}
+
+const STATE_LABELS = {
+  pc: 'vs PC', human: 'vs human', watching: 'watching', idle: 'idle',
+};
+
+function renderOps() {
+  const el = document.getElementById('tab-ops');
+  if (!ops) { el.innerHTML = '<div class="card muted">Loading…</div>'; return; }
+  const n = ops.now, t = ops.totals;
+  const played = t.players_played, never = t.players - t.players_played;
+  const chips = (n.connected_players ?? []).map(p =>
+    '<span class="chip">' + esc(p.nickname) + ' · <b>'
+    + STATE_LABELS[p.state] + '</b></span>').join('')
+    || '<span class="muted">Nobody connected right now.</span>';
+  const dayRows = (ops.daily ?? []).map(d =>
+    '<tr><td>' + d.day + '</td><td>' + d.human_games + '</td><td>' + d.pc_games
+    + '</td><td>' + d.tournaments + '</td><td>' + d.new_players + '</td></tr>'
+  ).join('');
+  el.innerHTML =
+    '<div class="cards">'
+    + '<div class="stat"><div class="n">' + n.connected + '</div>'
+    + '<div class="l">Players connected now</div><div class="sub">'
+    + 'Playing vs human: <b>' + n.playing_human + '</b><br>'
+    + 'Playing vs PC: <b>' + n.playing_pc + '</b><br>'
+    + 'Watching: <b>' + n.watching + '</b> · Idle: <b>' + n.idle + '</b></div></div>'
+    + '<div class="stat"><div class="n">'
+    + (n.games_playing_human + n.games_playing_pc) + '</div>'
+    + '<div class="l">Games in progress</div><div class="sub">'
+    + 'Human: <b>' + n.games_playing_human + '</b> · PC: <b>'
+    + n.games_playing_pc + '</b></div></div>'
+    + '<div class="stat"><div class="n">' + n.tournaments_running + '</div>'
+    + '<div class="l">Tournaments running</div><div class="sub">'
+    + 'Lobby: <b>' + n.lobby_players + '</b> waiting</div></div>'
+    + '<div class="stat"><div class="n">' + t.players + '</div>'
+    + '<div class="l">Total players</div><div class="sub">'
+    + 'Played a game: <b>' + played + '</b> ('
+    + (t.players ? Math.round(100 * played / t.players) : 0) + '%)<br>'
+    + 'Never played: <b>' + never + '</b><br>'
+    + 'Games all-time: <b>' + t.games_total + '</b> · Tournaments: <b>'
+    + t.tournaments_total + '</b></div></div>'
+    + '</div>'
+    + '<div class="card"><h2>Connected players</h2>' + chips + '</div>'
+    + '<div class="card"><h2 style="display:inline-block">Daily activity</h2> '
+    + '<select id="ops-days" style="width:auto;margin-left:12px">'
+    + [7, 14, 30, 60, 90].map(d => '<option value="' + d + '"'
+        + (d === opsDays ? ' selected' : '') + '>Last ' + d + ' days</option>').join('')
+    + '</select>'
+    + '<table style="margin-top:10px"><tr><th>Day</th><th>Human games</th>'
+    + '<th>PC games</th><th>Tournaments</th><th>New players</th></tr>'
+    + (dayRows || '<tr><td colspan="5" class="muted">No data.</td></tr>')
+    + '</table>'
+    + '<div class="muted" style="font-size:12px;margin-top:8px">'
+    + 'Live numbers refresh every 30 seconds.</div></div>';
+  document.getElementById('ops-days').onchange = e => {
+    opsDays = parseInt(e.target.value);
+    loadOps();
+  };
+}
+
+setInterval(loadOps, 30000);
+
+let msgTarget = null;
+let blockTarget = null;
+
+function pickerHtml(kind) {
+  const sel = kind === 'msg' ? msgTarget : blockTarget;
+  return '<label>Player</label>'
+    + '<input id="' + kind + '-search" placeholder="Search nickname…" autocomplete="off">'
+    + '<div id="' + kind + '-results"></div>'
+    + '<div class="msg" id="' + kind + '-picked">'
+    + (sel ? 'Selected: ' + esc(sel.nickname) + ' (' + sel.id.slice(0, 8) + '…)' : '')
+    + '</div>';
+}
+
+function wirePicker(kind) {
+  const input = document.getElementById(kind + '-search');
+  let timer = null;
+  input.oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const q = input.value.trim();
+      const box = document.getElementById(kind + '-results');
+      if (!q) { box.innerHTML = ''; return; }
+      const players = await api('/players?search=' + encodeURIComponent(q));
+      box.innerHTML = players.map(p =>
+        '<button class="small" style="margin:3px 4px 3px 0" data-id="' + p.id
+        + '" data-nick="' + esc(p.nickname) + '">' + esc(p.nickname)
+        + ' · ' + p.rating + '</button>').join('') ||
+        '<span class="muted">No players found.</span>';
+      box.querySelectorAll('button').forEach(b => b.onclick = () => {
+        const target = { id: b.dataset.id, nickname: b.dataset.nick };
+        if (kind === 'msg') { msgTarget = target; renderMsgs(); }
+        else { blockTarget = target; renderPlayers(); }
+      });
+    }, 350);
+  };
+}
+
+function renderMsgs() {
+  const el = document.getElementById('tab-msgs');
+  const rows = messages.map(m =>
+    '<tr><td>' + m.type + '<div class="muted" style="font-size:12px">'
+    + m.language + ' · until ' + (m.expires_at ?? '').slice(0, 10) + '</div></td>'
+    + '<td style="max-width:380px">' + esc((m.html_text ?? '').slice(0, 120))
+    + (m.image_url ? ' <span class="muted">[image]</span>' : '')
+    + (m.link_url ? ' <span class="muted">[link]</span>' : '') + '</td>'
+    + '<td><span class="pill ' + (m.enabled ? 'on">on' : 'off">off') + '</span></td>'
+    + '<td><button class="small" data-id="' + m.id + '" data-en="' + !m.enabled + '">'
+    + (m.enabled ? 'Disable' : 'Enable') + '</button></td></tr>').join('');
+  el.innerHTML =
+    '<div class="card"><h2>Messages to players</h2><table>'
+    + '<tr><th>Type</th><th>Content</th><th>Status</th><th></th></tr>'
+    + (rows || '<tr><td colspan="4" class="muted">No messages yet.</td></tr>')
+    + '</table></div>'
+    + '<div class="card"><h2>New message</h2>'
+    + '<div class="row"><div><label>Language</label><select id="m-lang">'
+    + '<option value="en">English</option><option value="fr">French</option></select></div>'
+    + '<div><label>Audience</label><select id="m-aud">'
+    + '<option value="public">All players</option>'
+    + '<option value="private"' + (msgTarget ? ' selected' : '') + '>One player</option>'
+    + '</select></div></div>'
+    + '<div id="m-picker"' + (msgTarget ? '' : ' hidden') + '>' + pickerHtml('msg') + '</div>'
+    + '<label>Text (HTML allowed)</label><textarea id="m-text" rows="3"></textarea>'
+    + '<div class="row"><div><label>Link URL (optional)</label><input id="m-link"></div>'
+    + '<div><label>Visible for (days)</label><input type="number" id="m-days" value="30"></div></div>'
+    + '<label>Image (optional)</label><input type="file" accept="image/*" id="m-image">'
+    + '<button class="primary" id="m-send">Send message</button>'
+    + '<div class="msg" id="m-msg"></div></div>';
+  el.querySelectorAll('table button[data-id]').forEach(b => b.onclick = async () => {
+    await api('/messages/' + b.dataset.id, { method: 'PATCH',
+      body: JSON.stringify({ enabled: b.dataset.en === 'true' }),
+      headers: { 'Content-Type': 'application/json' } });
+    await refresh();
+  });
+  document.getElementById('m-aud').onchange = e => {
+    if (e.target.value === 'public') { msgTarget = null; }
+    document.getElementById('m-picker').hidden = e.target.value !== 'private';
+  };
+  wirePicker('msg');
+  document.getElementById('m-send').onclick = sendMsg;
+}
+
+async function sendMsg() {
+  const msg = document.getElementById('m-msg');
+  msg.className = 'msg'; msg.textContent = 'Sending…';
+  try {
+    const isPrivate = document.getElementById('m-aud').value === 'private';
+    if (isPrivate && !msgTarget) throw new Error('Pick a player first.');
+    const text = document.getElementById('m-text').value.trim();
+    const file = document.getElementById('m-image').files[0];
+    if (!text && !file) throw new Error('Text or an image is required.');
+    const body = {
+      language: document.getElementById('m-lang').value,
+      target_uid: isPrivate ? msgTarget.id : null,
+      html_text: text || null,
+      link_url: document.getElementById('m-link').value.trim() || null,
+      days: parseInt(document.getElementById('m-days').value) || 30,
+    };
+    if (file) body.image_url = await uploadFile(file);
+    await api('/messages', { method: 'POST', body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' } });
+    msgTarget = null;
+    await refresh();
+    document.getElementById('m-msg').textContent = 'Message sent.';
+  } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
+}
+
+function renderPlayers() {
+  const el = document.getElementById('tab-players');
+  const rows = blocks.map(b =>
+    '<tr><td>' + esc(b.nickname || '(unknown)')
+    + '<div class="muted" style="font-size:12px">' + b.uid.slice(0, 8) + '…</div></td>'
+    + '<td><span class="pill ' + (b.level === 'full' ? 'off">full' : 'on">soft') + '</span></td>'
+    + '<td>' + esc(b.reason ?? '') + '</td>'
+    + '<td>' + (b.expires_at ? b.expires_at.slice(0, 10) : 'permanent') + '</td>'
+    + '<td><button class="small" data-uid="' + b.uid + '">Unblock</button></td></tr>').join('');
+  el.innerHTML =
+    '<div class="card"><h2>Active blocks</h2><table>'
+    + '<tr><th>Player</th><th>Level</th><th>Reason</th><th>Expires</th><th></th></tr>'
+    + (rows || '<tr><td colspan="5" class="muted">No active blocks.</td></tr>')
+    + '</table></div>'
+    + '<div class="card"><h2>Block a player</h2>'
+    + pickerHtml('block')
+    + '<div class="row"><div><label>Level</label><select id="b-level">'
+    + '<option value="soft">Soft — can watch, cannot play</option>'
+    + '<option value="full">Full — locked out</option></select></div>'
+    + '<div><label>Duration (days, empty = permanent)</label>'
+    + '<input type="number" id="b-days"></div></div>'
+    + '<label>Reason (optional)</label><input id="b-reason">'
+    + '<button class="primary" id="b-block">Block player</button>'
+    + '<div class="msg" id="b-msg"></div></div>';
+  el.querySelectorAll('table button[data-uid]').forEach(b => b.onclick = async () => {
+    await api('/unblock', { method: 'POST',
+      body: JSON.stringify({ uid: b.dataset.uid }),
+      headers: { 'Content-Type': 'application/json' } });
+    await refresh();
+  });
+  wirePicker('block');
+  document.getElementById('b-block').onclick = blockPlayer;
+}
+
+async function blockPlayer() {
+  const msg = document.getElementById('b-msg');
+  msg.className = 'msg'; msg.textContent = 'Blocking…';
+  try {
+    if (!blockTarget) throw new Error('Pick a player first.');
+    const days = parseInt(document.getElementById('b-days').value);
+    await api('/blocks', { method: 'POST',
+      body: JSON.stringify({
+        uid: blockTarget.id,
+        level: document.getElementById('b-level').value,
+        days: Number.isFinite(days) && days > 0 ? days : null,
+        reason: document.getElementById('b-reason').value.trim() || null,
+      }),
+      headers: { 'Content-Type': 'application/json' } });
+    blockTarget = null;
+    await refresh();
+    document.getElementById('b-msg').textContent = 'Player blocked.';
+  } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
+}
+
+function renderSettings() {
+  const el = document.getElementById('tab-settings');
+  el.innerHTML =
+    '<div class="card"><h2>Advertising settings</h2>'
+    + '<div class="row"><div>'
+    + '<label>Interstitial frequency (show every Nth event)</label>'
+    + '<input type="number" id="s-freq" min="1" value="'
+    + (settings.interstitialFrequency ?? 15) + '"></div>'
+    + '<div><label>&nbsp;</label>'
+    + '<label style="margin-top:14px"><input type="checkbox" id="s-enabled"'
+    + (settings.adsEnabled ? ' checked' : '') + '> AdMob ads enabled</label></div></div>'
+    + '<button class="primary" id="s-save">Save settings</button>'
+    + '<div class="msg" id="s-msg"></div></div>';
+  document.getElementById('s-save').onclick = async () => {
+    const msg = document.getElementById('s-msg');
+    msg.className = 'msg'; msg.textContent = 'Saving…';
+    try {
+      const freq = parseInt(document.getElementById('s-freq').value);
+      if (!Number.isFinite(freq) || freq < 1) throw new Error('Frequency must be at least 1.');
+      await api('/settings', { method: 'PATCH',
+        body: JSON.stringify({
+          interstitialFrequency: freq,
+          adsEnabled: document.getElementById('s-enabled').checked,
+        }),
+        headers: { 'Content-Type': 'application/json' } });
+      await refresh();
+      document.getElementById('s-msg').textContent = 'Settings saved.';
+    } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
+  };
+}
+
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
   b.classList.add('on');
-  for (const t of ['dash', 'camps', 'custs'])
+  for (const t of ['dash', 'ops', 'camps', 'custs', 'msgs', 'players', 'settings'])
     document.getElementById('tab-' + t).hidden = t !== b.dataset.tab;
 });
 

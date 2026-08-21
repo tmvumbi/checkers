@@ -19,7 +19,7 @@ void main() {
       }
     });
 
-    test('hard AI is deterministic for the same position', () {
+    test('hard AI is deterministic for the same position and seed', () {
       final engine = CheckersEngine(config: RulesConfig.international);
       const quick = AiConfig(
         level: AiLevel.hard,
@@ -30,9 +30,36 @@ void main() {
         blunderChance: 0,
         noiseCentiMen: 0,
       );
-      final first = CheckersAi(engine, quick).chooseMove();
-      final second = CheckersAi(engine, quick).chooseMove();
+      final first = CheckersAi(engine, quick, rngSeed: 42).chooseMove();
+      final second = CheckersAi(engine, quick, rngSeed: 42).chooseMove();
       expect(first.move.key, second.move.key);
+    });
+
+    test('hard AI randomizes only among near-equal best moves', () {
+      const quick = AiConfig(
+        level: AiLevel.hard,
+        maxDepth: 6,
+        budgetMs: 100000,
+        topN: 1,
+        pickSecondBestChance: 0,
+        blunderChance: 0,
+        noiseCentiMen: 0,
+      );
+      final baseline = CheckersAi(
+        CheckersEngine(config: RulesConfig.international),
+        quick,
+        rngSeed: 0,
+      ).chooseMove();
+      for (var seed = 1; seed <= 8; seed++) {
+        final choice = CheckersAi(
+          CheckersEngine(config: RulesConfig.international),
+          quick,
+          rngSeed: seed,
+        ).chooseMove();
+        // Whatever the seed picks must score within a tenth of a man of the
+        // best move (the opening is symmetric enough to have such ties).
+        expect(baseline.score - choice.score, lessThanOrEqualTo(10));
+      }
     });
 
     test('hard AI avoids the poisoned advance that loses a man', () {

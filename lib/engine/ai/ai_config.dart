@@ -59,7 +59,7 @@ class AiConfig {
   static const AiConfig hard = AiConfig(
     level: AiLevel.hard,
     maxDepth: 40,
-    budgetMs: 6500,
+    budgetMs: 10000,
     topN: 1,
     pickSecondBestChance: 0,
     blunderChance: 0,

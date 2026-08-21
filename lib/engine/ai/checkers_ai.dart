@@ -33,10 +33,17 @@ class AiMoveChoice {
 /// forced-capture quiescence (PRD §7.3). Synchronous — run it inside an
 /// isolate from UI code.
 class CheckersAi {
-  CheckersAi(this.engine, this.config);
+  CheckersAi(this.engine, this.config, {int? rngSeed})
+    : _seed = rngSeed ?? DateTime.now().microsecondsSinceEpoch;
 
   final CheckersEngine engine;
   final AiConfig config;
+
+  /// Mixed into root move-selection rolls only, never into the evaluation,
+  /// so the transposition table stays position-consistent within a search.
+  /// Defaults to the clock so repeat games don't replay identical lines;
+  /// pass a fixed seed for reproducible runs.
+  final int _seed;
 
   final Map<int, _TtEntry> _table = {};
 
@@ -52,8 +59,9 @@ class CheckersAi {
 
   static const int _win = 1 << 20;
 
-  /// Deterministic per-position pseudo-randomness: hash-mixed so results are
-  /// reproducible and the transposition table stays consistent.
+  /// Pseudo-randomness via hash mixing. Root move-selection rolls fold in
+  /// [_seed]; evaluation noise passes the bare position hash so it stays
+  /// deterministic per position and the transposition table stays consistent.
   int _mix(int seed) {
     var x = seed ^ 0x9E3779B97F4A7C15;
     x = (x ^ (x >>> 30)) * 0xBF58476D1CE4E5B9;
@@ -129,10 +137,23 @@ class CheckersAi {
   }
 
   Move _applyImperfection(List<MapEntry<Move, int>> ranked) {
-    if (config.level == AiLevel.hard || ranked.length == 1) {
+    if (ranked.length == 1) {
       return ranked.first.key;
     }
-    final roll = _mix(engine.hash) % 1000;
+    if (config.level == AiLevel.hard) {
+      // Full strength, but pick uniformly among moves within a tenth of a
+      // man of the best so hard games aren't deterministic replays.
+      final best = ranked.first.value;
+      final nearBest = [
+        for (final entry in ranked)
+          if (best - entry.value <= 10) entry,
+      ];
+      if (nearBest.length == 1) {
+        return ranked.first.key;
+      }
+      return nearBest[_mix(engine.hash ^ _seed) % nearBest.length].key;
+    }
+    final roll = _mix(engine.hash ^ _seed) % 1000;
 
     // Bounded blunder: play the best move that loses at most ~1.2 men,
     // preferring the worst such move.
@@ -146,7 +167,7 @@ class CheckersAi {
     }
 
     // Randomized pick among the top N within half a man of the best.
-    final roll2 = _mix(engine.hash ^ 0xABCDEF) % 1000;
+    final roll2 = _mix(engine.hash ^ _seed ^ 0xABCDEF) % 1000;
     if (roll2 < (config.pickSecondBestChance * 1000).round()) {
       final best = ranked.first.value;
       final eligible = [
@@ -154,7 +175,8 @@ class CheckersAi {
           if (best - entry.value <= 50) entry,
       ];
       if (eligible.length > 1) {
-        return eligible[_mix(engine.hash ^ 0x1234567) % eligible.length].key;
+        return eligible[_mix(engine.hash ^ _seed ^ 0x1234567) % eligible.length]
+            .key;
       }
     }
     return ranked.first.key;
