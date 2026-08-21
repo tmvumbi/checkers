@@ -517,86 +517,96 @@ class _WatchTab extends GetView<HomeController> {
       }
       final games = controller.watchableGames;
       final recent = controller.recentGames;
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          sectionTitle(
-            TranslationKeys.watchLiveSection.tr,
-            const Key('watch-live-section'),
-          ),
-          if (games.isEmpty)
-            mutedText(TranslationKeys.watchEmpty.tr, const Key('watch-empty'))
-          else
-            CheckersStaggeredEntrance(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              itemDelay: const Duration(milliseconds: 60),
-              children: [for (final game in games) liveRow(game)],
+      return RefreshIndicator(
+        key: const Key('watch-refresh'),
+        onRefresh: controller.refreshWatchTab,
+        color: brand.brandGold,
+        backgroundColor: theme.colorScheme.shadow,
+        child: ListView(
+          // Always scrollable so the pull gesture works on short lists too.
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
+            sectionTitle(
+              TranslationKeys.watchLiveSection.tr,
+              const Key('watch-live-section'),
             ),
-          if (controller.hasMoreWatchable.value)
-            loadMoreButton(
-              const Key('watch-load-more'),
-              controller.loadMoreWatchableGames,
+            if (games.isEmpty)
+              mutedText(TranslationKeys.watchEmpty.tr, const Key('watch-empty'))
+            else
+              CheckersStaggeredEntrance(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                itemDelay: const Duration(milliseconds: 60),
+                children: [for (final game in games) liveRow(game)],
+              ),
+            if (controller.hasMoreWatchable.value)
+              loadMoreButton(
+                const Key('watch-load-more'),
+                controller.loadMoreWatchableGames,
+              ),
+            const SizedBox(height: 12),
+            sectionTitle(
+              TranslationKeys.watchRecentSection.tr,
+              const Key('watch-recent-section'),
             ),
-          const SizedBox(height: 12),
-          sectionTitle(
-            TranslationKeys.watchRecentSection.tr,
-            const Key('watch-recent-section'),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: CheckersSearchField(
-                  hint: TranslationKeys.watchRecentSearchHint.tr,
-                  onChanged: (value) => controller.recentSearch.value = value,
+            Row(
+              children: [
+                Expanded(
+                  child: CheckersSearchField(
+                    hint: TranslationKeys.watchRecentSearchHint.tr,
+                    onChanged: (value) => controller.recentSearch.value = value,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              FilterChip(
-                key: const Key('recent-mine-filter'),
-                selected: controller.recentMineOnly.value,
-                onSelected: (_) => controller.toggleRecentMineOnly(),
-                label: Text(TranslationKeys.watchRecentMine.tr),
-                labelStyle: TextStyle(
-                  color: controller.recentMineOnly.value
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                const SizedBox(width: 10),
+                FilterChip(
+                  key: const Key('recent-mine-filter'),
+                  selected: controller.recentMineOnly.value,
+                  onSelected: (_) => controller.toggleRecentMineOnly(),
+                  label: Text(TranslationKeys.watchRecentMine.tr),
+                  labelStyle: TextStyle(
+                    color: controller.recentMineOnly.value
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  selectedColor: brand.brandGold,
+                  checkmarkColor: theme.colorScheme.primary,
+                  backgroundColor: theme.colorScheme.shadow.withValues(
+                    alpha: 0.3,
+                  ),
+                  side: BorderSide(
+                    color: controller.recentMineOnly.value
+                        ? brand.brandGold
+                        : theme.colorScheme.onPrimary.withValues(alpha: 0.4),
+                  ),
                 ),
-                selectedColor: brand.brandGold,
-                checkmarkColor: theme.colorScheme.primary,
-                backgroundColor: theme.colorScheme.shadow.withValues(
-                  alpha: 0.3,
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (controller.recentLoading.value)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(color: brand.brandGold),
                 ),
-                side: BorderSide(
-                  color: controller.recentMineOnly.value
-                      ? brand.brandGold
-                      : theme.colorScheme.onPrimary.withValues(alpha: 0.4),
-                ),
-              ),
+              )
+            else if (recent.isEmpty)
+              mutedText(
+                TranslationKeys.watchRecentEmpty.tr,
+                const Key('watch-recent-empty'),
+              )
+            else ...[
+              for (final game in recent) recentRow(game),
             ],
-          ),
-          const SizedBox(height: 12),
-          if (controller.recentLoading.value)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: CircularProgressIndicator(color: brand.brandGold),
+            if (controller.hasMoreRecent.value &&
+                !controller.recentLoading.value)
+              loadMoreButton(
+                const Key('recent-load-more'),
+                controller.loadMoreRecentGames,
               ),
-            )
-          else if (recent.isEmpty)
-            mutedText(
-              TranslationKeys.watchRecentEmpty.tr,
-              const Key('watch-recent-empty'),
-            )
-          else
-            ...[for (final game in recent) recentRow(game)],
-          if (controller.hasMoreRecent.value && !controller.recentLoading.value)
-            loadMoreButton(
-              const Key('recent-load-more'),
-              controller.loadMoreRecentGames,
-            ),
-        ],
+          ],
+        ),
       );
     });
   }

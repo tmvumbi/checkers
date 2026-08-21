@@ -113,9 +113,13 @@ class SupabaseAuthService implements AuthService {
 
   Future<String> _googleIdToken() async {
     final googleSignIn = GoogleSignIn.instance;
-    // iOS reads its clientId from GoogleService-Info.plist; the web
-    // client id is what GoTrue expects as the token audience.
+    // Apple platforms need their own OAuth client id; Android derives it
+    // from the signing certificate instead. GoTrue accepts tokens for
+    // either audience (both ids are in GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID).
     await googleSignIn.initialize(
+      clientId: !kIsWeb && (Platform.isIOS || Platform.isMacOS)
+          ? GoogleAuthConfig.iosClientId
+          : null,
       serverClientId: GoogleAuthConfig.serverClientId,
     );
     final account = await googleSignIn.authenticate();

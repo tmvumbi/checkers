@@ -257,13 +257,22 @@ class HomeController extends GetxController {
     watchLoading.value = false;
   }
 
+  /// Pull-to-refresh on the Watch tab: both sections at once, without the
+  /// inner spinners (the pull gesture shows its own).
+  Future<void> refreshWatchTab() async {
+    await Future.wait([
+      refreshWatchableGames(),
+      refreshRecentGames(showSpinner: false),
+    ]);
+  }
+
   Future<void> loadMoreWatchableGames() async {
     _watchLimit += watchPageSize;
     await refreshWatchableGames();
   }
 
-  Future<void> refreshRecentGames() async {
-    recentLoading.value = true;
+  Future<void> refreshRecentGames({bool showSpinner = true}) async {
+    recentLoading.value = showSpinner;
     final result = await _onlineGameService.fetchRecentGames(
       search: recentSearch.value.trim().isEmpty
           ? null

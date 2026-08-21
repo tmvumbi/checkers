@@ -146,6 +146,11 @@ class LandingController extends GetxController {
         if (error.code.endsWith('cancelled')) {
           return;
         }
+        // The user-facing message stays generic; the cause goes to the
+        // device log, where sign-in problems are actually diagnosable.
+        if (kDebugMode) {
+          debugPrint('sign-in failed [$method] ${error.code}: ${error.message}');
+        }
         showCheckersSnackbar(TranslationKeys.signInFailed.tr);
       },
     );
