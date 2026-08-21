@@ -28,7 +28,6 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
   int _boardSize = 10;
   bool _backwardCapture = true;
   bool _flyingKing = true;
-  bool _allowUndo = false;
   _SideChoice _side = _SideChoice.white;
 
   RulesConfig get _rules => RulesConfig(
@@ -60,7 +59,6 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
         rules: _rules,
         aiLevel: _level,
         humanColor: humanColor,
-        allowUndo: _allowUndo,
       ),
     );
   }
@@ -167,12 +165,6 @@ class _PlayPcModalContentState extends State<PlayPcModalContent> {
             label: TranslationKeys.flyingKing.tr,
             value: _flyingKing,
             onChanged: (value) => setState(() => _flyingKing = value),
-          ),
-          _SwitchRow(
-            key: const Key('play-pc-allow-undo'),
-            label: TranslationKeys.allowUndoMoves.tr,
-            value: _allowUndo,
-            onChanged: (value) => setState(() => _allowUndo = value),
           ),
           const SizedBox(height: 10),
           Row(

@@ -42,20 +42,12 @@ void main() {
       () => find.byKey(const Key('home-play-pc-button')).evaluate().isNotEmpty,
     );
 
-    // Start an Easy American PC game with undo enabled.
+    // Start an Easy American PC game.
     await tester.tap(find.byKey(const Key('home-play-pc-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('play-pc-level-easy')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('play-pc-preset-american')));
-    await tester.pump();
-    await tester.ensureVisible(find.byKey(const Key('play-pc-allow-undo')));
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('play-pc-allow-undo')),
-        matching: find.byType(Switch),
-      ),
-    );
     await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('play-pc-start')));
     await tester.tap(find.byKey(const Key('play-pc-start')));
@@ -76,7 +68,7 @@ void main() {
     final own = Supabase.instance.client;
     final row = await own.from('games').select().eq('id', gameId).single();
     expect(row['vs_pc'], isTrue);
-    expect(row['allow_undo'], isTrue);
+    expect(row['allow_undo'], isFalse);
     expect(row['ai_level'], 'easy');
     expect(row['rated'], isFalse);
 
