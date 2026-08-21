@@ -8,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config/google_auth_config.dart';
 import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
 
@@ -112,7 +113,11 @@ class SupabaseAuthService implements AuthService {
 
   Future<String> _googleIdToken() async {
     final googleSignIn = GoogleSignIn.instance;
-    await googleSignIn.initialize();
+    // iOS reads its clientId from GoogleService-Info.plist; the web
+    // client id is what GoTrue expects as the token audience.
+    await googleSignIn.initialize(
+      serverClientId: GoogleAuthConfig.serverClientId,
+    );
     final account = await googleSignIn.authenticate();
     final idToken = account.authentication.idToken;
     if (idToken == null) {
