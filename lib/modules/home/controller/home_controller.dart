@@ -68,9 +68,20 @@ class HomeController extends GetxController {
 
   final Rx<HomeTab> tab = HomeTab.play.obs;
   final Rxn<UserProfile> profile = Rxn<UserProfile>();
+  static const int watchPageSize = 15;
   final RxList<OnlineGameSnapshot> watchableGames =
       <OnlineGameSnapshot>[].obs;
   final RxBool watchLoading = false.obs;
+  final RxBool hasMoreWatchable = false.obs;
+  int _watchLimit = watchPageSize;
+
+  static const int recentPageSize = 10;
+  final RxList<OnlineGameSnapshot> recentGames = <OnlineGameSnapshot>[].obs;
+  final RxBool recentLoading = false.obs;
+  final RxBool hasMoreRecent = false.obs;
+  final RxBool recentMineOnly = false.obs;
+  final RxString recentSearch = ''.obs;
+  Worker? _recentSearchWorker;
   final RxList<LeaderboardPlayer> leaderboard = <LeaderboardPlayer>[].obs;
   final RxBool leaderboardLoading = false.obs;
 
@@ -103,6 +114,11 @@ class HomeController extends GetxController {
     super.onReady();
     refreshProfile();
     _maybeQueueRatingPrompt();
+    _recentSearchWorker = debounce<String>(
+      recentSearch,
+      (_) => refreshRecentGames(),
+      time: const Duration(milliseconds: 400),
+    );
   }
 
   Future<void> _maybeQueueRatingPrompt() async {
@@ -164,6 +180,9 @@ class HomeController extends GetxController {
     _watchRefreshTimer?.cancel();
     if (newTab == HomeTab.watch) {
       refreshWatchableGames();
+      if (recentGames.isEmpty) {
+        refreshRecentGames();
+      }
       _watchRefreshTimer = Timer.periodic(
         const Duration(seconds: 7),
         (_) => refreshWatchableGames(),
@@ -223,12 +242,77 @@ class HomeController extends GetxController {
 
   Future<void> refreshWatchableGames() async {
     watchLoading.value = watchableGames.isEmpty;
-    final result = await _onlineGameService.fetchWatchableGames();
+    // One extra row tells us whether a further page exists; the periodic
+    // refresh re-fetches every page currently on screen.
+    final result = await _onlineGameService.fetchWatchableGames(
+      limit: _watchLimit + 1,
+    );
     result.when(
-      success: (games) => watchableGames.value = games,
+      success: (games) {
+        hasMoreWatchable.value = games.length > _watchLimit;
+        watchableGames.value = games.take(_watchLimit).toList();
+      },
       failure: (_) {},
     );
     watchLoading.value = false;
+  }
+
+  Future<void> loadMoreWatchableGames() async {
+    _watchLimit += watchPageSize;
+    await refreshWatchableGames();
+  }
+
+  Future<void> refreshRecentGames() async {
+    recentLoading.value = true;
+    final result = await _onlineGameService.fetchRecentGames(
+      search: recentSearch.value.trim().isEmpty
+          ? null
+          : recentSearch.value.trim(),
+      mine: recentMineOnly.value,
+      limit: recentPageSize + 1,
+    );
+    result.when(
+      success: (games) {
+        hasMoreRecent.value = games.length > recentPageSize;
+        recentGames.value = games.take(recentPageSize).toList();
+      },
+      failure: (_) {},
+    );
+    recentLoading.value = false;
+  }
+
+  Future<void> loadMoreRecentGames() async {
+    final result = await _onlineGameService.fetchRecentGames(
+      search: recentSearch.value.trim().isEmpty
+          ? null
+          : recentSearch.value.trim(),
+      mine: recentMineOnly.value,
+      offset: recentGames.length,
+      limit: recentPageSize + 1,
+    );
+    result.when(
+      success: (games) {
+        hasMoreRecent.value = games.length > recentPageSize;
+        recentGames.addAll(games.take(recentPageSize));
+      },
+      failure: (_) {},
+    );
+  }
+
+  void toggleRecentMineOnly() {
+    recentMineOnly.value = !recentMineOnly.value;
+    refreshRecentGames();
+  }
+
+  void openRecentGame(OnlineGameSnapshot snapshot) {
+    _analyticsService.logEvent('replay_game_opened');
+    Get.toNamed<void>(
+      AppRoutes.gameBoard,
+      arguments: GameBoardArguments.replay(
+        rules: snapshot.rules,
+        gameId: snapshot.id,
+      ),
+    );
   }
 
   Future<void> refreshLeaderboard() async {
@@ -313,6 +397,7 @@ class HomeController extends GetxController {
 
   @override
   void onClose() {
+    _recentSearchWorker?.dispose();
     _watchRefreshTimer?.cancel();
     super.onClose();
   }

@@ -75,6 +75,12 @@ const Map<String, String> frFr = {
   TranslationKeys.loadMore: 'Voir plus',
   TranslationKeys.watchEmpty:
       'Aucune partie en direct pour le moment. Revenez bientôt !',
+  TranslationKeys.watchLiveSection: 'Parties en direct',
+  TranslationKeys.watchRecentSection: 'Parties récentes',
+  TranslationKeys.watchRecentMine: 'Mes parties',
+  TranslationKeys.watchRecentSearchHint: 'Rechercher par joueur…',
+  TranslationKeys.watchRecentEmpty: 'Aucune partie récente trouvée.',
+  TranslationKeys.searchPlayersHint: 'Rechercher un joueur…',
   TranslationKeys.leaderboardEmpty:
       'Aucun joueur classé. Jouez en ligne pour entrer dans le Top 30 !',
   TranslationKeys.spectatorWinner: '@name gagne !',

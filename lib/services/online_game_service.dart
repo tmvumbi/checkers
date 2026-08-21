@@ -70,7 +70,16 @@ class GameEmote {
 
 abstract class OnlineGameService {
   Future<ApiResult<({String gameId, int seat})>> joinOnlineGame(String preset);
-  Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames();
+  Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames({
+    int offset,
+    int limit,
+  });
+  Future<ApiResult<List<OnlineGameSnapshot>>> fetchRecentGames({
+    String? search,
+    bool mine,
+    int offset,
+    int limit,
+  });
   Future<ApiResult<List<LeaderboardPlayer>>> fetchLeaderboard();
   Future<ApiResult<OnlineGameSnapshot>> fetchGame(String gameId);
   Stream<OnlineGameSnapshot> watchGame(String gameId);
@@ -257,7 +266,10 @@ class SupabaseOnlineGameService implements OnlineGameService {
   }
 
   @override
-  Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames() {
+  Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames({
+    int offset = 0,
+    int limit = 30,
+  }) {
     return _guard(() async {
       final rows = await _client
           .from('games')
@@ -265,20 +277,43 @@ class SupabaseOnlineGameService implements OnlineGameService {
           .eq('status', 'playing')
           .eq('is_private', false)
           .order('started_at', ascending: false)
-          .limit(30);
+          .range(offset, offset + limit - 1);
+      return [for (final row in rows) _snapshotWithPlayers(row)];
+    });
+  }
+
+  @override
+  Future<ApiResult<List<OnlineGameSnapshot>>> fetchRecentGames({
+    String? search,
+    bool mine = false,
+    int offset = 0,
+    int limit = 10,
+  }) {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>(
+        'list_recent_games',
+        params: {
+          'p_search': search,
+          'p_mine': mine,
+          'p_offset': offset,
+          'p_limit': limit,
+        },
+      );
       return [
-        for (final row in rows)
-          OnlineGameSnapshot.fromRow(
-            row,
-            players: [
-              for (final playerRow in (row['game_players'] as List? ?? []))
-                OnlineGamePlayer.fromJson(
-                  (playerRow as Map).cast<String, dynamic>(),
-                ),
-            ]..sort((a, b) => a.seat.compareTo(b.seat)),
-          ),
+        for (final row in response as List)
+          _snapshotWithPlayers((row as Map).cast<String, dynamic>()),
       ];
     });
+  }
+
+  OnlineGameSnapshot _snapshotWithPlayers(Map<String, dynamic> row) {
+    return OnlineGameSnapshot.fromRow(
+      row,
+      players: [
+        for (final playerRow in (row['game_players'] as List? ?? []))
+          OnlineGamePlayer.fromJson((playerRow as Map).cast<String, dynamic>()),
+      ]..sort((a, b) => a.seat.compareTo(b.seat)),
+    );
   }
 
   @override

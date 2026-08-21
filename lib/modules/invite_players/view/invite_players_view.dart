@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
+import '../../../shared/widgets/checkers_search_field.dart';
 import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
 import '../controller/invite_players_controller.dart';
@@ -54,6 +55,14 @@ class InvitePlayersView extends GetView<InvitePlayersController> {
                   onPressed: controller.shareLink,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+                child: CheckersSearchField(
+                  key: const Key('invite-players-search'),
+                  hint: TranslationKeys.searchPlayersHint.tr,
+                  onChanged: (value) => controller.search.value = value,
+                ),
+              ),
               Expanded(
                 child: Obx(() {
                   if (controller.loading.value) {
@@ -81,8 +90,23 @@ class InvitePlayersView extends GetView<InvitePlayersController> {
                   }
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: players.length,
+                    itemCount:
+                        players.length + (controller.hasMore.value ? 1 : 0),
                     itemBuilder: (context, index) {
+                      if (index == players.length) {
+                        return TextButton(
+                          key: const Key('invite-players-load-more'),
+                          onPressed: controller.loadMore,
+                          child: Text(
+                            TranslationKeys.loadMore.tr,
+                            style: TextStyle(
+                              color: brand.brandGold,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        );
+                      }
                       final player = players[index];
                       final inviting =
                           controller.invitingUid.value == player.uid;

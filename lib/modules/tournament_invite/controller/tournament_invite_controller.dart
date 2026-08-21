@@ -19,12 +19,17 @@ class TournamentInviteController extends GetxController {
   final SupabaseClient? _client;
   SupabaseClient get client => _client ?? Supabase.instance.client;
 
+  static const int pageSize = 20;
   final RxList<AvailablePlayer> players = <AvailablePlayer>[].obs;
   final RxSet<String> selected = <String>{}.obs;
   final RxBool loading = true.obs;
   final RxBool sending = false.obs;
+  final RxBool hasMore = false.obs;
+  final RxString search = ''.obs;
+  int _limit = pageSize;
 
   Timer? _refreshTimer;
+  Worker? _searchWorker;
 
   @override
   void onReady() {
@@ -34,16 +39,28 @@ class TournamentInviteController extends GetxController {
       const Duration(seconds: 10),
       (_) => _load(),
     );
+    _searchWorker = debounce<String>(search, (_) {
+      _limit = pageSize;
+      _load();
+    }, time: const Duration(milliseconds: 400));
   }
 
   Future<void> _load() async {
     try {
+      final query = search.value.trim();
+      // One extra row reveals whether a further page exists.
       final response = await client.rpc<dynamic>(
         'list_tournament_invitable_players',
+        params: {
+          'p_search': query.isEmpty ? null : query,
+          'p_offset': 0,
+          'p_limit': _limit + 1,
+        },
       );
       final rows = (response as List).cast<Map<String, dynamic>>();
+      hasMore.value = rows.length > _limit;
       players.value = [
-        for (final row in rows)
+        for (final row in rows.take(_limit))
           AvailablePlayer(
             uid: row['uid'] as String,
             nickname: (row['nickname'] as String?) ?? '',
@@ -51,13 +68,17 @@ class TournamentInviteController extends GetxController {
             rating: (row['rating'] as num?)?.toInt() ?? 1200,
           ),
       ];
-      selected.removeWhere(
-        (uid) => !players.any((player) => player.uid == uid),
-      );
+      // Keep hidden selections: a player filtered out by the current
+      // search stays selected until sent or manually toggled.
     } catch (_) {
     } finally {
       loading.value = false;
     }
+  }
+
+  Future<void> loadMore() async {
+    _limit += pageSize;
+    await _load();
   }
 
   void toggle(String uid) {
@@ -102,6 +123,7 @@ class TournamentInviteController extends GetxController {
 
   @override
   void onClose() {
+    _searchWorker?.dispose();
     _refreshTimer?.cancel();
     super.onClose();
   }

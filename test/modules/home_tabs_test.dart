@@ -43,9 +43,20 @@ void main() {
     auth = MockAuthService();
     profile = MockProfileService();
     online = MockOnlineGameService();
-    when(() => online.fetchWatchableGames()).thenAnswer(
-      (_) async => const Success([]),
-    );
+    when(
+      () => online.fetchWatchableGames(
+        offset: any(named: 'offset'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer((_) async => const Success([]));
+    when(
+      () => online.fetchRecentGames(
+        search: any(named: 'search'),
+        mine: any(named: 'mine'),
+        offset: any(named: 'offset'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer((_) async => const Success([]));
     when(() => online.fetchLeaderboard()).thenAnswer(
       (_) async => const Success([]),
     );

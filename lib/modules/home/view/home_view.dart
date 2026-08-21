@@ -14,6 +14,7 @@ import '../../../shared/widgets/checkers_flag_icon.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
 import '../../../shared/widgets/checkers_logo_mark.dart';
 import '../../../shared/widgets/checkers_modal.dart';
+import '../../../shared/widgets/checkers_search_field.dart';
 import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../shared/widgets/checkers_square_icon_button.dart';
 import '../../../shared/widgets/checkers_staggered_entrance.dart';
@@ -357,125 +358,244 @@ class _WatchTab extends GetView<HomeController> {
     final theme = Theme.of(context);
     final brand = theme.extension<CheckersThemeExtension>()!;
 
+    Widget sectionTitle(String text, Key key) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        key: key,
+        style: theme.textTheme.headlineMedium!.copyWith(
+          color: brand.brandGold,
+          fontSize: 18,
+        ),
+      ),
+    );
+
+    Widget loadMoreButton(Key key, VoidCallback onPressed) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextButton(
+        key: key,
+        onPressed: onPressed,
+        child: Text(
+          TranslationKeys.loadMore.tr,
+          style: TextStyle(
+            color: brand.brandGold,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+
+    Widget mutedText(String text, Key key) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text(
+        text,
+        key: key,
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodyLarge!.copyWith(
+          color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+          fontSize: 14,
+        ),
+      ),
+    );
+
+    Widget playersRow(
+      OnlineGameSnapshot game, {
+      required Key key,
+      required VoidCallback onTap,
+      required String centerLabel,
+      Widget? trailing,
+    }) {
+      final white = game.players
+          .where((p) => p.color?.name == 'white')
+          .toList();
+      final black = game.players
+          .where((p) => p.color?.name == 'black')
+          .toList();
+      return InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.6),
+              width: 2,
+            ),
+          ),
+          child: Row(
+            children: [
+              _SeatAvatar(
+                player: white.isEmpty ? null : white.first,
+                theme: theme,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  seatDisplayName(
+                    white.isEmpty ? null : white.first,
+                    aiLevel: game.aiLevel,
+                  ),
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  centerLabel,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: brand.brandGold,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  seatDisplayName(
+                    black.isEmpty ? null : black.first,
+                    aiLevel: game.aiLevel,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _SeatAvatar(
+                player: black.isEmpty ? null : black.first,
+                theme: theme,
+              ),
+              if (trailing != null) ...[const SizedBox(width: 8), trailing],
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget liveRow(OnlineGameSnapshot game) => playersRow(
+      game,
+      key: Key('watch-game-${game.id}'),
+      onTap: () => controller.openWatchGame(game),
+      centerLabel: 'VS',
+    );
+
+    Widget recentRow(OnlineGameSnapshot game) => playersRow(
+      game,
+      key: Key('recent-game-${game.id}'),
+      onTap: () => controller.openRecentGame(game),
+      centerLabel: switch (game.result) {
+        'whiteWin' => '1 - 0',
+        'blackWin' => '0 - 1',
+        'draw' => '\u00bd - \u00bd',
+        _ => 'VS',
+      },
+      trailing: Icon(
+        Icons.play_circle_outline,
+        size: 22,
+        color: brand.brandGold.withValues(alpha: 0.9),
+      ),
+    );
+
     return Obx(() {
-      if (controller.watchLoading.value) {
+      if (controller.watchLoading.value &&
+          controller.watchableGames.isEmpty &&
+          controller.recentGames.isEmpty) {
         return Center(child: CircularProgressIndicator(color: brand.brandGold));
       }
       final games = controller.watchableGames;
-      if (games.isEmpty) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.visibility_outlined,
-                  size: 56,
-                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.4),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  TranslationKeys.watchEmpty.tr,
-                  key: const Key('watch-empty'),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge!.copyWith(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-      Widget gameRow(OnlineGameSnapshot game) {
-        final white = game.players
-            .where((p) => p.color?.name == 'white')
-            .toList();
-        final black = game.players
-            .where((p) => p.color?.name == 'black')
-            .toList();
-        return InkWell(
-          key: Key('watch-game-${game.id}'),
-          onTap: () => controller.openWatchGame(game),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.shadow.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: theme.colorScheme.onPrimary.withValues(alpha: 0.6),
-                width: 2,
-              ),
-            ),
-            child: Row(
-              children: [
-                _SeatAvatar(
-                  player: white.isEmpty ? null : white.first,
-                  theme: theme,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    seatDisplayName(
-                      white.isEmpty ? null : white.first,
-                      aiLevel: game.aiLevel,
-                    ),
-                    textAlign: TextAlign.end,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge!.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'VS',
-                    style: theme.textTheme.bodyLarge!.copyWith(
-                      color: brand.brandGold,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    seatDisplayName(
-                      black.isEmpty ? null : black.first,
-                      aiLevel: game.aiLevel,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge!.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _SeatAvatar(
-                  player: black.isEmpty ? null : black.first,
-                  theme: theme,
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-
+      final recent = controller.recentGames;
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          CheckersStaggeredEntrance(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            itemDelay: const Duration(milliseconds: 60),
-            children: [for (final game in games) gameRow(game)],
+          sectionTitle(
+            TranslationKeys.watchLiveSection.tr,
+            const Key('watch-live-section'),
           ),
+          if (games.isEmpty)
+            mutedText(TranslationKeys.watchEmpty.tr, const Key('watch-empty'))
+          else
+            CheckersStaggeredEntrance(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              itemDelay: const Duration(milliseconds: 60),
+              children: [for (final game in games) liveRow(game)],
+            ),
+          if (controller.hasMoreWatchable.value)
+            loadMoreButton(
+              const Key('watch-load-more'),
+              controller.loadMoreWatchableGames,
+            ),
+          const SizedBox(height: 12),
+          sectionTitle(
+            TranslationKeys.watchRecentSection.tr,
+            const Key('watch-recent-section'),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: CheckersSearchField(
+                  hint: TranslationKeys.watchRecentSearchHint.tr,
+                  onChanged: (value) => controller.recentSearch.value = value,
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilterChip(
+                key: const Key('recent-mine-filter'),
+                selected: controller.recentMineOnly.value,
+                onSelected: (_) => controller.toggleRecentMineOnly(),
+                label: Text(TranslationKeys.watchRecentMine.tr),
+                labelStyle: TextStyle(
+                  color: controller.recentMineOnly.value
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                selectedColor: brand.brandGold,
+                checkmarkColor: theme.colorScheme.primary,
+                backgroundColor: theme.colorScheme.shadow.withValues(
+                  alpha: 0.3,
+                ),
+                side: BorderSide(
+                  color: controller.recentMineOnly.value
+                      ? brand.brandGold
+                      : theme.colorScheme.onPrimary.withValues(alpha: 0.4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (controller.recentLoading.value)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: CircularProgressIndicator(color: brand.brandGold),
+              ),
+            )
+          else if (recent.isEmpty)
+            mutedText(
+              TranslationKeys.watchRecentEmpty.tr,
+              const Key('watch-recent-empty'),
+            )
+          else
+            ...[for (final game in recent) recentRow(game)],
+          if (controller.hasMoreRecent.value && !controller.recentLoading.value)
+            loadMoreButton(
+              const Key('recent-load-more'),
+              controller.loadMoreRecentGames,
+            ),
         ],
       );
     });

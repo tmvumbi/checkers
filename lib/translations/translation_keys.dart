@@ -70,6 +70,12 @@ abstract final class TranslationKeys {
   static const String optionOff = 'option_off';
   static const String loadMore = 'load_more';
   static const String watchEmpty = 'watch_empty';
+  static const String watchLiveSection = 'watch_live_section';
+  static const String watchRecentSection = 'watch_recent_section';
+  static const String watchRecentMine = 'watch_recent_mine';
+  static const String watchRecentSearchHint = 'watch_recent_search_hint';
+  static const String watchRecentEmpty = 'watch_recent_empty';
+  static const String searchPlayersHint = 'search_players_hint';
   static const String leaderboardEmpty = 'leaderboard_empty';
   static const String spectatorWinner = 'spectator_winner';
 

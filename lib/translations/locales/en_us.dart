@@ -73,6 +73,12 @@ const Map<String, String> enUs = {
   TranslationKeys.loadMore: 'Load more',
   TranslationKeys.watchEmpty:
       'No live games right now. Check back in a moment!',
+  TranslationKeys.watchLiveSection: 'Live games',
+  TranslationKeys.watchRecentSection: 'Recent games',
+  TranslationKeys.watchRecentMine: 'My games',
+  TranslationKeys.watchRecentSearchHint: 'Search by player…',
+  TranslationKeys.watchRecentEmpty: 'No recent games found.',
+  TranslationKeys.searchPlayersHint: 'Search players…',
   TranslationKeys.leaderboardEmpty:
       'No ranked players yet. Play online games to enter the Top 30!',
   TranslationKeys.spectatorWinner: '@name wins!',

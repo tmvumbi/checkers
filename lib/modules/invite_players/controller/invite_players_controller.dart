@@ -44,11 +44,16 @@ class InvitePlayersController extends GetxController {
   final SupabaseClient? _client;
   SupabaseClient get client => _client ?? Supabase.instance.client;
 
+  static const int pageSize = 20;
   final RxList<AvailablePlayer> players = <AvailablePlayer>[].obs;
   final RxBool loading = true.obs;
+  final RxBool hasMore = false.obs;
+  final RxString search = ''.obs;
   final RxnString invitingUid = RxnString();
+  int _limit = pageSize;
 
   Timer? _refreshTimer;
+  Worker? _searchWorker;
 
   @override
   void onReady() {
@@ -58,37 +63,45 @@ class InvitePlayersController extends GetxController {
       const Duration(seconds: 10),
       (_) => _load(),
     );
+    _searchWorker = debounce<String>(search, (_) {
+      _limit = pageSize;
+      _load();
+    }, time: const Duration(milliseconds: 400));
   }
 
   Future<void> _load() async {
     try {
-      final uid = client.auth.currentUser?.id;
-      final cutoff = DateTime.now()
-          .toUtc()
-          .subtract(const Duration(minutes: 3))
-          .toIso8601String();
-      final rows = await client
-          .from('player_presence')
-          .select()
-          .gte('last_active_at', cutoff)
-          .eq('busy_mode', 'idle')
-          .order('last_active_at', ascending: false)
-          .limit(50);
+      final query = search.value.trim();
+      // One extra row reveals whether a further page exists.
+      final response = await client.rpc<dynamic>(
+        'list_available_players',
+        params: {
+          'p_search': query.isEmpty ? null : query,
+          'p_offset': 0,
+          'p_limit': _limit + 1,
+        },
+      );
+      final rows = (response as List).cast<Map<String, dynamic>>();
+      hasMore.value = rows.length > _limit;
       players.value = [
-        for (final row in rows)
-          if (row['uid'] != uid && ((row['nickname'] as String?) ?? '') != '')
-            AvailablePlayer(
-              uid: row['uid'] as String,
-              nickname: row['nickname'] as String,
-              photoUrl: row['photo_url'] as String?,
-              rating: (row['rating'] as num?)?.toInt() ?? 1200,
-            ),
+        for (final row in rows.take(_limit))
+          AvailablePlayer(
+            uid: row['uid'] as String,
+            nickname: (row['nickname'] as String?) ?? '',
+            photoUrl: row['photo_url'] as String?,
+            rating: (row['rating'] as num?)?.toInt() ?? 1200,
+          ),
       ];
     } catch (_) {
       // Keep the previous list on transient errors.
     } finally {
       loading.value = false;
     }
+  }
+
+  Future<void> loadMore() async {
+    _limit += pageSize;
+    await _load();
   }
 
   Future<void> invite(AvailablePlayer player) async {
@@ -144,6 +157,7 @@ class InvitePlayersController extends GetxController {
 
   @override
   void onClose() {
+    _searchWorker?.dispose();
     _refreshTimer?.cancel();
     super.onClose();
   }

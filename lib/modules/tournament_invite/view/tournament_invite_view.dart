@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
+import '../../../shared/widgets/checkers_search_field.dart';
 import '../../../shared/widgets/checkers_square_icon_button.dart';
 import '../../../themes/app_theme.dart';
 import '../../../translations/translation_keys.dart';
@@ -64,6 +65,12 @@ class TournamentInviteView extends GetView<TournamentInviteController> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  CheckersSearchField(
+                    key: const Key('tournament-invite-search'),
+                    hint: TranslationKeys.searchPlayersHint.tr,
+                    onChanged: (value) => controller.search.value = value,
+                  ),
+                  const SizedBox(height: 8),
                   Expanded(
                     child: Obx(() {
                       if (controller.loading.value) {
@@ -92,8 +99,24 @@ class TournamentInviteView extends GetView<TournamentInviteController> {
                         );
                       }
                       return ListView.builder(
-                        itemCount: players.length,
+                        itemCount:
+                            players.length +
+                            (controller.hasMore.value ? 1 : 0),
                         itemBuilder: (context, index) {
+                          if (index == players.length) {
+                            return TextButton(
+                              key: const Key('tournament-invite-load-more'),
+                              onPressed: controller.loadMore,
+                              child: Text(
+                                TranslationKeys.loadMore.tr,
+                                style: TextStyle(
+                                  color: brand.brandGold,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            );
+                          }
                           final player = players[index];
                           return Obx(() {
                             final isSelected = controller.selected.contains(
