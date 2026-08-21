@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../engine/board_geometry.dart';
 import '../../../../engine/checkers_engine.dart';
+import '../../../../services/custom_ad_service.dart';
 import '../../controller/game_board_controller.dart';
 
 /// The interactive checkers board: squares, highlights, pieces, and
@@ -257,12 +258,41 @@ class PieceWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
+    // Sponsored skins (custom ad campaigns) replace the disc face; the
+    // painted base still provides the shadow, rim, and highlight ring.
+    final skinUrl = Get.isRegistered<CustomAdService>()
+        ? Get.find<CustomAdService>().pieceSkinUrl(color, isKing: isKing)
+        : null;
+    final base = CustomPaint(
       painter: _PiecePainter(
         color: color,
-        isKing: isKing,
+        // The skin image is the king marker when one is set.
+        isKing: isKing && skinUrl == null,
         highlighted: highlighted,
       ),
+    );
+    if (skinUrl == null) {
+      return base;
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        base,
+        Center(
+          child: FractionallySizedBox(
+            widthFactor: 0.70,
+            heightFactor: 0.70,
+            child: ClipOval(
+              child: Image.network(
+                skinUrl,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

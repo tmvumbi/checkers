@@ -7,6 +7,7 @@ import '../services/app_rating_service.dart';
 import '../services/auth_service.dart';
 import '../services/block_service.dart';
 import '../services/checkers_ai_service.dart';
+import '../services/custom_ad_service.dart';
 import '../services/invite_listener_service.dart';
 import '../services/online_game_service.dart';
 import '../services/party_link_service.dart';
@@ -48,6 +49,7 @@ class InitialBinding extends Bindings {
       permanent: true,
     );
     Get.put<AdService>(GoogleAdService(), permanent: true);
+    Get.put<CustomAdService>(CustomAdService(), permanent: true);
     Get.put<InviteListenerService>(InviteListenerService(), permanent: true);
     if (Firebase.apps.isNotEmpty) {
       Get.put<PushNotificationService>(
