@@ -2,7 +2,7 @@ name: checkers
 description: "Checkers — international draughts and checkers, online and vs the computer."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.11.5
