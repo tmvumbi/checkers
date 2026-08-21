@@ -68,6 +68,14 @@ class CheckersEngine {
   int kingsBB = 0;
   PieceColor sideToMove = PieceColor.white;
 
+  /// Incrementally maintained piece counts (kept in sync by
+  /// [applyMove]/[undoMove]); the AI evaluation and the FMJD endgame rules
+  /// read these instead of popcounting bitboards on every node.
+  int whiteMen = 0;
+  int whiteKings = 0;
+  int blackMen = 0;
+  int blackKings = 0;
+
   /// Consecutive plies in which a king moved with no capture (25-move /
   /// 40-move rules; threshold depends on the rules family).
   int noProgressPlies = 0;
@@ -93,8 +101,16 @@ class CheckersEngine {
   int get occupied => whiteBB | blackBB;
 
   /// Pieces of [color] still on the board.
-  int pieceCount(PieceColor color) =>
-      _popCount(color == PieceColor.white ? whiteBB : blackBB);
+  int pieceCount(PieceColor color) => color == PieceColor.white
+      ? whiteMen + whiteKings
+      : blackMen + blackKings;
+
+  void _recountPieces() {
+    whiteMen = _popCount(whiteBB & ~kingsBB);
+    whiteKings = _popCount(whiteBB & kingsBB);
+    blackMen = _popCount(blackBB & ~kingsBB);
+    blackKings = _popCount(blackBB & kingsBB);
+  }
 
   void reset() {
     whiteBB = 0;
@@ -117,6 +133,7 @@ class CheckersEngine {
     _hashHistory.clear();
     hash = _computeHash();
     _hashHistory.add(hash);
+    _recountPieces();
   }
 
   /// Loads an arbitrary position (tests, custom setups, replays).
@@ -149,6 +166,7 @@ class CheckersEngine {
     _hashHistory.clear();
     hash = _computeHash();
     _hashHistory.add(hash);
+    _recountPieces();
     _updateEndgameCountdown();
   }
 
@@ -208,10 +226,10 @@ class CheckersEngine {
   List<Move> _captureMoves(PieceColor color) {
     final own = color == PieceColor.white ? whiteBB : blackBB;
     final sequences = <Move>[];
-    for (var square = 0; square < config.squareCount; square++) {
-      if ((own >> square) & 1 == 0) {
-        continue;
-      }
+    var bits = own;
+    while (bits != 0) {
+      final square = _lowestBit(bits);
+      bits &= bits - 1;
       if (isKingAt(square)) {
         _kingCaptureDfs(color, square, square, 0, <int>[], sequences);
       } else {
@@ -239,10 +257,10 @@ class CheckersEngine {
 
     // Collapse sequences with identical legal identity (same origin,
     // destination and captured set — FMJD tie choices).
-    final seen = <String>{};
+    final seen = <int>{};
     final deduped = <Move>[];
     for (final move in filtered) {
-      if (seen.add(move.key)) {
+      if (seen.add((move.capturedMask << 12) | (move.from << 6) | move.to)) {
         deduped.add(move);
       }
     }
@@ -309,6 +327,7 @@ class CheckersEngine {
           path: List.of(path),
           captured: _maskToList(capturedMask),
           promotes: promotes,
+          capturedMask: capturedMask,
         ),
       );
     }
@@ -368,6 +387,7 @@ class CheckersEngine {
           from: origin,
           path: List.of(path),
           captured: _maskToList(capturedMask),
+          capturedMask: capturedMask,
         ),
       );
     }
@@ -384,15 +404,7 @@ class CheckersEngine {
     return squares;
   }
 
-  int _lowestBit(int mask) {
-    var index = 0;
-    var m = mask;
-    while ((m & 1) == 0) {
-      m >>= 1;
-      index++;
-    }
-    return index;
-  }
+  int _lowestBit(int mask) => (mask & -mask).bitLength - 1;
 
   List<Move> _quietMoves(PieceColor color) {
     final own = color == PieceColor.white ? whiteBB : blackBB;
@@ -401,10 +413,10 @@ class CheckersEngine {
         ? const [BoardGeometry.northWest, BoardGeometry.northEast]
         : const [BoardGeometry.southWest, BoardGeometry.southEast];
 
-    for (var square = 0; square < config.squareCount; square++) {
-      if ((own >> square) & 1 == 0) {
-        continue;
-      }
+    var bits = own;
+    while (bits != 0) {
+      final square = _lowestBit(bits);
+      bits &= bits - 1;
       if (isKingAt(square)) {
         for (final dir in BoardGeometry.allDirections) {
           var to = geometry.neighbors[dir][square];
@@ -469,8 +481,10 @@ class CheckersEngine {
     hash ^= zobrist.pieceKeys[_pieceIndex(color, wasKing)][move.from];
     if (color == PieceColor.white) {
       whiteBB &= ~fromBit;
+      wasKing ? whiteKings-- : whiteMen--;
     } else {
       blackBB &= ~fromBit;
+      wasKing ? blackKings-- : blackMen--;
     }
     kingsBB &= ~fromBit;
 
@@ -484,14 +498,21 @@ class CheckersEngine {
       whiteBB &= ~bit;
       blackBB &= ~bit;
       kingsBB &= ~bit;
+      if (color == PieceColor.white) {
+        capturedKing ? blackKings-- : blackMen--;
+      } else {
+        capturedKing ? whiteKings-- : whiteMen--;
+      }
     }
 
     // Land, possibly promoting.
     final becomesKing = wasKing || move.promotes;
     if (color == PieceColor.white) {
       whiteBB |= toBit;
+      becomesKing ? whiteKings++ : whiteMen++;
     } else {
       blackBB |= toBit;
+      becomesKing ? blackKings++ : blackMen++;
     }
     if (becomesKing) {
       kingsBB |= toBit;
@@ -527,8 +548,10 @@ class CheckersEngine {
     // Lift the piece back off its landing square.
     if (color == PieceColor.white) {
       whiteBB &= ~toBit;
+      landedAsKing ? whiteKings-- : whiteMen--;
     } else {
       blackBB &= ~toBit;
+      landedAsKing ? blackKings-- : blackMen--;
     }
     kingsBB &= ~toBit;
 
@@ -536,12 +559,15 @@ class CheckersEngine {
     for (var i = 0; i < move.captured.length; i++) {
       final square = move.captured[i];
       final bit = 1 << square;
+      final capturedKing = (record.capturedKingsMask >> i) & 1 == 1;
       if (color == PieceColor.white) {
         blackBB |= bit;
+        capturedKing ? blackKings++ : blackMen++;
       } else {
         whiteBB |= bit;
+        capturedKing ? whiteKings++ : whiteMen++;
       }
-      if ((record.capturedKingsMask >> i) & 1 == 1) {
+      if (capturedKing) {
         kingsBB |= bit;
       }
     }
@@ -550,8 +576,10 @@ class CheckersEngine {
     final fromBit = 1 << move.from;
     if (color == PieceColor.white) {
       whiteBB |= fromBit;
+      wasKing ? whiteKings++ : whiteMen++;
     } else {
       blackBB |= fromBit;
+      wasKing ? blackKings++ : blackMen++;
     }
     if (wasKing) {
       kingsBB |= fromBit;
@@ -587,17 +615,22 @@ class CheckersEngine {
       return;
     }
 
-    // Threefold repetition (same position, same side to move).
-    var repetitions = 0;
-    for (final h in _hashHistory) {
-      if (h == hash) {
+    // Threefold repetition (same position, same side to move). Only the
+    // plies since the last capture or man move can repeat: captures shrink
+    // material and men never retreat, so nothing before the last
+    // irreversible ply can equal the current position. Positions with the
+    // other side to move differ in the hash's side key, hence step 2.
+    var repetitions = 1;
+    final lastIndex = _hashHistory.length - 1;
+    for (var back = 2; back <= noProgressPlies; back += 2) {
+      if (_hashHistory[lastIndex - back] == hash) {
         repetitions++;
+        if (repetitions >= 3) {
+          result = GameResult.draw;
+          resultReason = ResultReason.repetition;
+          return;
+        }
       }
-    }
-    if (repetitions >= 3) {
-      result = GameResult.draw;
-      resultReason = ResultReason.repetition;
-      return;
     }
 
     if (config.usesFmjdDrawRules) {
@@ -626,10 +659,12 @@ class CheckersEngine {
     if (!config.usesFmjdDrawRules) {
       return;
     }
-    final whiteMen = _popCount(whiteBB & ~kingsBB);
-    final whiteKings = _popCount(whiteBB & kingsBB);
-    final blackMen = _popCount(blackBB & ~kingsBB);
-    final blackKings = _popCount(blackBB & kingsBB);
+    // Countdown only ever arms with <= 4 pieces on the board; skip the
+    // classification entirely for regular positions.
+    if (whiteMen + whiteKings + blackMen + blackKings > 4 &&
+        endgameCountdown < 0) {
+      return;
+    }
 
     final fiveClass = _isFiveMoveClass(
       whiteMen,
@@ -665,10 +700,6 @@ class CheckersEngine {
   }
 
   bool _endgameIsFiveMoveClass() {
-    final whiteMen = _popCount(whiteBB & ~kingsBB);
-    final whiteKings = _popCount(whiteBB & kingsBB);
-    final blackMen = _popCount(blackBB & ~kingsBB);
-    final blackKings = _popCount(blackBB & kingsBB);
     return _isFiveMoveClass(whiteMen, whiteKings, blackMen, blackKings);
   }
 

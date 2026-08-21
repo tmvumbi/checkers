@@ -1,19 +1,10 @@
+import 'dart:typed_data';
+
 import '../board_geometry.dart';
 import '../checkers_engine.dart';
 import '../move.dart';
 import 'ai_config.dart';
-
-class _TtEntry {
-  _TtEntry(this.depth, this.score, this.flag, this.bestKey);
-
-  final int depth;
-  final int score;
-  final int flag; // 0 exact, 1 lower bound, 2 upper bound.
-
-  /// Key of the best move found here — used for move ordering on re-visits,
-  /// which is where most of alpha-beta's pruning power comes from.
-  final String? bestKey;
-}
+import 'evaluator.dart';
 
 class AiMoveChoice {
   const AiMoveChoice({
@@ -29,28 +20,51 @@ class AiMoveChoice {
   final int nodes;
 }
 
-/// Negamax + alpha-beta with iterative deepening, a transposition table and
+/// Negamax + alpha-beta with iterative deepening, a fixed-size shared
+/// transposition table, PVS, aspiration windows, late-move reductions and
 /// forced-capture quiescence (PRD §7.3). Synchronous — run it inside an
 /// isolate from UI code.
+///
+/// The instance is designed to live across moves: the transposition table
+/// ages by generation instead of being cleared, and [engine]/[config] may
+/// be swapped between searches (the persistent AI isolate does both).
 class CheckersAi {
   CheckersAi(this.engine, this.config);
 
-  final CheckersEngine engine;
-  final AiConfig config;
+  CheckersEngine engine;
+  AiConfig config;
 
-  final Map<int, _TtEntry> _table = {};
+  // ---- transposition table (fixed typed arrays, ~8 MB) ----
+  static const int _ttBits = 19;
+  static const int _ttMask = (1 << _ttBits) - 1;
+  final Int64List _ttKeys = Int64List(1 << _ttBits);
+  final Int64List _ttData = Int64List(1 << _ttBits);
+  int _generation = 0;
 
-  /// Two killer-move keys per ply: quiet moves that recently caused beta
-  /// cutoffs at the same depth get searched early.
-  final List<List<String>> _killers = List.generate(64, (_) => <String>[]);
+  // data layout: score+_scoreOffset (22b) | depth<<22 (7b) | flag<<29 (2b)
+  //            | bestId<<31 (12b) | generation<<43 (8b)
+  static const int _scoreOffset = 1 << 21;
 
-  /// History heuristic: cutoff counts per move key, weighted by depth².
-  final Map<String, int> _history = {};
+  // ---- move ordering state ----
+  static const int _maxPly = 96;
+  final Int32List _killers = Int32List(2 * _maxPly);
+  final Int32List _history = Int32List(1 << 12);
+  final Int32List _counterMoves = Int32List(1 << 12);
+
+  // Scratch: previous move id per ply for the countermove heuristic.
+  final Int32List _prevMoveId = Int32List(_maxPly + 2);
+
   int _nodes = 0;
   int _deadline = 0;
   bool _aborted = false;
 
+  Evaluator? _evaluator;
+
   static const int _win = 1 << 20;
+  static const int _mateBound = _win - 2 * _maxPly;
+  static const int _infinity = _win * 2;
+
+  static int _moveId(Move move) => (move.from << 6) | move.to;
 
   /// Deterministic per-position pseudo-randomness: hash-mixed so results are
   /// reproducible and the transposition table stays consistent.
@@ -59,6 +73,26 @@ class CheckersAi {
     x = (x ^ (x >>> 30)) * 0xBF58476D1CE4E5B9;
     x = (x ^ (x >>> 27)) * 0x94D049BB133111EB;
     return (x ^ (x >>> 31)) & 0x7FFFFFFFFFFFFFFF;
+  }
+
+  /// Prepares ordering state for a fresh search while keeping the warm
+  /// transposition table (aged by generation).
+  void _newSearch() {
+    _generation = (_generation + 1) & 0xFF;
+    _killers.fillRange(0, _killers.length, 0);
+    for (var i = 0; i < _history.length; i++) {
+      _history[i] >>= 1;
+    }
+    _prevMoveId.fillRange(0, _prevMoveId.length, 0);
+  }
+
+  /// Drops all cross-move search state; call when the position context
+  /// changes entirely (new game, different rules).
+  void resetTables() {
+    _ttKeys.fillRange(0, _ttKeys.length, 0);
+    _ttData.fillRange(0, _ttData.length, 0);
+    _history.fillRange(0, _history.length, 0);
+    _counterMoves.fillRange(0, _counterMoves.length, 0);
   }
 
   AiMoveChoice chooseMove({int? nowMs}) {
@@ -72,19 +106,169 @@ class CheckersAi {
     _deadline = start + config.budgetMs;
     _aborted = false;
     _nodes = 0;
-    _table.clear();
+    _newSearch();
+    _evaluator = config.search.evalVersion >= 2
+        ? Evaluator.forConfig(engine.geometry, flying: engine.config.flyingKing)
+        : null;
     engine.searchMode = true;
     try {
-      return _search(legal);
+      return config.level == AiLevel.hard
+          ? _searchHard(legal, start)
+          : _searchGraded(legal);
     } finally {
       engine.searchMode = false;
     }
   }
 
-  AiMoveChoice _search(List<Move> legal) {
+  // -------------------------------------------------------------------
+  // Root search, full-strength profile: PVS + aspiration windows.
+  // -------------------------------------------------------------------
 
-    // Iterative deepening over root moves, keeping per-move scores so the
-    // difficulty layer can pick among the top N.
+  AiMoveChoice _searchHard(List<Move> legal, int startMs) {
+    final options = config.search;
+    var order = List.of(legal);
+    var bestMove = order.first;
+    var bestScore = 0;
+    var completedDepth = 0;
+    var stableIterations = 0;
+
+    for (var depth = 1; depth <= config.maxDepth; depth++) {
+      var alpha = -_infinity;
+      var beta = _infinity;
+      var window = 30;
+      if (options.useAspiration && completedDepth >= 4 &&
+          bestScore.abs() < _mateBound) {
+        alpha = bestScore - window;
+        beta = bestScore + window;
+      }
+
+      var iterationBest = -_infinity;
+      Move? iterationMove;
+      while (true) {
+        iterationBest = -_infinity;
+        iterationMove = null;
+        var raisedAlpha = alpha;
+        for (var i = 0; i < order.length; i++) {
+          final move = order[i];
+          engine.applyMove(move);
+          _prevMoveId[1] = _moveId(move);
+          int score;
+          if (i == 0 || !options.usePvs) {
+            score = -_negamax(depth - 1, 1, -beta, -raisedAlpha);
+          } else {
+            score = -_negamax(depth - 1, 1, -raisedAlpha - 1, -raisedAlpha);
+            if (!_aborted && score > raisedAlpha && score < beta) {
+              score = -_negamax(depth - 1, 1, -beta, -raisedAlpha);
+            }
+          }
+          engine.undoMove();
+          if (_aborted) {
+            break;
+          }
+          if (score > iterationBest) {
+            iterationBest = score;
+            iterationMove = move;
+          }
+          if (score > raisedAlpha) {
+            raisedAlpha = score;
+          }
+        }
+        if (_aborted) {
+          break;
+        }
+        // Aspiration window management.
+        if (iterationBest <= alpha && alpha > -_infinity) {
+          window *= 4;
+          alpha = iterationBest - window;
+          continue;
+        }
+        if (iterationBest >= beta && beta < _infinity) {
+          window *= 4;
+          beta = iterationBest + window;
+          continue;
+        }
+        break;
+      }
+      if (_aborted) {
+        break;
+      }
+
+      final previousBest = bestMove;
+      bestMove = iterationMove ?? bestMove;
+      bestScore = iterationBest;
+      completedDepth = depth;
+
+      // Search the new best move first next iteration.
+      order
+        ..remove(bestMove)
+        ..insert(0, bestMove);
+
+      if (bestScore >= _win - _maxPly) {
+        break; // proven win
+      }
+      if (options.useEarlyStop) {
+        stableIterations = bestMove == previousBest ? stableIterations + 1 : 0;
+        if (stableIterations >= 4 && depth >= 12) {
+          final elapsed = DateTime.now().millisecondsSinceEpoch - startMs;
+          if (elapsed * 100 > config.budgetMs * 55) {
+            break;
+          }
+        }
+      }
+    }
+
+    final chosen = _maybeVariety(legal, bestMove, completedDepth) ?? bestMove;
+    return AiMoveChoice(
+      move: chosen,
+      score: bestScore,
+      depth: completedDepth,
+      nodes: _nodes,
+    );
+  }
+
+  /// Opening variety: with a non-zero seed, re-score the closest root
+  /// alternatives with full windows at a reduced depth (cheap on a warm
+  /// table) and pick randomly among near-equal moves.
+  Move? _maybeVariety(List<Move> legal, Move best, int completedDepth) {
+    if (config.varietySeed == 0 ||
+        engine.moveHistory.length >= 6 ||
+        legal.length < 2 ||
+        completedDepth < 6) {
+      return null;
+    }
+    final depth = completedDepth - 3;
+    _deadline += 500; // small extra allowance; warm TT makes this fast
+    final scored = <(Move, int)>[];
+    for (final move in legal.take(6)) {
+      engine.applyMove(move);
+      _prevMoveId[1] = _moveId(move);
+      final score = -_negamax(depth - 1, 1, -_infinity, _infinity);
+      engine.undoMove();
+      if (_aborted) {
+        return null;
+      }
+      scored.add((move, score));
+    }
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+    final top = scored.first.$2;
+    final eligible = [
+      for (final entry in scored)
+        if (top - entry.$2 <= 25) entry.$1,
+    ];
+    if (eligible.length < 2) {
+      return null;
+    }
+    final pick =
+        _mix(engine.hash ^ config.varietySeed) % eligible.length;
+    return eligible[pick];
+  }
+
+  // -------------------------------------------------------------------
+  // Root search, graded profiles: comparable root scores feed the
+  // imperfection layer (bounded blunders, top-N randomness).
+  // -------------------------------------------------------------------
+
+  AiMoveChoice _searchGraded(List<Move> legal) {
     var rootScores = <MapEntry<Move, int>>[
       for (final move in legal) MapEntry(move, 0),
     ];
@@ -92,12 +276,12 @@ class CheckersAi {
 
     for (var depth = 1; depth <= config.maxDepth; depth++) {
       final iterationScores = <MapEntry<Move, int>>[];
-      var alpha = -_win * 2;
-      // Search in the previous iteration's order for better pruning.
+      var alpha = -_infinity;
       for (final entry in rootScores) {
         final move = entry.key;
         engine.applyMove(move);
-        final score = -_negamax(depth - 1, 1, -_win * 2, -alpha);
+        _prevMoveId[1] = _moveId(move);
+        final score = -_negamax(depth - 1, 1, -_infinity, -alpha);
         engine.undoMove();
         if (_aborted) {
           break;
@@ -113,8 +297,7 @@ class CheckersAi {
       iterationScores.sort((a, b) => b.value.compareTo(a.value));
       rootScores = iterationScores;
       completedDepth = depth;
-      // Stop early on a proven win.
-      if (rootScores.first.value >= _win - 100) {
+      if (rootScores.first.value >= _win - _maxPly) {
         break;
       }
     }
@@ -160,7 +343,13 @@ class CheckersAi {
     return ranked.first.key;
   }
 
-  int _negamax(int depth, int ply, int alpha, int beta) {
+  // -------------------------------------------------------------------
+  // Inner search
+  // -------------------------------------------------------------------
+
+  int _negamax(int depth, int ply, int alphaIn, int betaIn) {
+    var alpha = alphaIn;
+    var beta = betaIn;
     _nodes++;
     if ((_nodes & 1023) == 0 &&
         DateTime.now().millisecondsSinceEpoch > _deadline) {
@@ -176,14 +365,26 @@ class CheckersAi {
       case GameResult.whiteWin:
       case GameResult.blackWin:
         // The side to move has lost (previous mover ended the game).
-        return -_win + (_nodes & 63);
+        return -_win + ply;
+    }
+
+    // Mate-distance pruning: no result here can beat an already-found
+    // shorter mate.
+    if (alpha < -_win + ply) {
+      alpha = -_win + ply;
+    }
+    if (beta > _win - ply - 1) {
+      beta = _win - ply - 1;
+    }
+    if (alpha >= beta) {
+      return alpha;
     }
 
     final moves = engine.legalMoves();
     if (moves.isEmpty) {
       // Blocked: the side to move loses (search-mode replaces the engine's
       // own blocked detection).
-      return -_win + (_nodes & 63);
+      return -_win + ply;
     }
     final isCapturePosition = moves.first.isCapture;
 
@@ -193,87 +394,237 @@ class CheckersAi {
     }
 
     final originalAlpha = alpha;
-    final entry = _table[engine.hash];
-    if (entry != null && entry.depth >= depth) {
-      if (entry.flag == 0) {
-        return entry.score;
-      }
-      if (entry.flag == 1 && entry.score > alpha) {
-        alpha = entry.score;
-      } else if (entry.flag == 2 && entry.score < beta) {
-        beta = entry.score;
-      }
-      if (alpha >= beta) {
-        return entry.score;
+
+    // ---- transposition table probe ----
+    final hash = engine.hash;
+    final index = hash & _ttMask;
+    var ttMoveId = 0;
+    final storedKey = _ttKeys[index];
+    if (storedKey == hash) {
+      final data = _ttData[index];
+      final entryDepth = (data >> 22) & 0x7F;
+      ttMoveId = (data >> 31) & 0xFFF;
+      if (entryDepth >= depth) {
+        var score = (data & 0x3FFFFF) - _scoreOffset;
+        // Mate scores are stored node-relative; rebase to this ply.
+        if (score >= _mateBound) {
+          score -= ply;
+        } else if (score <= -_mateBound) {
+          score += ply;
+        }
+        final flag = (data >> 29) & 0x3;
+        if (flag == 0) {
+          return score;
+        }
+        if (flag == 1 && score > alpha) {
+          alpha = score;
+        } else if (flag == 2 && score < beta) {
+          beta = score;
+        }
+        if (alpha >= beta) {
+          return score;
+        }
       }
     }
 
-    // Move ordering: TT best move, then killers, then history score;
-    // captures already dominate when present (they are the only legal
-    // moves and majority-filtered). Ranks are precomputed once per move.
+    final options = config.search;
+
+    // ---- move ordering ----
     if (moves.length > 1) {
-      final bestKey = entry?.bestKey;
-      final killers = ply < _killers.length ? _killers[ply] : const <String>[];
-      final ranks = <Move, int>{
-        for (final move in moves) move: _orderRank(move, bestKey, killers),
-      };
-      moves.sort((a, b) => ranks[a]!.compareTo(ranks[b]!));
+      _orderMoves(moves, ply, ttMoveId, isCapturePosition, engine.kingsBB);
     }
 
     // Forced-move extension keeps the horizon honest in forcing lines.
-    final nextDepth = moves.length == 1 ? depth : depth - 1;
+    final extended = moves.length == 1;
+    final nextDepth = extended ? depth : depth - 1;
 
-    var best = -_win * 2;
-    String? bestKey;
-    for (final move in moves) {
+    final counterIndex =
+        options.useCounterMoves ? _prevMoveId[ply] : 0;
+    final allowLmr = options.useLmr &&
+        !isCapturePosition &&
+        depth >= 3 &&
+        !extended;
+
+    var best = -_infinity;
+    var bestId = 0;
+    for (var i = 0; i < moves.length; i++) {
+      final move = moves[i];
+      final moveId = _moveId(move);
       engine.applyMove(move);
-      final score = -_negamax(nextDepth, ply + 1, -beta, -alpha);
+      if (ply + 1 < _prevMoveId.length) {
+        _prevMoveId[ply + 1] = moveId;
+      }
+
+      int score;
+      if (i == 0 || !options.usePvs) {
+        score = -_negamax(nextDepth, ply + 1, -beta, -alpha);
+      } else {
+        var reduction = 0;
+        if (allowLmr &&
+            i >= 3 &&
+            !move.promotes &&
+            moveId != ttMoveId &&
+            moveId != _killers[2 * ply] &&
+            moveId != _killers[2 * ply + 1]) {
+          reduction = (i >= 8 && depth >= 6) ? 2 : 1;
+        }
+        score = -_negamax(nextDepth - reduction, ply + 1, -alpha - 1, -alpha);
+        if (!_aborted && score > alpha && reduction > 0) {
+          score = -_negamax(nextDepth, ply + 1, -alpha - 1, -alpha);
+        }
+        if (!_aborted && score > alpha && score < beta) {
+          score = -_negamax(nextDepth, ply + 1, -beta, -alpha);
+        }
+      }
       engine.undoMove();
       if (_aborted) {
         return 0;
       }
       if (score > best) {
         best = score;
-        bestKey = move.key;
+        bestId = moveId;
       }
       if (best > alpha) {
         alpha = best;
       }
       if (alpha >= beta) {
         if (!move.isCapture) {
-          final key = move.key;
-          if (ply < _killers.length) {
-            final killers = _killers[ply];
-            if (!killers.contains(key)) {
-              killers.insert(0, key);
-              if (killers.length > 2) {
-                killers.removeLast();
-              }
+          if (_killers[2 * ply] != moveId) {
+            _killers[2 * ply + 1] = _killers[2 * ply];
+            _killers[2 * ply] = moveId;
+          }
+          _history[moveId] += depth * depth;
+          if (_history[moveId] > 1 << 24) {
+            for (var j = 0; j < _history.length; j++) {
+              _history[j] >>= 1;
             }
           }
-          _history[key] = (_history[key] ?? 0) + depth * depth;
+          if (counterIndex != 0) {
+            _counterMoves[counterIndex] = moveId;
+          }
         }
         break;
       }
     }
 
+    // ---- transposition table store ----
     final flag = best <= originalAlpha ? 2 : (best >= beta ? 1 : 0);
-    if (_table.length < 1 << 18) {
-      _table[engine.hash] = _TtEntry(depth, best, flag, bestKey);
+    var storedScore = best;
+    if (storedScore >= _mateBound) {
+      storedScore += ply;
+      if (storedScore >= _win) {
+        storedScore = _win - 1;
+      }
+    } else if (storedScore <= -_mateBound) {
+      storedScore -= ply;
+      if (storedScore <= -_win) {
+        storedScore = -_win + 1;
+      }
+    }
+    final storedDepth = depth < 0 ? 0 : (depth > 127 ? 127 : depth);
+    final existing = _ttData[index];
+    final existingGeneration = (existing >> 43) & 0xFF;
+    final existingDepth = (existing >> 22) & 0x7F;
+    if (storedKey == 0 ||
+        storedKey == hash ||
+        existingGeneration != _generation ||
+        storedDepth >= existingDepth) {
+      _ttKeys[index] = hash;
+      _ttData[index] = (storedScore + _scoreOffset) |
+          (storedDepth << 22) |
+          (flag << 29) |
+          (bestId << 31) |
+          (_generation << 43);
     }
     return best;
   }
 
-  int _orderRank(Move move, String? bestKey, List<String> killers) {
-    final key = move.key;
-    if (key == bestKey) {
-      return -(1 << 40);
+  void _orderMoves(
+    List<Move> moves,
+    int ply,
+    int ttMoveId,
+    bool isCapturePosition,
+    int kingsBB,
+  ) {
+    final counter = config.search.useCounterMoves && _prevMoveId[ply] != 0
+        ? _counterMoves[_prevMoveId[ply]]
+        : 0;
+    final killer0 = _killers[2 * ply];
+    final killer1 = _killers[2 * ply + 1];
+
+    // Insertion sort by descending rank — move lists are short.
+    for (var i = 1; i < moves.length; i++) {
+      final move = moves[i];
+      final rank = _rankOf(
+        move,
+        ttMoveId,
+        killer0,
+        killer1,
+        counter,
+        isCapturePosition,
+        kingsBB,
+      );
+      var j = i - 1;
+      while (j >= 0 &&
+          _rankOf(
+                moves[j],
+                ttMoveId,
+                killer0,
+                killer1,
+                counter,
+                isCapturePosition,
+                kingsBB,
+              ) <
+              rank) {
+        moves[j + 1] = moves[j];
+        j--;
+      }
+      moves[j + 1] = move;
     }
-    final killerIndex = killers.indexOf(key);
-    if (killerIndex >= 0) {
-      return -(1 << 30) + killerIndex;
+  }
+
+  int _rankOf(
+    Move move,
+    int ttMoveId,
+    int killer0,
+    int killer1,
+    int counter,
+    bool isCapturePosition,
+    int kingsBB,
+  ) {
+    final moveId = _moveId(move);
+    if (moveId == ttMoveId) {
+      return 1 << 30;
     }
-    return -(_history[key] ?? 0);
+    if (isCapturePosition) {
+      // Bigger hauls first; captured kings outrank captured men.
+      var rank = move.captured.length << 20;
+      rank += _popCount(move.capturedMask & kingsBB) << 16;
+      if (move.promotes) {
+        rank += 1 << 15;
+      }
+      return rank;
+    }
+    if (moveId == killer0) {
+      return (1 << 28) + 1;
+    }
+    if (moveId == killer1) {
+      return 1 << 28;
+    }
+    if (moveId == counter) {
+      return 1 << 27;
+    }
+    return _history[moveId];
+  }
+
+  static int _popCount(int mask) {
+    var count = 0;
+    var m = mask;
+    while (m != 0) {
+      m &= m - 1;
+      count++;
+    }
+    return count;
   }
 
   // -------------------------------------------------------------------
@@ -281,13 +632,26 @@ class CheckersAi {
   // -------------------------------------------------------------------
 
   int _evaluate() {
-    final config = engine.config;
+    final evaluator = _evaluator;
+    var score = evaluator != null ? evaluator.evaluate(engine) : _evaluateV1();
+
+    if (config.noiseCentiMen > 0) {
+      final noise =
+          (_mix(engine.hash) % (2 * config.noiseCentiMen + 1)) -
+          config.noiseCentiMen;
+      score += noise;
+    }
+    return score;
+  }
+
+  int _evaluateV1() {
+    final rules = engine.config;
     final geometry = engine.geometry;
-    final kingValue = config.flyingKing ? 300 : 140;
-    final size = config.boardSize;
+    final kingValue = rules.flyingKing ? 300 : 140;
+    final size = rules.boardSize;
 
     var score = 0;
-    for (var square = 0; square < config.squareCount; square++) {
+    for (var square = 0; square < rules.squareCount; square++) {
       final color = engine.colorAt(square);
       if (color == null) {
         continue;
@@ -297,10 +661,8 @@ class CheckersAi {
 
       if (!isKing) {
         final row = geometry.rowOf(square);
-        // Advancement: rows toward promotion are worth a nudge.
         final advance = color == PieceColor.white ? (size - 1 - row) : row;
         value += advance * 3;
-        // Back-row guard bonus while the game is young.
         final onBackRow = color == PieceColor.white
             ? row == size - 1
             : row == 0;
@@ -308,20 +670,12 @@ class CheckersAi {
           value += 8;
         }
       }
-      // Edge pieces have half the capture cover.
       final col = geometry.colOf(square);
       if (col == 0 || col == size - 1) {
         value -= 6;
       }
 
       score += color == engine.sideToMove ? value : -value;
-    }
-
-    if (this.config.noiseCentiMen > 0) {
-      final noise =
-          (_mix(engine.hash) % (2 * this.config.noiseCentiMen + 1)) -
-          this.config.noiseCentiMen;
-      score += noise;
     }
     return score;
   }

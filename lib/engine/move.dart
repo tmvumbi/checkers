@@ -9,13 +9,27 @@ class Move {
     required List<int> path,
     List<int> captured = const [],
     this.promotes = false,
+    int? capturedMask,
   }) : path = List.unmodifiable(path),
-       captured = List.unmodifiable(captured);
+       captured = List.unmodifiable(captured),
+       capturedMask = capturedMask ?? _maskOf(captured);
 
   final int from;
   final List<int> path;
   final List<int> captured;
   final bool promotes;
+
+  /// Bitboard of the captured squares — the hot-path identity used by the
+  /// engine and the AI (the string [key] is for UI/tests only).
+  final int capturedMask;
+
+  static int _maskOf(List<int> squares) {
+    var mask = 0;
+    for (final square in squares) {
+      mask |= 1 << square;
+    }
+    return mask;
+  }
 
   int get to => path.last;
 

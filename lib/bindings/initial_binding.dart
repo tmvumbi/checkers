@@ -34,7 +34,7 @@ class InitialBinding extends Bindings {
       SupabaseProfilePhotoService.new,
       fenix: true,
     );
-    Get.lazyPut<AiService>(IsolateAiService.new, fenix: true);
+    Get.lazyPut<AiService>(PersistentIsolateAiService.new, fenix: true);
     Get.lazyPut<OnlineGameService>(SupabaseOnlineGameService.new, fenix: true);
     Get.lazyPut<TournamentService>(SupabaseTournamentService.new, fenix: true);
     Get.put<PresenceService>(PresenceService(), permanent: true);
