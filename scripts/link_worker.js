@@ -9,8 +9,12 @@ const ASSETLINKS = [
       namespace: "android_app",
       package_name: "club.contribution.checkers",
       sha256_cert_fingerprints: [
-        // Debug keystore; add the release keystore fingerprint at launch.
+        // Debug keystore.
         "99:D5:F9:DB:83:5C:52:CE:4C:D3:AD:03:72:9D:B0:10:22:3A:E0:B8:B7:0A:9E:F4:12:7B:2E:50:00:3B:B4:EA",
+        // Release keystore (~/.config/checkers/checkers-release.keystore).
+        // If Play App Signing re-signs at launch, add Google's fingerprint
+        // from Play Console -> App integrity as a third entry.
+        "3E:5A:90:05:CC:D6:22:35:79:18:CF:96:B9:D5:07:F1:5E:87:7A:57:6C:59:6C:E7:0F:24:04:8D:AF:76:92:07",
       ],
     },
   },
