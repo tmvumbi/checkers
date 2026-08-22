@@ -1,6 +1,10 @@
 import 'package:checkers/core/network/api_result.dart';
 import 'package:checkers/data/models/user_profile.dart';
+import 'package:checkers/engine/checkers_engine.dart';
+import 'package:checkers/engine/rules_config.dart';
 import 'package:checkers/main.dart';
+import 'package:checkers/modules/game_board/models/game_board_arguments.dart';
+import 'package:checkers/modules/home/controller/home_controller.dart';
 import 'package:checkers/services/analytics_service.dart';
 import 'package:checkers/services/auth_service.dart';
 import 'package:checkers/services/online_game_service.dart';
@@ -60,6 +64,9 @@ void main() {
     when(() => online.fetchLeaderboard()).thenAnswer(
       (_) async => const Success([]),
     );
+    when(() => online.fetchMyActiveGame()).thenAnswer(
+      (_) async => const Success(null),
+    );
     when(() => auth.supportsAppleSignIn).thenReturn(false);
     when(() => auth.currentUser).thenReturn(_guestUser);
     when(() => auth.userChanges).thenAnswer((_) => const Stream.empty());
@@ -92,6 +99,64 @@ void main() {
     expect(find.byKey(const Key('home-play-pc-button')), findsOneWidget);
     expect(find.byKey(const Key('home-play-people-button')), findsOneWidget);
     expect(find.byKey(const Key('home-how-to-play-button')), findsOneWidget);
+  });
+
+  testWidgets('no resume banner when there is no game in progress', (
+    tester,
+  ) async {
+    await pumpHome(tester);
+    expect(find.byKey(const Key('home-resume-game-button')), findsNothing);
+  });
+
+  testWidgets('a game left in progress offers a way back into it', (
+    tester,
+  ) async {
+    when(() => online.fetchMyActiveGame()).thenAnswer(
+      (_) async => Success(
+        ResumableGame(
+          gameId: 'game-42',
+          rules: RulesConfig.international,
+          humanColor: PieceColor.black,
+          opponentNickname: 'Marion',
+          myTurn: true,
+        ),
+      ),
+    );
+    await pumpHome(tester);
+
+    expect(find.byKey(const Key('home-resume-game-button')), findsOneWidget);
+    expect(find.textContaining('Marion'), findsOneWidget);
+    // The clock keeps running while the app is closed, so say whose move it is.
+    expect(find.textContaining('Your turn'), findsOneWidget);
+  });
+
+  test('resuming re-enters as a player, not a spectator', () async {
+    when(() => online.fetchMyActiveGame()).thenAnswer(
+      (_) async => Success(
+        ResumableGame(
+          gameId: 'game-42',
+          rules: RulesConfig.international,
+          humanColor: PieceColor.black,
+          opponentNickname: 'Marion',
+          myTurn: true,
+        ),
+      ),
+    );
+    final controller = HomeController(
+      authService: auth,
+      profileService: profile,
+      analyticsService: NoopAnalyticsService(),
+      onlineGameService: online,
+    );
+
+    await controller.refreshActiveGame();
+    expect(controller.activeGame.value?.gameId, 'game-42');
+
+    final args = controller.resumeArguments()!;
+    expect(args.mode, GameBoardMode.online);
+    expect(args.gameId, 'game-42');
+    expect(args.humanColor, PieceColor.black);
+    expect(args.rules.boardSize, 10);
   });
 
   testWidgets('bottom navigation switches tabs', (tester) async {

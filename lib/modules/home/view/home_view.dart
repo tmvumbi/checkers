@@ -191,6 +191,7 @@ class _PlayTab extends GetView<HomeController> {
               const SizedBox(height: 18),
               const CheckersLogoMark(compact: true),
               const SizedBox(height: 26),
+              const _ResumeGameBanner(),
               CheckersStaggeredEntrance(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -251,6 +252,69 @@ class _PlayTab extends GetView<HomeController> {
       context: context,
       builder: (dialogContext) => const PlayPeopleModalContent(),
     );
+  }
+}
+
+/// Offers the way back into a game that outlived the app being closed.
+/// Hidden entirely when there is nothing to resume.
+class _ResumeGameBanner extends GetView<HomeController> {
+  const _ResumeGameBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final game = controller.activeGame.value;
+      if (game == null) {
+        return const SizedBox.shrink();
+      }
+      final theme = Theme.of(context);
+      final brand = theme.extension<CheckersThemeExtension>()!;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: brand.brandGold, width: 2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                game.opponentNickname.isEmpty
+                    ? TranslationKeys.resumeGame.tr
+                    : TranslationKeys.resumeGameVs.trParams({
+                        'name': game.opponentNickname,
+                      }),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge!.copyWith(
+                  color: brand.brandGold,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                game.myTurn
+                    ? TranslationKeys.resumeYourTurn.tr
+                    : TranslationKeys.resumeOpponentTurn.tr,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall!.copyWith(
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 12),
+              CheckersGradientButton(
+                key: const Key('home-resume-game-button'),
+                label: TranslationKeys.resumeGame.tr,
+                minHeight: 52,
+                onPressed: controller.resumeActiveGame,
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 }
 

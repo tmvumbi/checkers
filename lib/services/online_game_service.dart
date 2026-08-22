@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
 import '../data/models/online_game.dart';
+import '../engine/checkers_engine.dart';
 import '../engine/move.dart';
 import '../engine/rules_config.dart';
 
@@ -68,8 +69,55 @@ class GameEmote {
   }
 }
 
+/// An online game this player is still seated at, found on a cold start so
+/// the game survives the app being killed (PRD §6.4).
+class ResumableGame {
+  const ResumableGame({
+    required this.gameId,
+    required this.rules,
+    required this.humanColor,
+    required this.opponentNickname,
+    required this.myTurn,
+    this.tournamentId,
+  });
+
+  final String gameId;
+  final RulesConfig rules;
+  final PieceColor humanColor;
+  final String opponentNickname;
+  final bool myTurn;
+
+  /// Set when the game in progress is a tournament match, so resuming it
+  /// behaves like entering from the bracket.
+  final String? tournamentId;
+
+  static ResumableGame? fromJson(Map<String, dynamic> json) {
+    final color = json['color'] as String?;
+    final gameId = json['game_id'] as String?;
+    if (gameId == null || (color != 'white' && color != 'black')) {
+      return null;
+    }
+    return ResumableGame(
+      gameId: gameId,
+      rules: RulesConfig(
+        boardSize: (json['board_size'] as num).toInt(),
+        backwardCapture: json['backward_capture'] as bool,
+        flyingKing: json['flying_king'] as bool,
+        majorityCapture: json['majority_capture'] as bool,
+      ),
+      humanColor: color == 'white' ? PieceColor.white : PieceColor.black,
+      opponentNickname: (json['opponent_nickname'] as String?) ?? '',
+      myTurn: (json['my_turn'] as bool?) ?? false,
+      tournamentId: json['tournament_id'] as String?,
+    );
+  }
+}
+
 abstract class OnlineGameService {
   Future<ApiResult<({String gameId, int seat})>> joinOnlineGame(String preset);
+
+  /// The in-progress human game this player is seated at, if any.
+  Future<ApiResult<ResumableGame?>> fetchMyActiveGame();
   Future<ApiResult<List<OnlineGameSnapshot>>> fetchWatchableGames({
     int offset,
     int limit,
@@ -271,14 +319,26 @@ class SupabaseOnlineGameService implements OnlineGameService {
     int limit = 30,
   }) {
     return _guard(() async {
+      // Private games are listed too (migration 0030 opened the select
+      // policy); every live game is watchable.
       final rows = await _client
           .from('games')
           .select('*, game_players(*)')
           .eq('status', 'playing')
-          .eq('is_private', false)
           .order('started_at', ascending: false)
           .range(offset, offset + limit - 1);
       return [for (final row in rows) _snapshotWithPlayers(row)];
+    });
+  }
+
+  @override
+  Future<ApiResult<ResumableGame?>> fetchMyActiveGame() {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>('my_active_game');
+      if (response == null) {
+        return null;
+      }
+      return ResumableGame.fromJson((response as Map).cast<String, dynamic>());
     });
   }
 

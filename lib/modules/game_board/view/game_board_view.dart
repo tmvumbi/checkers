@@ -1087,6 +1087,14 @@ class _GameOverBanner extends GetView<GameBoardController> {
                 const SizedBox(height: 20),
                 if (controller.isWatching)
                   const SizedBox.shrink()
+                else if (controller.isTournamentMatch)
+                  // No rematch in a bracket: the next round is what matters,
+                  // and it is already on the clock.
+                  CheckersGradientButton(
+                    key: const Key('game-back-to-tournament'),
+                    label: TranslationKeys.backToTournament.tr,
+                    onPressed: controller.backToTournament,
+                  )
                 else if (controller.isOnline)
                   Obx(() {
                     final waiting = controller.rematchRequested.value;

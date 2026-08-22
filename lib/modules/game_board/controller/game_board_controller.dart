@@ -15,7 +15,9 @@ import '../../../services/analytics_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/checkers_ai_service.dart';
 import '../../../services/online_game_service.dart';
+import '../../../data/models/tournament.dart';
 import '../../../services/profile_service.dart';
+import '../../../services/tournament_service.dart';
 import '../models/game_board_arguments.dart';
 
 /// Board-square animation step for multi-hop capture rendering.
@@ -100,6 +102,7 @@ class GameBoardController extends GetxController {
   final RxList<GameWatcher> watchers = <GameWatcher>[].obs;
   StreamSubscription<List<GameWatcher>>? _watchersSubscription;
   Timer? _watchHeartbeatTimer;
+  Timer? _nextMatchTimer;
 
   // Emoji exchanges (online games; spectators see both sides).
   static const List<String> emoteChoices = [
@@ -482,6 +485,7 @@ class GameBoardController extends GetxController {
     _clockTimer?.cancel();
     _watchersSubscription?.cancel();
     _watchHeartbeatTimer?.cancel();
+    _nextMatchTimer?.cancel();
     if (isOnline && !isWatching && args.gameId != null) {
       _onlineGameService.touchConnection(args.gameId!, false);
     }
@@ -600,6 +604,9 @@ class GameBoardController extends GetxController {
     }
     result.value = mapped;
     resultReason.value = reason;
+    if (mapped != GameResult.ongoing) {
+      _watchForNextTournamentMatch();
+    }
   }
 
   void _tickClocks() {
@@ -863,6 +870,51 @@ class GameBoardController extends GetxController {
 
   void goHome() {
     Get.offAllNamed<void>(AppRoutes.home);
+  }
+
+  bool get isTournamentMatch => args.isTournamentMatch;
+
+  /// Back to the bracket. Reached either by popping (the usual case, the
+  /// bracket is the route underneath) or by replacing this route when the
+  /// player resumed the match from somewhere else.
+  void backToTournament() {
+    final tournamentId = args.tournamentId;
+    if (tournamentId == null) {
+      return;
+    }
+    _nextMatchTimer?.cancel();
+    if (Get.previousRoute == AppRoutes.tournament) {
+      Get.back<void>();
+    } else {
+      Get.offNamed<void>(AppRoutes.tournament, arguments: tournamentId);
+    }
+  }
+
+  /// A tournament match that has ended: the next round is paired the moment
+  /// the last game of this round finishes, and its clock starts immediately.
+  /// Watch for it so a player reading the result screen is not timed out of
+  /// a game they never saw.
+  void _watchForNextTournamentMatch() {
+    if (!isTournamentMatch || _nextMatchTimer != null) {
+      return;
+    }
+    final tournaments = Get.isRegistered<TournamentService>()
+        ? Get.find<TournamentService>()
+        : null;
+    if (tournaments == null) {
+      return;
+    }
+    _nextMatchTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      final result = await tournaments.myTournamentState();
+      final state = result.when(
+        success: (value) => value,
+        failure: (_) => const MyTournamentState(),
+      );
+      final next = state.gameId;
+      if (next != null && next != args.gameId) {
+        backToTournament();
+      }
+    });
   }
 
   bool get humanWon =>

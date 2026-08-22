@@ -109,10 +109,15 @@ class HomeController extends GetxController {
   /// consumes it and opens the modal.
   final RxBool ratingPromptDue = false.obs;
 
+  /// An online game still in progress from a previous app run — the clock
+  /// keeps ticking while the app is closed, so this is offered up front.
+  final Rxn<ResumableGame> activeGame = Rxn<ResumableGame>();
+
   @override
   void onReady() {
     super.onReady();
     refreshProfile();
+    refreshActiveGame();
     _maybeQueueRatingPrompt();
     // A deep link may have arrived before sign-in; now that the player is
     // here with a nickname, take them where the link pointed.
@@ -334,6 +339,52 @@ class HomeController extends GetxController {
       failure: (_) {},
     );
     leaderboardLoading.value = false;
+  }
+
+  /// Look for a game left in progress (app killed, crash, phone died).
+  /// Runs on every home entry, so it must not throw in harnesses that
+  /// never registered the online service.
+  Future<void> refreshActiveGame() async {
+    if (_onlineGameServiceOverride == null &&
+        !Get.isRegistered<OnlineGameService>()) {
+      return;
+    }
+    final result = await _onlineGameService.fetchMyActiveGame();
+    result.when(
+      success: (game) => activeGame.value = game,
+      failure: (_) {},
+    );
+  }
+
+  /// Board arguments for [activeGame] — split out from the navigation so
+  /// the "re-enter as a player, on my own side" mapping can be tested.
+  GameBoardArguments? resumeArguments() {
+    final game = activeGame.value;
+    if (game == null) {
+      return null;
+    }
+    return GameBoardArguments.online(
+      rules: game.rules,
+      gameId: game.gameId,
+      humanColor: game.humanColor,
+      tournamentId: game.tournamentId,
+    );
+  }
+
+  /// Re-enter that game as a player, not a spectator.
+  void resumeActiveGame() {
+    final arguments = resumeArguments();
+    if (arguments == null) {
+      return;
+    }
+    _analyticsService.logEvent('online_game_resumed');
+    Get.toNamed<void>(
+      AppRoutes.gameBoard,
+      arguments: arguments,
+    )?.then((_) {
+      // It may have finished (or timed out) while we were in there.
+      refreshActiveGame();
+    });
   }
 
   void openWatchGame(OnlineGameSnapshot snapshot) {

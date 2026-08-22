@@ -2,14 +2,9 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 
-import '../../../data/models/online_game.dart';
 import '../../../data/models/tournament.dart';
-import '../../../engine/checkers_engine.dart';
-import '../../../modules/game_board/models/game_board_arguments.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/analytics_service.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/online_game_service.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../services/tournament_service.dart';
 import '../../../shared/widgets/checkers_snackbar.dart';
@@ -20,22 +15,12 @@ import '../../../translations/translation_keys.dart';
 class TournamentLobbyController extends GetxController {
   TournamentLobbyController({
     TournamentService? tournamentService,
-    OnlineGameService? onlineGameService,
-    AuthService? authService,
     AnalyticsService? analyticsService,
   }) : _tournamentService = tournamentService ?? Get.find(),
-       _onlineGameServiceOverride = onlineGameService,
-       _authServiceOverride = authService,
        _analyticsService = analyticsService ?? Get.find();
 
   final TournamentService _tournamentService;
-  final OnlineGameService? _onlineGameServiceOverride;
-  final AuthService? _authServiceOverride;
   final AnalyticsService _analyticsService;
-
-  OnlineGameService get _onlineGameService =>
-      _onlineGameServiceOverride ?? Get.find();
-  AuthService get _authService => _authServiceOverride ?? Get.find();
 
   final RxList<TournamentLobbyPlayer> players = <TournamentLobbyPlayer>[].obs;
   final RxString countdown = ''.obs;
@@ -129,41 +114,11 @@ class TournamentLobbyController extends GetxController {
     }
     _navigatingToTournament = true;
     _analyticsService.logEvent('tournament_started');
-    final gameId = state.gameId;
-    if (gameId != null) {
-      await _openMyGame(gameId, state.tournamentId!);
-    } else {
-      Get.offNamed<void>(
-        AppRoutes.tournament,
-        arguments: state.tournamentId,
-      );
-    }
-  }
-
-  Future<void> _openMyGame(String gameId, String tournamentId) async {
-    final result = await _onlineGameService.fetchGame(gameId);
-    final snapshot = result.when<OnlineGameSnapshot?>(
-      success: (value) => value,
-      failure: (_) => null,
-    );
-    if (snapshot == null) {
-      Get.offNamed<void>(AppRoutes.tournament, arguments: tournamentId);
-      return;
-    }
-    final uid = _authService.currentUser?.uid;
-    final me = snapshot.players
-        .where((player) => player.uid == uid)
-        .toList();
-    Get.offNamed<void>(
-      AppRoutes.gameBoard,
-      arguments: GameBoardArguments.online(
-        rules: snapshot.rules,
-        gameId: gameId,
-        humanColor: me.isEmpty
-            ? PieceColor.white
-            : (me.first.color ?? PieceColor.white),
-      ),
-    );
+    // Always land on the bracket, which opens the player's match itself and
+    // keeps doing so each round. Going straight to the board here would
+    // leave the bracket out of the back stack, stranding the player on the
+    // result screen when the match ended.
+    Get.offNamed<void>(AppRoutes.tournament, arguments: state.tournamentId);
   }
 
   void leave() {

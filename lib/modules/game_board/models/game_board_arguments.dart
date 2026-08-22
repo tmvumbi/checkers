@@ -11,12 +11,14 @@ class GameBoardArguments {
     required this.humanColor,
     this.allowUndo = false,
   }) : mode = GameBoardMode.pc,
-       gameId = null;
+       gameId = null,
+       tournamentId = null;
 
   const GameBoardArguments.online({
     required this.rules,
     required this.gameId,
     required this.humanColor,
+    this.tournamentId,
   }) : mode = GameBoardMode.online,
        aiLevel = null,
        allowUndo = false;
@@ -25,14 +27,16 @@ class GameBoardArguments {
     : mode = GameBoardMode.watching,
       aiLevel = null,
       humanColor = PieceColor.white,
-      allowUndo = false;
+      allowUndo = false,
+      tournamentId = null;
 
   /// Step through a recorded (finished) game.
   const GameBoardArguments.replay({required this.rules, required this.gameId})
     : mode = GameBoardMode.replay,
       aiLevel = null,
       humanColor = PieceColor.white,
-      allowUndo = false;
+      allowUndo = false,
+      tournamentId = null;
 
   final GameBoardMode mode;
   final RulesConfig rules;
@@ -42,4 +46,12 @@ class GameBoardArguments {
 
   /// PC games only: whether the player opted in to undoing moves.
   final bool allowUndo;
+
+  /// Set when this online game is a tournament match: the board then sends
+  /// the player back to the bracket instead of offering a rematch, and
+  /// follows them into the next round as soon as it is paired.
+  final String? tournamentId;
+
+  bool get isTournamentMatch =>
+      mode == GameBoardMode.online && tournamentId != null;
 }

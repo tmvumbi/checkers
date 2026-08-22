@@ -45,6 +45,11 @@ class TournamentController extends GetxController {
   final RxBool myMatchReady = false.obs;
   String? _myPendingGameId;
 
+  /// Matches this screen has already taken the player into, so backing out
+  /// of a game does not immediately re-open it.
+  final Set<String> _openedGameIds = <String>{};
+  bool _openingGame = false;
+
   StreamSubscription<List<TournamentMatch>>? _matchesSubscription;
   Timer? _refreshTimer;
 
@@ -115,6 +120,20 @@ class TournamentController extends GetxController {
         .toList();
     _myPendingGameId = mine.isEmpty ? null : mine.first.gameId;
     myMatchReady.value = _myPendingGameId != null;
+    _maybeAutoOpen();
+  }
+
+  /// A paired match is already on the clock, so take the player into it
+  /// rather than waiting for them to notice the button. Each match is
+  /// opened at most once: a player who deliberately backs out of their
+  /// game must not be dragged straight back in.
+  void _maybeAutoOpen() {
+    final gameId = _myPendingGameId;
+    if (gameId == null || _openedGameIds.contains(gameId) || _openingGame) {
+      return;
+    }
+    _openedGameIds.add(gameId);
+    unawaited(playMyMatch());
   }
 
   Future<void> playMyMatch() async {
@@ -137,6 +156,18 @@ class TournamentController extends GetxController {
   }
 
   Future<void> _openGame(String gameId, {required bool asPlayer}) async {
+    if (_openingGame) {
+      return;
+    }
+    _openingGame = true;
+    try {
+      await _openGameInner(gameId, asPlayer: asPlayer);
+    } finally {
+      _openingGame = false;
+    }
+  }
+
+  Future<void> _openGameInner(String gameId, {required bool asPlayer}) async {
     final result = await _onlineGameService.fetchGame(gameId);
     final snapshot = result.when<OnlineGameSnapshot?>(
       success: (value) => value,
@@ -158,6 +189,7 @@ class TournamentController extends GetxController {
           humanColor: me.isEmpty
               ? PieceColor.white
               : (me.first.color ?? PieceColor.white),
+          tournamentId: tournamentId,
         ),
       );
     } else if (snapshot.isPlaying) {

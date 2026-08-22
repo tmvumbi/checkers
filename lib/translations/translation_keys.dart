@@ -27,6 +27,11 @@ abstract final class TranslationKeys {
   static const String tabTop30 = 'tab_top30';
   static const String welcomeBack = 'welcome_back';
   static const String playWithPc = 'play_with_pc';
+  static const String resumeGame = 'resume_game';
+  static const String backToTournament = 'back_to_tournament';
+  static const String resumeGameVs = 'resume_game_vs';
+  static const String resumeYourTurn = 'resume_your_turn';
+  static const String resumeOpponentTurn = 'resume_opponent_turn';
   static const String playWithPeople = 'play_with_people';
   static const String howToPlay = 'how_to_play';
   static const String comingSoon = 'coming_soon';
