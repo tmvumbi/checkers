@@ -83,10 +83,11 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<ApiResult<AuthUser>> signInWithGoogle() {
     return _guard(() async {
-      final idToken = await _googleIdToken();
+      final credential = await _googleCredential();
       final response = await _client.signInWithIdToken(
         provider: OAuthProvider.google,
-        idToken: idToken,
+        idToken: credential.idToken,
+        nonce: credential.rawNonce,
       );
       return _requireUser(response.user);
     });
@@ -95,7 +96,7 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<ApiResult<AuthUser>> linkWithGoogle() {
     return _guard(() async {
-      final idToken = await _googleIdToken();
+      final credential = await _googleCredential();
       final response = await _client.updateUser(
         UserAttributes(),
       ).then((_) async {
@@ -104,15 +105,27 @@ class SupabaseAuthService implements AuthService {
         // anonymous flag is set.
         return _client.signInWithIdToken(
           provider: OAuthProvider.google,
-          idToken: idToken,
+          idToken: credential.idToken,
+          nonce: credential.rawNonce,
         );
       });
       return _requireUser(response.user);
     });
   }
 
-  Future<String> _googleIdToken() async {
+  /// Signs in with Google and returns the ID token together with the raw
+  /// nonce it was minted for.
+  ///
+  /// The nonce is not optional in practice: Google's iOS SDK puts one in
+  /// the ID token whether or not we ask, and GoTrue rejects a token whose
+  /// nonce it cannot verify ("Passed nonce and nonce in id_token should
+  /// either both exist or not"). So we mint the nonce ourselves, hand
+  /// Google its SHA-256 (which is what lands in the token) and keep the
+  /// raw value for GoTrue — the same handshake the Apple flow uses.
+  Future<_GoogleCredential> _googleCredential() async {
     final googleSignIn = GoogleSignIn.instance;
+    final rawNonce = _generateNonce();
+    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
     // Apple platforms need their own OAuth client id; Android derives it
     // from the signing certificate instead. GoTrue accepts tokens for
     // either audience (both ids are in GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID).
@@ -121,13 +134,14 @@ class SupabaseAuthService implements AuthService {
           ? GoogleAuthConfig.iosClientId
           : null,
       serverClientId: GoogleAuthConfig.serverClientId,
+      nonce: hashedNonce,
     );
     final account = await googleSignIn.authenticate();
     final idToken = account.authentication.idToken;
     if (idToken == null) {
       throw const AuthException('missing-google-id-token');
     }
-    return idToken;
+    return _GoogleCredential(idToken: idToken, rawNonce: rawNonce);
   }
 
   @override
@@ -205,4 +219,11 @@ class SupabaseAuthService implements AuthService {
       return Failure(ApiError(code: 'unknown', message: error.toString()));
     }
   }
+}
+
+class _GoogleCredential {
+  const _GoogleCredential({required this.idToken, required this.rawNonce});
+
+  final String idToken;
+  final String rawNonce;
 }

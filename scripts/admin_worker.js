@@ -238,6 +238,16 @@ async function handleApi(request, env, path) {
     return Response.json(result);
   }
 
+  if (path === "/player-stats" && method === "GET") {
+    const days = Math.min(
+      Math.max(parseInt(url.searchParams.get("days") ?? "7"), 1), 90);
+    const result = await sbJson(env, "/rest/v1/rpc/admin_player_stats", {
+      method: "POST",
+      body: JSON.stringify({ p_days: days, p_limit: 200 }),
+    });
+    return Response.json(result);
+  }
+
   if (path === "/settings" && method === "GET") {
     const rows = await sbJson(
       env,
@@ -289,10 +299,11 @@ body { background: var(--bg); color: var(--text);
 header { display: flex; align-items: center; gap: 14px;
   padding: 14px 22px; background: var(--panel); border-bottom: 2px solid var(--line); }
 header h1 { font-size: 19px; color: var(--gold); }
-nav button { background: none; border: none; color: var(--muted);
+nav { display: flex; flex-wrap: wrap; gap: 2px; }
+nav a { background: none; border: none; color: var(--muted);
   font-size: 15px; font-weight: 600; padding: 8px 14px; cursor: pointer;
-  border-radius: 8px; }
-nav button.on { color: var(--gold); background: var(--panel2); }
+  border-radius: 8px; text-decoration: none; display: inline-block; }
+nav a.on { color: var(--gold); background: var(--panel2); }
 main { max-width: 1060px; margin: 0 auto; padding: 22px; }
 .card { background: var(--panel); border: 1px solid var(--line);
   border-radius: 12px; padding: 18px; margin-bottom: 18px; }
@@ -335,24 +346,25 @@ img.thumb { height: 40px; border-radius: 6px; display: block; }
   font-size: 12px; background: var(--panel2); border: 1px solid var(--line);
   margin: 2px 4px 2px 0; }
 .chip b { color: var(--gold); font-weight: 700; }
+.chartbox { position: relative; height: 320px; margin-top: 10px; }
+details.raw { margin-top: 12px; }
+details.raw summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.wld b { color: #7ce09a; } .wld i { color: #e07c7c; font-style: normal; }
+.wld s { color: var(--muted); text-decoration: none; }
+.rank { color: var(--muted); font-size: 12px; width: 34px; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 </head>
 <body>
 <header>
   <h1>Checkers &mdash; Ads Admin</h1>
-  <nav>
-    <button data-tab="dash" class="on">Dashboard</button>
-    <button data-tab="ops">Operations</button>
-    <button data-tab="camps">Campaigns</button>
-    <button data-tab="custs">Customers</button>
-    <button data-tab="msgs">Messages</button>
-    <button data-tab="players">Players</button>
-    <button data-tab="settings">Settings</button>
-  </nav>
+  <nav id="nav"></nav>
 </header>
 <main>
   <section id="tab-dash"></section>
   <section id="tab-ops" hidden></section>
+  <section id="tab-pstats" hidden></section>
   <section id="tab-camps" hidden></section>
   <section id="tab-custs" hidden></section>
   <section id="tab-msgs" hidden></section>
@@ -371,6 +383,55 @@ const esc = s => (s ?? '').toString().replace(/[&<>"]/g,
 let customers = [], campaigns = [], stats = [];
 let messages = [], blocks = [], settings = {};
 let ops = null, opsDays = 7;
+let pstats = null, pstatsDays = 7;
+
+// --- Routing: one URL per page, so a refresh stays put. ----------------
+const ROUTES = [
+  ['dash', '/admin', 'Dashboard'],
+  ['ops', '/admin/operations', 'Operations'],
+  ['pstats', '/admin/player-stats', 'Player stats'],
+  ['camps', '/admin/campaigns', 'Campaigns'],
+  ['custs', '/admin/customers', 'Customers'],
+  ['msgs', '/admin/messages', 'Messages'],
+  ['players', '/admin/players', 'Players'],
+  ['settings', '/admin/settings', 'Settings'],
+];
+let currentTab = 'dash';
+
+function tabForPath(path) {
+  let clean = path;
+  while (clean.length > 1 && clean.endsWith('/')) clean = clean.slice(0, -1);
+  const hit = ROUTES.find(r => r[1] === clean);
+  return hit ? hit[0] : 'dash';
+}
+
+function renderNav() {
+  document.getElementById('nav').innerHTML = ROUTES.map(r =>
+    '<a href="' + r[1] + '" data-tab="' + r[0] + '">' + r[2] + '</a>').join('');
+  document.querySelectorAll('#nav a').forEach(a => a.onclick = e => {
+    // Let modified clicks open a real new tab.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    const path = a.getAttribute('href');
+    if (location.pathname !== path) history.pushState({}, '', path);
+    showTab(tabForPath(path));
+  });
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  for (const r of ROUTES) {
+    document.getElementById('tab-' + r[0]).hidden = r[0] !== tab;
+  }
+  document.querySelectorAll('#nav a').forEach(a =>
+    a.classList.toggle('on', a.dataset.tab === tab));
+  const hit = ROUTES.find(r => r[0] === tab);
+  document.title = 'Checkers Admin — ' + (hit ? hit[2] : 'Dashboard');
+  if (tab === 'ops') loadOps();
+  if (tab === 'pstats') loadPstats();
+}
+
+window.addEventListener('popstate', () => showTab(tabForPath(location.pathname)));
 
 async function refresh() {
   [customers, campaigns, stats, messages, blocks, settings] = await Promise.all([
@@ -378,7 +439,6 @@ async function refresh() {
     api('/messages'), api('/blocks'), api('/settings')]);
   renderDash(); renderCamps(); renderCusts();
   renderMsgs(); renderPlayers(); renderSettings();
-  loadOps();
 }
 
 function totals(id) {
@@ -601,20 +661,90 @@ const STATE_LABELS = {
   pc: 'vs PC', human: 'vs human', watching: 'watching', idle: 'idle',
 };
 
+// [value, label]. "Today" is just a 1-day window: the RPCs bound on
+// created_at::date >= current_date, i.e. midnight until now.
+const DAY_OPTIONS = [7, 14, 30, 60, 90].map(d => [d, 'Last ' + d + ' days']);
+const PSTATS_DAY_OPTIONS = [[1, 'Today']].concat(DAY_OPTIONS);
+
+function daysSelect(id, value, options) {
+  return '<select id="' + id + '" style="width:auto;margin-left:12px">'
+    + options.map(o => '<option value="' + o[0] + '"'
+        + (o[0] === value ? ' selected' : '') + '>' + o[1] + '</option>')
+      .join('')
+    + '</select>';
+}
+
+// --- Daily-activity line chart (Chart.js) ------------------------------
+const OPS_SERIES = [
+  ['human_games', 'Human games', '#e5b94e'],
+  ['pc_games', 'PC games', '#6ea8fe'],
+  ['active_players', 'Players who played', '#ef8fb5'],
+  ['tournaments', 'Tournaments', '#a78bfa'],
+  ['new_players', 'New players', '#7ce09a'],
+];
+const CHART_GRID = 'rgba(147,168,154,0.16)';
+const CHART_OPTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: {
+      labels: { color: '#e8efe9', usePointStyle: true, boxWidth: 8,
+        padding: 16 },
+    },
+    tooltip: {
+      backgroundColor: '#0d1d14', borderColor: '#2c4a38', borderWidth: 1,
+      titleColor: '#e5b94e', bodyColor: '#e8efe9', padding: 10,
+      usePointStyle: true,
+    },
+  },
+  scales: {
+    x: { ticks: { color: '#93a89a', maxRotation: 0, autoSkipPadding: 16 },
+      grid: { color: CHART_GRID } },
+    y: { beginAtZero: true, ticks: { color: '#93a89a', precision: 0 },
+      grid: { color: CHART_GRID } },
+  },
+};
+
+let opsChart = null, opsBuilt = false;
+
 function renderOps() {
   const el = document.getElementById('tab-ops');
-  if (!ops) { el.innerHTML = '<div class="card muted">Loading…</div>'; return; }
+  if (!ops) {
+    el.innerHTML = '<div class="card muted">Loading…</div>';
+    opsBuilt = false; opsChart = null;
+    return;
+  }
+  // The skeleton is built once so the period <select> keeps its state and
+  // the chart survives the 30-second live refresh.
+  if (!opsBuilt) {
+    el.innerHTML =
+      '<div id="ops-live"></div>'
+      + '<div class="card"><h2 style="display:inline-block">Daily activity</h2> '
+      + daysSelect('ops-days', opsDays, DAY_OPTIONS)
+      + '<div class="chartbox"><canvas id="ops-chart"></canvas></div>'
+      + '<details class="raw" id="ops-raw"><summary>Show the numbers</summary>'
+      + '<table style="margin-top:10px" id="ops-table"></table></details>'
+      + '<div class="muted" style="font-size:12px;margin-top:8px">'
+      + 'Live numbers refresh every 30 seconds.</div></div>';
+    opsBuilt = true; opsChart = null;
+    document.getElementById('ops-days').onchange = e => {
+      opsDays = parseInt(e.target.value);
+      loadOps();
+    };
+  }
+  renderOpsLive();
+  renderOpsChart();
+}
+
+function renderOpsLive() {
   const n = ops.now, t = ops.totals;
   const played = t.players_played, never = t.players - t.players_played;
   const chips = (n.connected_players ?? []).map(p =>
     '<span class="chip">' + esc(p.nickname) + ' · <b>'
     + STATE_LABELS[p.state] + '</b></span>').join('')
     || '<span class="muted">Nobody connected right now.</span>';
-  const dayRows = (ops.daily ?? []).map(d =>
-    '<tr><td>' + d.day + '</td><td>' + d.human_games + '</td><td>' + d.pc_games
-    + '</td><td>' + d.tournaments + '</td><td>' + d.new_players + '</td></tr>'
-  ).join('');
-  el.innerHTML =
+  document.getElementById('ops-live').innerHTML =
     '<div class="cards">'
     + '<div class="stat"><div class="n">' + n.connected + '</div>'
     + '<div class="l">Players connected now</div><div class="sub">'
@@ -637,25 +767,122 @@ function renderOps() {
     + 'Games all-time: <b>' + t.games_total + '</b> · Tournaments: <b>'
     + t.tournaments_total + '</b></div></div>'
     + '</div>'
-    + '<div class="card"><h2>Connected players</h2>' + chips + '</div>'
-    + '<div class="card"><h2 style="display:inline-block">Daily activity</h2> '
-    + '<select id="ops-days" style="width:auto;margin-left:12px">'
-    + [7, 14, 30, 60, 90].map(d => '<option value="' + d + '"'
-        + (d === opsDays ? ' selected' : '') + '>Last ' + d + ' days</option>').join('')
-    + '</select>'
-    + '<table style="margin-top:10px"><tr><th>Day</th><th>Human games</th>'
-    + '<th>PC games</th><th>Tournaments</th><th>New players</th></tr>'
-    + (dayRows || '<tr><td colspan="5" class="muted">No data.</td></tr>')
-    + '</table>'
-    + '<div class="muted" style="font-size:12px;margin-top:8px">'
-    + 'Live numbers refresh every 30 seconds.</div></div>';
-  document.getElementById('ops-days').onchange = e => {
-    opsDays = parseInt(e.target.value);
-    loadOps();
-  };
+    + '<div class="card"><h2>Connected players</h2>' + chips + '</div>';
 }
 
-setInterval(loadOps, 30000);
+function renderOpsChart() {
+  const desc = ops.daily ?? [];
+  document.getElementById('ops-table').innerHTML =
+    '<tr><th>Day</th>'
+    + OPS_SERIES.map(s => '<th class="num">' + s[1] + '</th>').join('')
+    + '</tr>'
+    + (desc.map(d => '<tr><td>' + d.day + '</td>'
+        + OPS_SERIES.map(s => '<td class="num">' + (d[s[0]] ?? 0) + '</td>')
+          .join('')
+        + '</tr>').join('')
+      || '<tr><td colspan="' + (OPS_SERIES.length + 1)
+         + '" class="muted">No data.</td></tr>');
+
+  const canvas = document.getElementById('ops-chart');
+  if (typeof Chart === 'undefined' || !canvas) {
+    // Chart library unreachable: fall back to the raw table, opened.
+    document.getElementById('ops-raw').open = true;
+    return;
+  }
+  const asc = desc.slice().reverse();
+  const labels = asc.map(d => d.day.slice(5));
+  if (opsChart && opsChart.data.datasets.length !== OPS_SERIES.length) {
+    opsChart.destroy();   // series list changed under a long-lived page
+    opsChart = null;
+  }
+  if (opsChart) {
+    opsChart.data.labels = labels;
+    OPS_SERIES.forEach(([key], i) => {
+      opsChart.data.datasets[i].data = asc.map(d => d[key] ?? 0);
+    });
+    opsChart.update();
+    return;
+  }
+  opsChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: OPS_SERIES.map(([key, label, color]) => ({
+        label, data: asc.map(d => d[key] ?? 0),
+        borderColor: color, backgroundColor: color, pointBackgroundColor: color,
+        borderWidth: 2, tension: 0.3, pointRadius: 2, pointHoverRadius: 5,
+        fill: false,
+      })),
+    },
+    options: CHART_OPTS,
+  });
+}
+
+setInterval(() => { if (currentTab === 'ops') loadOps(); }, 30000);
+
+// --- Player stats ------------------------------------------------------
+let pstatsBuilt = false;
+
+async function loadPstats() {
+  try {
+    pstats = await api('/player-stats?days=' + pstatsDays);
+    renderPstats();
+  } catch (e) {
+    document.getElementById('tab-pstats').innerHTML =
+      '<div class="card msg err">Failed to load player stats: '
+      + esc(e.message) + '</div>';
+    pstatsBuilt = false;
+  }
+}
+
+const wld = (w, l, d) =>
+  '<b>' + w + '</b> / <i>' + l + '</i> / <s>' + d + '</s>';
+
+function renderPstats() {
+  const el = document.getElementById('tab-pstats');
+  if (!pstatsBuilt) {
+    el.innerHTML =
+      '<div class="card"><h2 style="display:inline-block">Player stats</h2> '
+      + daysSelect('ps-days', pstatsDays, PSTATS_DAY_OPTIONS)
+      + '<div class="muted" id="ps-summary" style="font-size:13px;margin-top:8px">'
+      + '</div>'
+      + '<table style="margin-top:10px" id="ps-table"></table></div>';
+    pstatsBuilt = true;
+    document.getElementById('ps-days').onchange = e => {
+      pstatsDays = parseInt(e.target.value);
+      loadPstats();
+    };
+  }
+  const list = pstats?.players ?? [];
+  const active = pstats?.active_players ?? list.length;
+  document.getElementById('ps-summary').innerHTML =
+    '<b>' + active + '</b> player' + (active === 1 ? '' : 's')
+    + ' played at least one game '
+    + (pstatsDays === 1
+        ? 'today (since midnight)'
+        : 'since ' + esc(pstats?.from_day ?? ''))
+    + (list.length < active
+        ? ' · showing the top ' + list.length + ' by games played'
+        : '')
+    + ' · W / L / D = won / lost / drawn';
+  document.getElementById('ps-table').innerHTML =
+    '<tr><th class="rank"></th><th>Player</th><th class="num">Total</th>'
+    + '<th class="num">Human</th><th class="num">W / L / D</th>'
+    + '<th class="num">PC</th><th class="num">W / L / D</th></tr>'
+    + (list.map((p, i) =>
+        '<tr><td class="rank">' + (i + 1) + '</td>'
+        + '<td>' + esc(p.nickname || '(no nickname)')
+        + '<div class="muted" style="font-size:12px">' + esc(p.uid.slice(0, 8))
+        + '… · rating ' + p.rating + '</div></td>'
+        + '<td class="num"><b style="color:var(--gold)">' + p.total + '</b></td>'
+        + '<td class="num">' + p.human_games + '</td>'
+        + '<td class="num wld">' + wld(p.human_won, p.human_lost, p.human_draw)
+        + '</td>'
+        + '<td class="num">' + p.pc_games + '</td>'
+        + '<td class="num wld">' + wld(p.pc_won, p.pc_lost, p.pc_draw)
+        + '</td></tr>').join('')
+      || '<tr><td colspan="7" class="muted">No games in this period.</td></tr>');
+}
 
 let msgTarget = null;
 let blockTarget = null;
@@ -848,18 +1075,29 @@ function renderSettings() {
   };
 }
 
-document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
-  b.classList.add('on');
-  for (const t of ['dash', 'ops', 'camps', 'custs', 'msgs', 'players', 'settings'])
-    document.getElementById('tab-' + t).hidden = t !== b.dataset.tab;
-});
+renderNav();
+showTab(tabForPath(location.pathname));
 
 refresh().catch(e => document.querySelector('main').innerHTML =
   '<div class="card msg err">Failed to load: ' + esc(e.message) + '</div>');
 </script>
 </body>
 </html>`;
+
+// Every console page has its own URL so a refresh (or a bookmark) lands
+// back on the same tab. The shell is identical for all of them; the client
+// picks the tab from location.pathname.
+const PAGE_ROUTES = new Set([
+  "/admin",
+  "/admin/",
+  "/admin/operations",
+  "/admin/player-stats",
+  "/admin/campaigns",
+  "/admin/customers",
+  "/admin/messages",
+  "/admin/players",
+  "/admin/settings",
+]);
 
 export default {
   async fetch(request, env) {
@@ -870,8 +1108,14 @@ export default {
     if (url.pathname.startsWith("/admin/api")) {
       return handleApi(request, env, url.pathname.slice("/admin/api".length));
     }
+    if (!PAGE_ROUTES.has(url.pathname)) {
+      return Response.redirect(new URL("/admin", url).toString(), 302);
+    }
     return new Response(PAGE, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
     });
   },
 };
