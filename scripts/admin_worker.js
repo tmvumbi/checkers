@@ -253,29 +253,158 @@ async function handleApi(request, env, path) {
       env,
       "/rest/v1/app_config?id=eq.public&select=config",
     );
-    const ads = rows[0]?.config?.ads ?? {};
+    const config = rows[0]?.config ?? {};
+    const ads = config.ads ?? {};
     return Response.json({
-      interstitialFrequency: ads.interstitialFrequency ?? 15,
       adsEnabled: ads.enabled ?? true,
+      interstitialFrequency: ads.interstitialFrequency ?? 15,
+      adUnits: {
+        android: {
+          banner: ads.android?.bannerAdUnitId ?? "",
+          interstitial: ads.android?.interstitialAdUnitId ?? "",
+        },
+        ios: {
+          banner: ads.ios?.bannerAdUnitId ?? "",
+          interstitial: ads.ios?.interstitialAdUnitId ?? "",
+        },
+      },
+      allowedAndroidVersions: config.allowed_android_versions ?? [],
+      allowedIosVersions: config.allowed_ios_versions ?? [],
+      androidAppUrl: config.android_app_url ?? "",
+      iosAppUrl: config.ios_app_url ?? "",
+      turnMs: config.turn_ms ?? 15000,
+      bankMs: config.bank_ms ?? 300000,
+      leaderboardMinGames: config.leaderboard_min_games ?? 1,
     });
   }
   if (path === "/settings" && method === "PATCH") {
     const b = await request.json();
+    const bad = (m) => Response.json({ error: m }, { status: 400 });
+
+    // Guard rails: these keys reach every client, and a bad value either
+    // locks players out of the app or breaks the clocks.
+    const versionList = (value, label) => {
+      if (!Array.isArray(value)) return label + " must be a list";
+      for (const v of value) {
+        if (typeof v !== "string" || !/^[0-9]+(\.[0-9]+)*$/.test(v.trim())) {
+          return label + ': "' + v + '" is not a version number';
+        }
+      }
+      return null;
+    };
+    const positiveInt = (value, label, min, max) => {
+      if (!Number.isInteger(value) || value < min || value > max) {
+        return label + " must be a whole number between " + min + " and " + max;
+      }
+      return null;
+    };
+    const httpsUrl = (value, label) => {
+      if (typeof value !== "string" || !value.startsWith("https://")) {
+        return label + " must be an https:// URL";
+      }
+      return null;
+    };
+
+    const checks = [
+      b.allowedAndroidVersions !== undefined &&
+        versionList(b.allowedAndroidVersions, "Android versions"),
+      b.allowedIosVersions !== undefined &&
+        versionList(b.allowedIosVersions, "iOS versions"),
+      b.androidAppUrl !== undefined && httpsUrl(b.androidAppUrl, "Android app URL"),
+      b.iosAppUrl !== undefined && httpsUrl(b.iosAppUrl, "iOS app URL"),
+      b.turnMs !== undefined &&
+        positiveInt(b.turnMs, "Turn time", 3000, 600000),
+      b.bankMs !== undefined &&
+        positiveInt(b.bankMs, "Time bank", 10000, 7200000),
+      b.leaderboardMinGames !== undefined &&
+        positiveInt(b.leaderboardMinGames, "Leaderboard minimum games", 0, 1000),
+      b.interstitialFrequency !== undefined &&
+        positiveInt(b.interstitialFrequency, "Interstitial frequency", 1, 1000),
+    ].filter(Boolean);
+    if (checks.length) return bad(checks[0]);
+
     const rows = await sbJson(
       env,
       "/rest/v1/app_config?id=eq.public&select=config",
     );
     const config = rows[0]?.config ?? {};
-    config.ads = {
-      ...(config.ads ?? {}),
-      ...(b.interstitialFrequency != null
-        ? { interstitialFrequency: b.interstitialFrequency }
-        : {}),
-      ...(b.adsEnabled != null ? { enabled: b.adsEnabled } : {}),
-    };
+    const ads = { ...(config.ads ?? {}) };
+    if (b.adsEnabled != null) ads.enabled = b.adsEnabled;
+    if (b.interstitialFrequency != null) {
+      ads.interstitialFrequency = b.interstitialFrequency;
+    }
+    for (const platform of ["android", "ios"]) {
+      const units = b.adUnits?.[platform];
+      if (!units) continue;
+      ads[platform] = {
+        ...(ads[platform] ?? {}),
+        ...(units.banner !== undefined
+          ? { bannerAdUnitId: units.banner.trim() }
+          : {}),
+        ...(units.interstitial !== undefined
+          ? { interstitialAdUnitId: units.interstitial.trim() }
+          : {}),
+      };
+    }
+    config.ads = ads;
+
+    if (b.allowedAndroidVersions !== undefined) {
+      config.allowed_android_versions =
+        b.allowedAndroidVersions.map((v) => v.trim());
+    }
+    if (b.allowedIosVersions !== undefined) {
+      config.allowed_ios_versions = b.allowedIosVersions.map((v) => v.trim());
+    }
+    if (b.androidAppUrl !== undefined) {
+      config.android_app_url = b.androidAppUrl.trim();
+    }
+    if (b.iosAppUrl !== undefined) config.ios_app_url = b.iosAppUrl.trim();
+    if (b.turnMs !== undefined) config.turn_ms = b.turnMs;
+    if (b.bankMs !== undefined) config.bank_ms = b.bankMs;
+    if (b.leaderboardMinGames !== undefined) {
+      config.leaderboard_min_games = b.leaderboardMinGames;
+    }
+
     return sb(env, "/rest/v1/app_config?id=eq.public", {
       method: "PATCH",
       body: JSON.stringify({ config }),
+    });
+  }
+
+  if (path === "/feedback" && method === "GET") {
+    const scope = url.searchParams.get("scope") ?? "open";
+    const filter = scope === "all" ? "" : "&handled_at=is.null";
+    const items = await sbJson(
+      env,
+      "/rest/v1/feedback?select=*" + filter
+        + "&order=created_at.desc&limit=100",
+    );
+    const uids = [...new Set(items.map((f) => f.uid).filter(Boolean))];
+    let names = {};
+    if (uids.length) {
+      const profiles = await sbJson(
+        env,
+        `/rest/v1/profiles?select=id,nickname&id=in.(${uids.join(",")})`,
+      );
+      names = Object.fromEntries(profiles.map((p) => [p.id, p.nickname]));
+    }
+    const open = await sbJson(
+      env,
+      "/rest/v1/feedback?select=id&handled_at=is.null&limit=1000",
+    );
+    return Response.json({
+      items: items.map((f) => ({ ...f, nickname: names[f.uid] ?? "" })),
+      open_count: open.length,
+    });
+  }
+  if (path.startsWith("/feedback/") && method === "PATCH") {
+    const id = path.split("/")[2];
+    const b = await request.json();
+    return sb(env, `/rest/v1/feedback?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        handled_at: b.handled ? new Date().toISOString() : null,
+      }),
     });
   }
 
@@ -382,6 +511,7 @@ const esc = s => (s ?? '').toString().replace(/[&<>"]/g,
 
 let customers = [], campaigns = [], stats = [];
 let messages = [], blocks = [], settings = {};
+let feedback = { items: [], open_count: 0 }, feedbackScope = 'open';
 let ops = null, opsDays = 7;
 let pstats = null, pstatsDays = 7;
 
@@ -434,11 +564,14 @@ function showTab(tab) {
 window.addEventListener('popstate', () => showTab(tabForPath(location.pathname)));
 
 async function refresh() {
-  [customers, campaigns, stats, messages, blocks, settings] = await Promise.all([
-    api('/customers'), api('/campaigns'), api('/stats?days=30'),
-    api('/messages'), api('/blocks'), api('/settings')]);
+  [customers, campaigns, stats, messages, blocks, settings, feedback] =
+    await Promise.all([
+      api('/customers'), api('/campaigns'), api('/stats?days=30'),
+      api('/messages'), api('/blocks'), api('/settings'),
+      api('/feedback?scope=' + feedbackScope)]);
   renderDash(); renderCamps(); renderCusts();
   renderMsgs(); renderPlayers(); renderSettings();
+  updateInboxBadge();
 }
 
 function totals(id) {
@@ -921,6 +1054,71 @@ function wirePicker(kind) {
   };
 }
 
+function inboxHtml() {
+  const items = feedback.items ?? [];
+  const rows = items.map(f =>
+    '<tr><td style="white-space:nowrap">'
+    + esc(f.nickname || '(unknown)')
+    + '<div class="muted" style="font-size:12px">'
+    + (f.created_at ?? '').slice(0, 16).replace('T', ' ') + '</div></td>'
+    + '<td>' + esc(f.text) + '</td>'
+    + '<td><span class="pill ' + (f.handled_at ? 'on">handled' : 'off">open')
+    + '</span></td>'
+    + '<td style="white-space:nowrap">'
+    + '<button class="small" data-reply="' + f.uid + '" data-nick="'
+    + esc(f.nickname || '') + '">Reply</button> '
+    + '<button class="small" data-fb="' + f.id + '" data-handled="'
+    + (f.handled_at ? 'false' : 'true') + '">'
+    + (f.handled_at ? 'Reopen' : 'Mark handled') + '</button></td></tr>').join('');
+  return '<div class="card"><h2 style="display:inline-block">Inbox</h2> '
+    + '<select id="fb-scope" style="width:auto;margin-left:12px">'
+    + '<option value="open"' + (feedbackScope === 'open' ? ' selected' : '')
+    + '>Open only</option>'
+    + '<option value="all"' + (feedbackScope === 'all' ? ' selected' : '')
+    + '>All (last 100)</option></select>'
+    + '<div class="muted" style="font-size:13px;margin-top:6px">'
+    + 'What players sent through "Write to the admins". '
+    + '<b>' + (feedback.open_count ?? 0) + '</b> open.</div>'
+    + '<table style="margin-top:10px">'
+    + '<tr><th>From</th><th>Message</th><th>Status</th><th></th></tr>'
+    + (rows || '<tr><td colspan="4" class="muted">Nothing here.</td></tr>')
+    + '</table></div>';
+}
+
+function wireInbox(el) {
+  document.getElementById('fb-scope').onchange = async e => {
+    feedbackScope = e.target.value;
+    feedback = await api('/feedback?scope=' + feedbackScope);
+    renderMsgs();
+  };
+  el.querySelectorAll('button[data-fb]').forEach(b => b.onclick = async () => {
+    await api('/feedback/' + b.dataset.fb, { method: 'PATCH',
+      body: JSON.stringify({ handled: b.dataset.handled === 'true' }),
+      headers: { 'Content-Type': 'application/json' } });
+    feedback = await api('/feedback?scope=' + feedbackScope);
+    renderMsgs();
+    updateInboxBadge();
+  });
+  // Reply = compose a private message to that player, prefilled below.
+  el.querySelectorAll('button[data-reply]').forEach(b => b.onclick = () => {
+    msgTarget = { id: b.dataset.reply, nickname: b.dataset.nick };
+    renderMsgs();
+    const aud = document.getElementById('m-aud');
+    aud.value = 'private';
+    document.getElementById('m-picker').hidden = false;
+    document.getElementById('m-text').scrollIntoView(
+      { behavior: 'smooth', block: 'center' });
+    document.getElementById('m-text').focus();
+  });
+}
+
+function updateInboxBadge() {
+  const link = document.querySelector('#nav a[data-tab="msgs"]');
+  if (!link) return;
+  const open = feedback.open_count ?? 0;
+  link.textContent = open > 0 ? 'Messages (' + open + ')' : 'Messages';
+}
+
 function renderMsgs() {
   const el = document.getElementById('tab-msgs');
   const rows = messages.map(m =>
@@ -933,7 +1131,8 @@ function renderMsgs() {
     + '<td><button class="small" data-id="' + m.id + '" data-en="' + !m.enabled + '">'
     + (m.enabled ? 'Disable' : 'Enable') + '</button></td></tr>').join('');
   el.innerHTML =
-    '<div class="card"><h2>Messages to players</h2><table>'
+    inboxHtml()
+    + '<div class="card"><h2>Messages to players</h2><table>'
     + '<tr><th>Type</th><th>Content</th><th>Status</th><th></th></tr>'
     + (rows || '<tr><td colspan="4" class="muted">No messages yet.</td></tr>')
     + '</table></div>'
@@ -951,6 +1150,7 @@ function renderMsgs() {
     + '<label>Image (optional)</label><input type="file" accept="image/*" id="m-image">'
     + '<button class="primary" id="m-send">Send message</button>'
     + '<div class="msg" id="m-msg"></div></div>';
+  wireInbox(el);
   el.querySelectorAll('table button[data-id]').forEach(b => b.onclick = async () => {
     await api('/messages/' + b.dataset.id, { method: 'PATCH',
       body: JSON.stringify({ enabled: b.dataset.en === 'true' }),
@@ -1044,35 +1244,120 @@ async function blockPlayer() {
   } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
 }
 
+const val = id => document.getElementById(id).value.trim();
+const intVal = id => parseInt(document.getElementById(id).value);
+const numVal = id => parseFloat(document.getElementById(id).value);
+const versionList = id => val(id).split(',')
+  .map(v => v.trim()).filter(v => v.length > 0);
+
+// Each card saves only its own keys, so one bad field can't take the
+// others with it.
+async function saveSettings(cardId, build) {
+  const msg = document.getElementById(cardId);
+  msg.className = 'msg'; msg.textContent = 'Saving…';
+  try {
+    await api('/settings', { method: 'PATCH',
+      body: JSON.stringify(build()),
+      headers: { 'Content-Type': 'application/json' } });
+    settings = await api('/settings');
+    msg.className = 'msg'; msg.textContent = 'Saved.';
+  } catch (e) {
+    msg.className = 'msg err';
+    let text = e.message;
+    try { text = JSON.parse(e.message).error ?? text; } catch (_) {}
+    msg.textContent = text;
+  }
+}
+
 function renderSettings() {
   const el = document.getElementById('tab-settings');
+  const units = settings.adUnits ?? { android: {}, ios: {} };
   el.innerHTML =
-    '<div class="card"><h2>Advertising settings</h2>'
+    // --- App releases -------------------------------------------------
+    '<div class="card"><h2>App releases</h2>'
+    + '<div class="muted" style="font-size:13px;margin-bottom:6px">'
+    + 'Players running a version that is not listed are forced to update, '
+    + 'and sent to the store URL. Leave a list empty to turn the gate off '
+    + 'for that platform — never remove the version you have shipped.'
+    + '</div>'
+    + '<div class="row">'
+    + '<div><label>Allowed Android versions (comma separated)</label>'
+    + '<input id="s-andv" value="'
+    + esc((settings.allowedAndroidVersions ?? []).join(', ')) + '"></div>'
+    + '<div><label>Allowed iOS versions (comma separated)</label>'
+    + '<input id="s-iosv" value="'
+    + esc((settings.allowedIosVersions ?? []).join(', ')) + '"></div></div>'
+    + '<div class="row">'
+    + '<div><label>Android store URL</label><input id="s-andurl" value="'
+    + esc(settings.androidAppUrl ?? '') + '"></div>'
+    + '<div><label>iOS store URL</label><input id="s-iosurl" value="'
+    + esc(settings.iosAppUrl ?? '') + '"></div></div>'
+    + '<button class="primary" id="s-save-rel">Save releases</button>'
+    + '<div class="msg" id="s-msg-rel"></div></div>'
+    // --- Gameplay -----------------------------------------------------
+    + '<div class="card"><h2>Gameplay</h2>'
+    + '<div class="row4">'
+    + '<div><label>Turn time (seconds)</label>'
+    + '<input type="number" id="s-turn" min="3" max="600" value="'
+    + Math.round((settings.turnMs ?? 15000) / 1000) + '"></div>'
+    + '<div><label>Time bank (minutes)</label>'
+    + '<input type="number" id="s-bank" min="1" max="120" step="0.5" value="'
+    + ((settings.bankMs ?? 300000) / 60000) + '"></div>'
+    + '<div><label>Leaderboard min. games</label>'
+    + '<input type="number" id="s-lbmin" min="0" max="1000" value="'
+    + (settings.leaderboardMinGames ?? 1) + '"></div>'
+    + '<div></div></div>'
+    + '<div class="muted" style="font-size:12px;margin-top:4px">'
+    + 'Clock settings apply to new online games only.</div>'
+    + '<button class="primary" id="s-save-play">Save gameplay</button>'
+    + '<div class="msg" id="s-msg-play"></div></div>'
+    // --- Advertising --------------------------------------------------
+    + '<div class="card"><h2>Advertising</h2>'
     + '<div class="row"><div>'
     + '<label>Interstitial frequency (show every Nth event)</label>'
     + '<input type="number" id="s-freq" min="1" value="'
     + (settings.interstitialFrequency ?? 15) + '"></div>'
     + '<div><label>&nbsp;</label>'
     + '<label style="margin-top:14px"><input type="checkbox" id="s-enabled"'
-    + (settings.adsEnabled ? ' checked' : '') + '> AdMob ads enabled</label></div></div>'
-    + '<button class="primary" id="s-save">Save settings</button>'
-    + '<div class="msg" id="s-msg"></div></div>';
-  document.getElementById('s-save').onclick = async () => {
-    const msg = document.getElementById('s-msg');
-    msg.className = 'msg'; msg.textContent = 'Saving…';
-    try {
-      const freq = parseInt(document.getElementById('s-freq').value);
-      if (!Number.isFinite(freq) || freq < 1) throw new Error('Frequency must be at least 1.');
-      await api('/settings', { method: 'PATCH',
-        body: JSON.stringify({
-          interstitialFrequency: freq,
-          adsEnabled: document.getElementById('s-enabled').checked,
-        }),
-        headers: { 'Content-Type': 'application/json' } });
-      await refresh();
-      document.getElementById('s-msg').textContent = 'Settings saved.';
-    } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
-  };
+    + (settings.adsEnabled ? ' checked' : '')
+    + '> AdMob ads enabled</label></div></div>'
+    + '<div class="row">'
+    + '<div><label>Android banner unit ID</label><input id="s-and-ban" value="'
+    + esc(units.android?.banner ?? '') + '"></div>'
+    + '<div><label>Android interstitial unit ID</label>'
+    + '<input id="s-and-int" value="'
+    + esc(units.android?.interstitial ?? '') + '"></div></div>'
+    + '<div class="row">'
+    + '<div><label>iOS banner unit ID</label><input id="s-ios-ban" value="'
+    + esc(units.ios?.banner ?? '') + '"></div>'
+    + '<div><label>iOS interstitial unit ID</label>'
+    + '<input id="s-ios-int" value="'
+    + esc(units.ios?.interstitial ?? '') + '"></div></div>'
+    + '<button class="primary" id="s-save-ads">Save advertising</button>'
+    + '<div class="msg" id="s-msg-ads"></div></div>';
+
+  document.getElementById('s-save-rel').onclick = () =>
+    saveSettings('s-msg-rel', () => ({
+      allowedAndroidVersions: versionList('s-andv'),
+      allowedIosVersions: versionList('s-iosv'),
+      androidAppUrl: val('s-andurl'),
+      iosAppUrl: val('s-iosurl'),
+    }));
+  document.getElementById('s-save-play').onclick = () =>
+    saveSettings('s-msg-play', () => ({
+      turnMs: Math.round(numVal('s-turn') * 1000),
+      bankMs: Math.round(numVal('s-bank') * 60000),
+      leaderboardMinGames: intVal('s-lbmin'),
+    }));
+  document.getElementById('s-save-ads').onclick = () =>
+    saveSettings('s-msg-ads', () => ({
+      interstitialFrequency: intVal('s-freq'),
+      adsEnabled: document.getElementById('s-enabled').checked,
+      adUnits: {
+        android: { banner: val('s-and-ban'), interstitial: val('s-and-int') },
+        ios: { banner: val('s-ios-ban'), interstitial: val('s-ios-int') },
+      },
+    }));
 }
 
 renderNav();
