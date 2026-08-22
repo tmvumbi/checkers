@@ -1432,9 +1432,35 @@ class _LanguageModalRow extends StatelessWidget {
 class _HomeBottomNavigation extends GetView<HomeController> {
   const _HomeBottomNavigation();
 
+  /// Icon box plus breathing room — also the floor for a comfortable tap
+  /// target on the label-less "more" tab.
+  static const double _minItemWidth = 52;
+  static const double _itemPadding = 20;
+  static const double _iconWidth = 28;
+
+  /// Width the label actually needs, so tabs can be sized to their content
+  /// instead of all being squeezed into equal fifths. Measuring (rather
+  /// than hard-coding weights) keeps it correct across locales and the
+  /// user's text-size setting.
+  double _itemWidth(BuildContext context, String? label, TextStyle style) {
+    if (label == null) {
+      return _minItemWidth;
+    }
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final content = painter.width > _iconWidth ? painter.width : _iconWidth;
+    final width = content + _itemPadding;
+    return width < _minItemWidth ? _minItemWidth : width;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.bodyLarge!.copyWith(fontSize: 13);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1446,44 +1472,48 @@ class _HomeBottomNavigation extends GetView<HomeController> {
       ),
       child: Obx(() {
         final selected = controller.tab.value;
-        return Row(
-          children: [
+        final items = <({HomeTab tab, IconData icon, String? label})>[
+          (
+            tab: HomeTab.play,
+            icon: Icons.play_circle_outline,
+            label: TranslationKeys.tabPlay.tr,
+          ),
+          (
+            tab: HomeTab.watch,
+            icon: Icons.visibility_outlined,
+            label: TranslationKeys.tabWatch.tr,
+          ),
+          (
+            tab: HomeTab.tournament,
+            icon: Icons.account_tree_outlined,
+            label: TranslationKeys.tabTournament.tr,
+          ),
+          (
+            tab: HomeTab.leaderboard,
+            icon: Icons.emoji_events_outlined,
+            label: TranslationKeys.tabTop30.tr,
+          ),
+          (tab: HomeTab.more, icon: Icons.more_horiz, label: null),
+        ];
+
+        final children = <Widget>[];
+        for (final item in items) {
+          if (children.isNotEmpty) {
+            children.add(const _BottomNavigationDivider());
+          }
+          children.add(
             _BottomNavigationItem(
-              tab: HomeTab.play,
-              icon: Icons.play_circle_outline,
-              label: TranslationKeys.tabPlay.tr,
-              isSelected: selected == HomeTab.play,
+              tab: item.tab,
+              icon: item.icon,
+              label: item.label,
+              isSelected: selected == item.tab,
+              // Leftover width is shared in proportion to each tab's own
+              // need, so "Tournament" gets room and "..." doesn't hog it.
+              flex: _itemWidth(context, item.label, labelStyle).round(),
             ),
-            const _BottomNavigationDivider(),
-            _BottomNavigationItem(
-              tab: HomeTab.watch,
-              icon: Icons.visibility_outlined,
-              label: TranslationKeys.tabWatch.tr,
-              isSelected: selected == HomeTab.watch,
-            ),
-            const _BottomNavigationDivider(),
-            _BottomNavigationItem(
-              tab: HomeTab.tournament,
-              icon: Icons.account_tree_outlined,
-              label: TranslationKeys.tabTournament.tr,
-              isSelected: selected == HomeTab.tournament,
-            ),
-            const _BottomNavigationDivider(),
-            _BottomNavigationItem(
-              tab: HomeTab.leaderboard,
-              icon: Icons.emoji_events_outlined,
-              label: TranslationKeys.tabTop30.tr,
-              isSelected: selected == HomeTab.leaderboard,
-            ),
-            const _BottomNavigationDivider(),
-            _BottomNavigationItem(
-              tab: HomeTab.more,
-              icon: Icons.more_horiz,
-              label: null,
-              isSelected: selected == HomeTab.more,
-            ),
-          ],
-        );
+          );
+        }
+        return Row(children: children);
       }),
     );
   }
@@ -1495,12 +1525,14 @@ class _BottomNavigationItem extends GetView<HomeController> {
     required this.icon,
     required this.label,
     required this.isSelected,
+    required this.flex,
   });
 
   final HomeTab tab;
   final IconData icon;
   final String? label;
   final bool isSelected;
+  final int flex;
 
   @override
   Widget build(BuildContext context) {
@@ -1511,6 +1543,7 @@ class _BottomNavigationItem extends GetView<HomeController> {
         : theme.colorScheme.onPrimary.withValues(alpha: 0.7);
 
     return Expanded(
+      flex: flex,
       child: InkWell(
         key: Key('home-tab-${tab.name}'),
         onTap: () => controller.selectTab(tab),
