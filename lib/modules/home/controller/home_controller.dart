@@ -17,6 +17,7 @@ import '../../../services/analytics_service.dart';
 import '../../../services/app_rating_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/online_game_service.dart';
+import '../../../services/party_link_service.dart';
 import '../../../services/player_message_service.dart';
 import '../../../services/profile_service.dart';
 import '../../../services/tournament_service.dart';
@@ -69,8 +70,7 @@ class HomeController extends GetxController {
   final Rx<HomeTab> tab = HomeTab.play.obs;
   final Rxn<UserProfile> profile = Rxn<UserProfile>();
   static const int watchPageSize = 15;
-  final RxList<OnlineGameSnapshot> watchableGames =
-      <OnlineGameSnapshot>[].obs;
+  final RxList<OnlineGameSnapshot> watchableGames = <OnlineGameSnapshot>[].obs;
   final RxBool watchLoading = false.obs;
   final RxBool hasMoreWatchable = false.obs;
   int _watchLimit = watchPageSize;
@@ -114,6 +114,11 @@ class HomeController extends GetxController {
     super.onReady();
     refreshProfile();
     _maybeQueueRatingPrompt();
+    // A deep link may have arrived before sign-in; now that the player is
+    // here with a nickname, take them where the link pointed.
+    if (Get.isRegistered<PartyLinkService>()) {
+      unawaited(Get.find<PartyLinkService>().resumePendingLink());
+    }
     _recentSearchWorker = debounce<String>(
       recentSearch,
       (_) => refreshRecentGames(),
@@ -161,10 +166,7 @@ class HomeController extends GetxController {
       return;
     }
     final result = await _profileService.getProfile(user.uid);
-    result.when(
-      success: (loaded) => profile.value = loaded,
-      failure: (_) {},
-    );
+    result.when(success: (loaded) => profile.value = loaded, failure: (_) {});
   }
 
   void selectTab(HomeTab newTab) {
@@ -388,9 +390,10 @@ class HomeController extends GetxController {
     }
     await _analyticsService.logEvent('feedback_submit_attempt');
     try {
-      await Supabase.instance.client
-          .from('feedback')
-          .insert({'uid': uid, 'text': trimmed});
+      await Supabase.instance.client.from('feedback').insert({
+        'uid': uid,
+        'text': trimmed,
+      });
       return true;
     } catch (_) {
       return false;

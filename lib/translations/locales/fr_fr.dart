@@ -81,6 +81,10 @@ const Map<String, String> frFr = {
   TranslationKeys.watchRecentSearchHint: 'Rechercher par joueur…',
   TranslationKeys.watchRecentEmpty: 'Aucune partie récente trouvée.',
   TranslationKeys.searchPlayersHint: 'Rechercher un joueur…',
+  TranslationKeys.linkSignInForGame:
+      'Connectez-vous d\'abord — nous vous emmenons ensuite à la partie.',
+  TranslationKeys.linkSignInForTournament:
+      'Connectez-vous d\'abord — nous vous emmenons ensuite au tournoi.',
   TranslationKeys.leaderboardEmpty:
       'Aucun joueur classé. Jouez en ligne pour entrer dans le Top 30 !',
   TranslationKeys.spectatorWinner: '@name gagne !',

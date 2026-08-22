@@ -76,6 +76,8 @@ abstract final class TranslationKeys {
   static const String watchRecentSearchHint = 'watch_recent_search_hint';
   static const String watchRecentEmpty = 'watch_recent_empty';
   static const String searchPlayersHint = 'search_players_hint';
+  static const String linkSignInForGame = 'link_sign_in_for_game';
+  static const String linkSignInForTournament = 'link_sign_in_for_tournament';
   static const String leaderboardEmpty = 'leaderboard_empty';
   static const String spectatorWinner = 'spectator_winner';
 

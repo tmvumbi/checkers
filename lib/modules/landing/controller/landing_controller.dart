@@ -58,7 +58,18 @@ class LandingController extends GetxController {
       if (await _isFullyBlocked()) {
         return;
       }
-      Get.offAllNamed<void>(AppRoutes.home);
+      // A session without a nickname isn't usable yet — the backend
+      // rejects nameless players in lobbies and tournaments — so finish
+      // the profile before the home screen.
+      final profileResult = await _profileService.getProfile(user.uid);
+      final hasNickname = profileResult.when(
+        success: (profile) => (profile?.nickname ?? '').isNotEmpty,
+        // Don't strand the player on the profile form over a network blip.
+        failure: (_) => true,
+      );
+      Get.offAllNamed<void>(
+        hasNickname ? AppRoutes.home : AppRoutes.editProfile,
+      );
     }
   }
 

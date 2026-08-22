@@ -8,7 +8,10 @@ import '../core/constants/app_strings.dart';
 import '../engine/checkers_engine.dart';
 import '../modules/game_board/models/game_board_arguments.dart';
 import '../routes/app_routes.dart';
+import '../shared/widgets/checkers_snackbar.dart';
+import '../translations/translation_keys.dart';
 import 'online_game_service.dart';
+import 'profile_service.dart';
 
 /// Handles `https://checkers.contribution.club/party/<gameId>` and
 /// `club.contribution.checkers://party/<gameId>` invite links
@@ -18,19 +21,30 @@ class PartyLinkService extends GetxService {
     AppLinks? appLinks,
     SupabaseClient? client,
     OnlineGameService? onlineGameService,
+    ProfileService? profileService,
   }) : _appLinks = appLinks,
        _client = client,
-       _onlineGameServiceOverride = onlineGameService;
+       _onlineGameServiceOverride = onlineGameService,
+       _profileServiceOverride = profileService;
 
   final AppLinks? _appLinks;
   final SupabaseClient? _client;
   final OnlineGameService? _onlineGameServiceOverride;
+  final ProfileService? _profileServiceOverride;
 
   SupabaseClient get client => _client ?? Supabase.instance.client;
   OnlineGameService get _onlineGameService =>
       _onlineGameServiceOverride ?? Get.find();
+  ProfileService? get _profileService =>
+      _profileServiceOverride ??
+      (Get.isRegistered<ProfileService>() ? Get.find<ProfileService>() : null);
 
   StreamSubscription<Uri>? _subscription;
+
+  /// A link that arrived before the player was ready to use it (not signed
+  /// in, or signed in without a nickname). Replayed by
+  /// [resumePendingLink] once they land on the home screen.
+  Uri? _pendingUri;
 
   @override
   void onInit() {
@@ -47,6 +61,15 @@ class PartyLinkService extends GetxService {
   /// Cold start: wait for the landing flow to finish routing first, or
   /// its offAllNamed(home) would wipe the deep link's navigation.
   Future<void> _handleInitialUri(Uri uri) async {
+    if (!_isKnownUri(uri)) {
+      return;
+    }
+    // Nothing to wait for when the link can't be acted on yet: park it and
+    // let the sign-in flow run its course.
+    if (!await _isReadyForLinks()) {
+      _remember(uri);
+      return;
+    }
     for (var i = 0; i < 20; i++) {
       if (Get.currentRoute == AppRoutes.home) {
         break;
@@ -57,9 +80,11 @@ class PartyLinkService extends GetxService {
   }
 
   String? gameIdFromUri(Uri uri) {
-    final isHttp = (uri.scheme == 'https' || uri.scheme == 'http') &&
+    final isHttp =
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
         uri.host == AppStrings.partyLinkHost;
-    final isCustom = uri.scheme == AppStrings.partyLinkScheme ||
+    final isCustom =
+        uri.scheme == AppStrings.partyLinkScheme ||
         uri.scheme == AppStrings.legacyLinkScheme;
     if (!isHttp && !isCustom) {
       return null;
@@ -80,7 +105,8 @@ class PartyLinkService extends GetxService {
     final isHttp =
         (uri.scheme == 'https' || uri.scheme == 'http') &&
         uri.host == AppStrings.partyLinkHost;
-    final isCustom = uri.scheme == AppStrings.partyLinkScheme ||
+    final isCustom =
+        uri.scheme == AppStrings.partyLinkScheme ||
         uri.scheme == AppStrings.legacyLinkScheme;
     if (!isHttp && !isCustom) {
       return false;
@@ -92,14 +118,64 @@ class PartyLinkService extends GetxService {
     return segments.isNotEmpty && segments.first == 'tournament';
   }
 
+  bool _isKnownUri(Uri uri) =>
+      isTournamentUri(uri) || gameIdFromUri(uri) != null;
+
+  /// Links need a signed-in player with a nickname: joining a lobby or a
+  /// party seats them under that name, and the backend rejects empty ones.
+  Future<bool> _isReadyForLinks() async {
+    final user = client.auth.currentUser;
+    if (user == null) {
+      return false;
+    }
+    final service = _profileService;
+    if (service == null) {
+      return true;
+    }
+    final result = await service.getProfile(user.id);
+    return result.when(
+      success: (profile) => (profile?.nickname ?? '').isNotEmpty,
+      failure: (_) => false,
+    );
+  }
+
+  void _remember(Uri uri) {
+    _pendingUri = uri;
+    showCheckersSnackbar(
+      isTournamentUri(uri)
+          ? TranslationKeys.linkSignInForTournament.tr
+          : TranslationKeys.linkSignInForGame.tr,
+    );
+  }
+
+  /// Called once the player reaches the home screen: opens whatever link
+  /// they arrived with before signing in.
+  Future<void> resumePendingLink() async {
+    final uri = _pendingUri;
+    if (uri == null) {
+      return;
+    }
+    if (!await _isReadyForLinks()) {
+      return; // Still not ready — keep it for the next attempt.
+    }
+    _pendingUri = null;
+    await _openUri(uri);
+  }
+
   Future<void> _handleUri(Uri uri) async {
+    if (!_isKnownUri(uri)) {
+      return;
+    }
+    if (!await _isReadyForLinks()) {
+      _remember(uri);
+      return;
+    }
+    await _openUri(uri);
+  }
+
+  Future<void> _openUri(Uri uri) async {
     if (isTournamentUri(uri)) {
-      try {
-        if (client.auth.currentSession == null) {
-          await client.auth.signInAnonymously();
-        }
-        Get.toNamed<void>(AppRoutes.tournamentLobby);
-      } catch (_) {}
+      Get.toNamed<void>(AppRoutes.tournamentLobby);
       return;
     }
     final gameId = gameIdFromUri(uri);
@@ -107,14 +183,12 @@ class PartyLinkService extends GetxService {
       return;
     }
     try {
-      // Sign in anonymously if the link arrives before authentication.
-      if (client.auth.currentSession == null) {
-        await client.auth.signInAnonymously();
-      }
-      final response = await client.rpc<dynamic>(
-        'join_social_game',
-        params: {'p_game_id': gameId},
-      ) as Map;
+      final response =
+          await client.rpc<dynamic>(
+                'join_social_game',
+                params: {'p_game_id': gameId},
+              )
+              as Map;
       final status = response['status'] as String?;
       if (status != 'joined' && status != 'already_seated') {
         return;

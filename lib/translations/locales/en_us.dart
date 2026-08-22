@@ -79,6 +79,10 @@ const Map<String, String> enUs = {
   TranslationKeys.watchRecentSearchHint: 'Search by player…',
   TranslationKeys.watchRecentEmpty: 'No recent games found.',
   TranslationKeys.searchPlayersHint: 'Search players…',
+  TranslationKeys.linkSignInForGame:
+      'Sign in first — we\'ll take you to the game right after.',
+  TranslationKeys.linkSignInForTournament:
+      'Sign in first — we\'ll take you to the tournament right after.',
   TranslationKeys.leaderboardEmpty:
       'No ranked players yet. Play online games to enter the Top 30!',
   TranslationKeys.spectatorWinner: '@name wins!',
