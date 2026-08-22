@@ -8,5 +8,11 @@ abstract final class AppStrings {
       'assets/images/avatar_placeholder.png';
 
   static const String partyLinkHost = 'checkers.contribution.club';
-  static const String partyLinkScheme = 'checkers';
+  /// Reverse-DNS so the scheme is unique: the bare `checkers://` scheme is
+  /// also claimed by unrelated App Store apps (the Checkers restaurant
+  /// chain), and iOS picks the winner arbitrarily when schemes collide.
+  static const String partyLinkScheme = 'club.contribution.checkers';
+
+  /// Still accepted for links shared before the rename.
+  static const String legacyLinkScheme = 'checkers';
 }

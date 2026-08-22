@@ -44,7 +44,7 @@
 			<string>club.contribution.checkers.party</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>checkers</string>
+				<string>club.contribution.checkers</string>
 			</array>
 		</dict>
 		<dict>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	<!-- ?mode=developer makes iOS fetch the AASA directly from the domain
+	     instead of Apple's CDN, which is required for universal links to
+	     work on development-signed builds installed from Xcode. Release
+	     builds use Runner.entitlements without it. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:checkers.contribution.club?mode=developer</string>
+	</array>
+</dict>
+</plist>

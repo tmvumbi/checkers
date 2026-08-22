@@ -11,7 +11,8 @@ import '../routes/app_routes.dart';
 import 'online_game_service.dart';
 
 /// Handles `https://checkers.contribution.club/party/<gameId>` and
-/// `checkers://party/<gameId>` invite links (kopo's PartyLinkService).
+/// `club.contribution.checkers://party/<gameId>` invite links
+/// (kopo's PartyLinkService).
 class PartyLinkService extends GetxService {
   PartyLinkService({
     AppLinks? appLinks,
@@ -58,7 +59,8 @@ class PartyLinkService extends GetxService {
   String? gameIdFromUri(Uri uri) {
     final isHttp = (uri.scheme == 'https' || uri.scheme == 'http') &&
         uri.host == AppStrings.partyLinkHost;
-    final isCustom = uri.scheme == AppStrings.partyLinkScheme;
+    final isCustom = uri.scheme == AppStrings.partyLinkScheme ||
+        uri.scheme == AppStrings.legacyLinkScheme;
     if (!isHttp && !isCustom) {
       return null;
     }
@@ -73,12 +75,13 @@ class PartyLinkService extends GetxService {
   }
 
   /// `https://checkers.contribution.club/tournament` and
-  /// `checkers://tournament` open the tournament lobby.
+  /// `club.contribution.checkers://tournament` open the tournament lobby.
   bool isTournamentUri(Uri uri) {
     final isHttp =
         (uri.scheme == 'https' || uri.scheme == 'http') &&
         uri.host == AppStrings.partyLinkHost;
-    final isCustom = uri.scheme == AppStrings.partyLinkScheme;
+    final isCustom = uri.scheme == AppStrings.partyLinkScheme ||
+        uri.scheme == AppStrings.legacyLinkScheme;
     if (!isHttp && !isCustom) {
       return false;
     }

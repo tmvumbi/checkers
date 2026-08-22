@@ -55,6 +55,7 @@ function deepLinkPage(scheme, label) {
 <a class="btn" href="${scheme}">Open the app</a>
 <p style="font-size:13px;opacity:.6">If nothing happens, install Checkers
 first, then tap the link again.</p>
+<p style="font-size:12px;opacity:.45">Opens club.contribution.checkers</p>
 </div>
 <script>setTimeout(function(){window.location=${JSON.stringify(scheme)}},400)</script>
 </body></html>`;
@@ -84,19 +85,19 @@ export default {
     if (party)
       return html(
         deepLinkPage(
-          "checkers://party/" + party[1],
+          "club.contribution.checkers://party/" + party[1],
           "You've been invited to a game!"
         )
       );
     if (p === "/tournament" || p.startsWith("/tournament/"))
       return html(
         deepLinkPage(
-          "checkers://tournament",
+          "club.contribution.checkers://tournament",
           "You've been invited to a tournament!"
         )
       );
     return html(
-      deepLinkPage("checkers://home", "Draughts & checkers, together.")
+      deepLinkPage("club.contribution.checkers://home", "Draughts & checkers, together.")
     );
   },
 };

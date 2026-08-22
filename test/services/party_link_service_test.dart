@@ -17,8 +17,36 @@ void main() {
 
     test('parses custom scheme links', () {
       expect(
+        service.gameIdFromUri(
+          Uri.parse('club.contribution.checkers://party/xyz'),
+        ),
+        'xyz',
+      );
+    });
+
+    test('still parses the legacy scheme shared before the rename', () {
+      expect(
         service.gameIdFromUri(Uri.parse('checkers://party/xyz')),
         'xyz',
+      );
+    });
+
+    test('recognizes tournament links on both schemes', () {
+      expect(
+        service.isTournamentUri(
+          Uri.parse('club.contribution.checkers://tournament'),
+        ),
+        isTrue,
+      );
+      expect(
+        service.isTournamentUri(Uri.parse('checkers://tournament')),
+        isTrue,
+      );
+      expect(
+        service.isTournamentUri(
+          Uri.parse('https://checkers.contribution.club/tournament'),
+        ),
+        isTrue,
       );
     });
 

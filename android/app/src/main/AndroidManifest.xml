@@ -52,6 +52,9 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="club.contribution.checkers" android:host="party"/>
+                <data android:scheme="club.contribution.checkers" android:host="tournament"/>
+                <!-- Legacy scheme: links shared before the rename. -->
                 <data android:scheme="checkers" android:host="party"/>
                 <data android:scheme="checkers" android:host="tournament"/>
             </intent-filter>
