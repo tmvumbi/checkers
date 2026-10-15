@@ -8,11 +8,15 @@
  * @module
  */
 
+import type * as account from "../account.js";
+import type * as admin from "../admin.js";
+import type * as ads from "../ads.js";
 import type * as blocks from "../blocks.js";
 import type * as config from "../config.js";
 import type * as crons from "../crons.js";
 import type * as feedback from "../feedback.js";
 import type * as games from "../games.js";
+import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_blocks from "../lib/blocks.js";
 import type * as lib_config from "../lib/config.js";
@@ -23,6 +27,7 @@ import type * as lib_points from "../lib/points.js";
 import type * as lib_serialize from "../lib/serialize.js";
 import type * as lib_time from "../lib/time.js";
 import type * as lib_tournaments from "../lib/tournaments.js";
+import type * as messages from "../messages.js";
 import type * as pcGames from "../pcGames.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
@@ -39,11 +44,15 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  account: typeof account;
+  admin: typeof admin;
+  ads: typeof ads;
   blocks: typeof blocks;
   config: typeof config;
   crons: typeof crons;
   feedback: typeof feedback;
   games: typeof games;
+  http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/blocks": typeof lib_blocks;
   "lib/config": typeof lib_config;
@@ -54,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   "lib/serialize": typeof lib_serialize;
   "lib/time": typeof lib_time;
   "lib/tournaments": typeof lib_tournaments;
+  messages: typeof messages;
   pcGames: typeof pcGames;
   presence: typeof presence;
   profiles: typeof profiles;

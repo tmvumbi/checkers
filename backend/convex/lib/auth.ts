@@ -39,7 +39,41 @@ export function isAnonymousIdentity(identity: Record<string, unknown>): boolean 
   return typeof provider === "string" ? provider === "anonymous" : undefined;
 }
 
-/** Creates the caller's profile on first sign-in (empty nickname). */
+// Firebase `firebase.identities` provider keys → Supabase auth.identities
+// provider names recorded on imported profiles.
+const PROVIDERS: Record<string, string> = { "google.com": "google", "apple.com": "apple" };
+
+/** Provider identities in a Firebase ID token, as (provider, subject). */
+export function federatedIdentities(identity: Record<string, unknown>) {
+  const firebase = identity["firebase"] as { identities?: Record<string, unknown> } | undefined;
+  const out: { provider: string; subject: string }[] = [];
+  for (const [key, subjects] of Object.entries(firebase?.identities ?? {})) {
+    const provider = PROVIDERS[key];
+    if (!provider || !Array.isArray(subjects)) continue;
+    for (const subject of subjects) {
+      if (typeof subject === "string") out.push({ provider, subject });
+    }
+  }
+  return out;
+}
+
+/** An imported, still-unclaimed profile whose Google/Apple identity
+ * matches the caller's token. */
+async function unclaimedLegacyMatch(ctx: MutationCtx, identity: Record<string, unknown>) {
+  for (const { provider, subject } of federatedIdentities(identity)) {
+    const link = await ctx.db
+      .query("legacyIdentities")
+      .withIndex("by_provider_and_subject", (q) => q.eq("provider", provider).eq("subject", subject))
+      .first();
+    if (!link) continue;
+    const profile = await ctx.db.get("profiles", link.profileId);
+    if (profile && !profile.tokenIdentifier) return profile;
+  }
+  return null;
+}
+
+/** Creates the caller's profile on first sign-in (empty nickname), or
+ * re-claims their imported Supabase profile by Google/Apple identity. */
 export async function getOrCreateProfile(
   ctx: MutationCtx,
   isAnonymousHint?: boolean,
@@ -52,6 +86,15 @@ export async function getOrCreateProfile(
     .unique();
   if (existing) return existing;
   const now = Date.now();
+  const legacy = await unclaimedLegacyMatch(ctx, identity);
+  if (legacy) {
+    await ctx.db.patch("profiles", legacy._id, {
+      tokenIdentifier: identity.tokenIdentifier,
+      isAnonymous: false,
+      updatedAt: now,
+    });
+    return (await ctx.db.get("profiles", legacy._id))!;
+  }
   const id = await ctx.db.insert("profiles", {
     tokenIdentifier: identity.tokenIdentifier,
     nickname: "",

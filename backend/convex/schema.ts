@@ -43,6 +43,7 @@ export default defineSchema({
     legacyId: v.optional(v.string()),
   })
     .index("by_token", ["tokenIdentifier"])
+    .index("by_created", ["createdAt"])
     .index("by_legacy_id", ["legacyId"])
     .index("by_rating", ["rating"])
     .index("by_points_and_rating", ["points", "rating"]),
@@ -54,7 +55,9 @@ export default defineSchema({
     provider: v.string(),
     subject: v.string(),
     profileId: v.id("profiles"),
-  }).index("by_provider_and_subject", ["provider", "subject"]),
+  })
+    .index("by_provider_and_subject", ["provider", "subject"])
+    .index("by_profile", ["profileId"]),
 
   games: defineTable({
     status: gameStatus,
@@ -102,6 +105,7 @@ export default defineSchema({
     ])
     .index("by_vs_pc_and_status_and_updated", ["vsPc", "status", "updatedAt"])
     .index("by_tournament", ["tournamentId"])
+    .index("by_created", ["createdAt"])
     .index("by_legacy_id", ["legacyId"]),
 
   gamePlayers: defineTable({
