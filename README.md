@@ -23,16 +23,22 @@ the international family and the 40-move rule for American. Online clocks:
 ## Architecture
 
 - **Flutter + GetX** (kopo conventions): `lib/modules/<feature>/{binding,controller,view}`,
-  service interfaces + Supabase implementations, EN/FR translations.
+  service interfaces + Convex implementations (registered in
+  `lib/bindings/initial_binding.dart`), EN/FR translations.
 - **Rules engine** ([lib/engine/](lib/engine/)): pure-Dart bitboard engine,
   perft-validated. AI: negamax + alpha-beta + iterative deepening +
   transposition table + quiescence, in a background isolate.
 - **Server-authoritative online play**: the same rules run as JavaScript
-  inside Postgres (plv8, [supabase/engine/engine.js](supabase/engine/engine.js)) —
-  clients are read-only; every move goes through security-definer RPCs.
+  in Convex mutations ([supabase/engine/engine.js](supabase/engine/engine.js),
+  copied to `backend/convex/lib/engine.js` by `scripts/build_engine_convex.sh`) —
+  clients only read and call functions; every move is validated server-side.
   The two engines are locked together by a generated test-vector suite.
-- **Backend**: self-hosted Supabase (Coolify), public API at
-  `https://api.dame.cd`.
+- **Backend**: [Convex](https://convex.dev) in [backend/](backend/)
+  (schema, queries/mutations, crons, admin HTTP API). Sign-in is Firebase
+  Auth (guest, Google, Apple); Convex verifies the Firebase ID tokens. The
+  Flutter client is [dartvex](https://pub.dev/packages/dartvex).
+  Migration from the former self-hosted Supabase stack:
+  [backend/MIGRATION.md](backend/MIGRATION.md).
 
 ## Development
 
@@ -40,12 +46,13 @@ the international family and the 40-move rule for American. Online clocks:
 flutter pub get
 flutter test                                     # unit + widget tests
 dart run tool/generate_vectors.dart              # regenerate engine vectors
-deno test --allow-read supabase/engine/engine_test.ts   # JS/Dart engine parity
-flutter test integration_test -d <device>        # e2e (live backend)
+(cd backend && npm install && npm test)          # Convex functions + engine parity
+flutter test integration_test -d <device>        # e2e (live dev backend)
 ```
 
-Database migrations live in [supabase/migrations/](supabase/migrations/) and
-are applied with `scripts/db_apply.sh <file>`; after editing
-`supabase/engine/engine.js`, run `scripts/build_engine_sql.sh` to regenerate
-the plv8 migration. Server-flow smoke tests: `scripts/test_online_flow.sh`
-and `scripts/test_social_flow.sh`.
+Backend development: `cd backend && npx convex dev` pushes `convex/` to the
+dev deployment on every change (the app targets it by default; override
+with `--dart-define=CONVEX_URL=...`). After editing
+`supabase/engine/engine.js`, run `scripts/build_engine_convex.sh`.
+`supabase/` and the `scripts/test_*_flow` scripts describe the legacy stack
+that stays up until the account-handoff window closes.
