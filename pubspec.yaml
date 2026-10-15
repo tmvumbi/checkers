@@ -34,8 +34,8 @@ dependencies:
   flutter_secure_storage: ^11.0.0
   uuid: ^4.5.1
   firebase_core: ^4.13.0
-  firebase_messaging: ^16.5.0
-  firebase_analytics: ^12.4.6
+  firebase_messaging: ^16.7.0
+  firebase_analytics: ^12.6.0
   firebase_auth: ^6.7.0
   dartvex: ^0.2.0
 
