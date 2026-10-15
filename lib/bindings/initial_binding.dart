@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 
 import '../services/ad_service.dart';
+import '../services/account_deletion_service.dart';
 import '../services/analytics_service.dart';
 import '../services/app_rating_service.dart';
 import '../services/auth_service.dart';
@@ -29,6 +30,10 @@ class InitialBinding extends Bindings {
       fenix: true,
     );
     Get.lazyPut<AuthService>(SupabaseAuthService.new, fenix: true);
+    Get.lazyPut<AccountDeletionService>(
+      SupabaseAccountDeletionService.new,
+      fenix: true,
+    );
     Get.lazyPut<ProfileService>(SupabaseProfileService.new, fenix: true);
     Get.lazyPut<ProfilePhotoService>(
       SupabaseProfilePhotoService.new,

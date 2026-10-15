@@ -14,7 +14,7 @@
 	     builds use Runner.entitlements without it. -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:checkers.contribution.club?mode=developer</string>
+		<string>applinks:dame.cd?mode=developer</string>
 	</array>
 </dict>
 </plist>

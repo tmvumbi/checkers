@@ -36,7 +36,7 @@ if [[ -z "$LANGUAGE" || ( -z "$TEXT" && -z "$IMAGE" ) ]]; then
 fi
 
 AUTH_FILE="${CHECKERS_DASHBOARD_AUTH_FILE:-$HOME/.config/checkers_supabase_dashboard_auth}"
-API="${CHECKERS_SUPABASE_URL:-https://checkers-api.contribution.club}"
+API="${CHECKERS_SUPABASE_URL:-https://api.dame.cd}"
 
 MSG_LANGUAGE="$LANGUAGE" MSG_TEXT="$TEXT" MSG_TARGET="$TARGET" \
 MSG_LINK="$LINK" MSG_IMAGE="$IMAGE" MSG_DAYS="$DAYS" \

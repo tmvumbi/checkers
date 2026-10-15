@@ -38,7 +38,7 @@ if [[ "$UNBLOCK" -eq 0 && -z "$LEVEL" ]]; then
 fi
 
 AUTH_FILE="${CHECKERS_DASHBOARD_AUTH_FILE:-$HOME/.config/checkers_supabase_dashboard_auth}"
-API="${CHECKERS_SUPABASE_URL:-https://checkers-api.contribution.club}"
+API="${CHECKERS_SUPABASE_URL:-https://api.dame.cd}"
 
 BP_UID="$UID_ARG" BP_NICKNAME="$NICKNAME" BP_LEVEL="$LEVEL" BP_DAYS="$DAYS" \
 BP_REASON="$REASON" BP_UNBLOCK="$UNBLOCK" \

@@ -17,6 +17,7 @@ void main() {
         'allow_undo': true,
         'white_bank_ms': 300000,
         'black_bank_ms': 300000,
+        'finished_at': '2026-08-29T08:15:00Z',
         'state': {
           'ply': 0,
           'side': 'white',
@@ -37,6 +38,7 @@ void main() {
     expect(snapshot.vsPc, isTrue);
     expect(snapshot.aiLevel, 'hard');
     expect(snapshot.allowUndo, isTrue);
+    expect(snapshot.finishedAt, DateTime.utc(2026, 8, 29, 8, 15));
     expect(snapshot.players[1].isBot, isTrue);
     expect(snapshot.players[1].uid, isNull);
   });

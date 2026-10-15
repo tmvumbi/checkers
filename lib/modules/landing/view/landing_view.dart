@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/constants/app_locales.dart';
+import '../../../shared/widgets/apple_sign_in_button.dart';
 import '../../../shared/widgets/checkers_background.dart';
 import '../../../shared/widgets/checkers_flag_icon.dart';
 import '../../../shared/widgets/checkers_gradient_button.dart';
@@ -51,16 +52,19 @@ class LandingView extends GetView<LandingController> {
                           CheckersGradientButton(
                             key: const Key('landing-google-button'),
                             label: TranslationKeys.continueWithGoogle.tr,
-                            onPressed:
-                                busy ? null : controller.signInWithGoogle,
+                            onPressed: busy
+                                ? null
+                                : controller.signInWithGoogle,
                           ),
                           const SizedBox(height: 14),
                           if (controller.supportsAppleSignIn) ...[
-                            CheckersGradientButton(
+                            AppleSignInButton(
                               key: const Key('landing-apple-button'),
-                              label: TranslationKeys.continueWithApple.tr,
-                              onPressed:
-                                  busy ? null : controller.signInWithApple,
+                              fallbackLabel:
+                                  TranslationKeys.continueWithApple.tr,
+                              onPressed: busy
+                                  ? null
+                                  : controller.signInWithApple,
                             ),
                             const SizedBox(height: 14),
                           ],

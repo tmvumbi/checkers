@@ -431,7 +431,12 @@ Board representation: bitboards — three 64-bit ints (`white`, `black`, `kings`
 
 A new **Supabase project deployed as a Coolify service** on the existing instance (`http://192.168.101.240:8000/`) — Coolify's one-click Supabase stack (Postgres, GoTrue auth, PostgREST, Realtime, Storage, Edge Functions runtime, Studio). Setup checklist in §10 M0.
 
-> **Public API URL: `https://checkers-api.contribution.club`** — published via the existing Cloudflare Tunnel (`ubuntu-home-server` connector) as a route to `http://localhost:80` (the server's proxy), alongside the other Coolify-hosted services. The Supabase project in Coolify must be configured with this as its API domain. Cloudflare terminates TLS; DNS is auto-managed by the tunnel.
+> **Public API URL: `https://api.dame.cd`** — the replacement hostname is
+> served by a Cloudflare Worker compatibility proxy to the existing
+> `checkers-api.contribution.club` tunnel route. This preserves the production
+> endpoint and Supabase Realtime WebSockets while the `dame.cd` zone and the
+> tunnel remain in separate Cloudflare accounts. GoTrue must be configured with
+> the replacement domain and app identity before the new client is distributed.
 
 #### 7.4.1 Auth
 
@@ -535,7 +540,7 @@ Ads (AdMob + UMP + ATT), subscriptions/IAP + entitlements + receipt validation, 
 
 | # | Milestone | Contents |
 |---|---|---|
-| **M0** | Infra bootstrap | ✅ *Done (2026-08-13):* Coolify project `checkers` + service `supabase-checkers` (full stack running healthy); public API live at `https://checkers-api.contribution.club` (Cloudflare Tunnel → Traefik → Kong; verified 200 with anon key on `/auth/v1/health` and `/rest/v1/`); `checkers.contribution.club` tunnel route reserved for deep links. Note: Kong's Coolify domain uses the `http://` scheme deliberately — TLS terminates at Cloudflare and the tunnel delivers plain HTTP to Traefik; an `https://` scheme generates a redirect loop. *Remaining:* Auth providers (Google/Apple/anonymous) configuration in GoTrue; Flutter app skeleton with kopo structure, theme port, landing + auth + edit-profile + home shell with 4 tabs. |
+| **M0** | Infra bootstrap | ✅ *Done (2026-08-13):* Coolify project `checkers` + service `supabase-checkers` (full stack running healthy); the legacy Cloudflare Tunnel → Traefik → Kong route is live and verified. *2026-08-28 domain migration:* the `api.dame.cd` compatibility Worker is implemented and locally verified against GoTrue, PostgREST, and Realtime; production deployment is pending Cloudflare confirmation. *Remaining:* update GoTrue Google/Apple audiences and public URLs for `cd.dame`, then deploy and verify the new domain. |
 | **M1** | Engine + PC play | Dart engine (all 3 presets + toggles, draw detection) passing the test-vector suite + perft; board UI with tap/drag input, highlights, animations; AI with 3 levels in an isolate; full offline PC game loop with How to Play. **App is playable offline end-to-end.** |
 | **M2** | Online core | TS engine port passing the same vectors; schema + RLS + Edge Functions (`join/submit_move/claim_timeout/resign/reconnect/leave`); matchmaking lobby; live online games with clocks (15 s + 5 min bank), timeout losses; recorded moves. |
 | **M3** | Social + draws | Draw offer/accept + all auto-draw rules live online; rematch; in-app invites + presence directory; share-link invites + deep links; abandonment handling. |
@@ -549,7 +554,7 @@ Ads (AdMob + UMP + ATT), subscriptions/IAP + entitlements + receipt validation, 
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | **Public domain** | ✅ **Resolved.** API: `checkers-api.contribution.club` (Cloudflare Tunnel route → Coolify Supabase, live and verified). Deep links: `checkers.contribution.club` (tunnel route created; needs a small static site serving `assetlinks.json` / AASA / `/party/*` fallback page when M3 lands). |
+| 1 | **Public domain** | 🟡 **Prepared.** The `dame.cd` website/deep-link Worker and `api.dame.cd` compatibility proxy are implemented; the API proxy passes health, REST, and Realtime WebSocket checks locally. Production Worker routes and final end-to-end verification remain pending. The legacy `contribution.club` routes stay active throughout the migration. |
 | 2 | Dual-engine drift (Dart + TS) | Mitigated by the shared test-vector + perft CI gate (§7.2); this is kopo's known biggest cost — the vector suite is the non-negotiable answer. |
 | 3 | Turkish-strike & majority-rule correctness | The two classic draughts implementation bugs; explicit vectors for both, in both engines. |
 | 4 | Self-hosted Supabase operational load | Backups (Postgres dumps via Coolify scheduled backups), upgrades, uptime on a single host. Acceptable for beta; revisit before scale. |

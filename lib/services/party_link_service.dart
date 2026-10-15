@@ -13,8 +13,8 @@ import '../translations/translation_keys.dart';
 import 'online_game_service.dart';
 import 'profile_service.dart';
 
-/// Handles `https://checkers.contribution.club/party/<gameId>` and
-/// `club.contribution.checkers://party/<gameId>` invite links
+/// Handles `https://dame.cd/party/<gameId>` and
+/// `dame://party/<gameId>` invite links
 /// (kopo's PartyLinkService).
 class PartyLinkService extends GetxService {
   PartyLinkService({
@@ -83,9 +83,7 @@ class PartyLinkService extends GetxService {
     final isHttp =
         (uri.scheme == 'https' || uri.scheme == 'http') &&
         uri.host == AppStrings.partyLinkHost;
-    final isCustom =
-        uri.scheme == AppStrings.partyLinkScheme ||
-        uri.scheme == AppStrings.legacyLinkScheme;
+    final isCustom = uri.scheme == AppStrings.partyLinkScheme;
     if (!isHttp && !isCustom) {
       return null;
     }
@@ -99,15 +97,13 @@ class PartyLinkService extends GetxService {
     return null;
   }
 
-  /// `https://checkers.contribution.club/tournament` and
-  /// `club.contribution.checkers://tournament` open the tournament lobby.
+  /// `https://dame.cd/tournament` and
+  /// `dame://tournament` open the tournament lobby.
   bool isTournamentUri(Uri uri) {
     final isHttp =
         (uri.scheme == 'https' || uri.scheme == 'http') &&
         uri.host == AppStrings.partyLinkHost;
-    final isCustom =
-        uri.scheme == AppStrings.partyLinkScheme ||
-        uri.scheme == AppStrings.legacyLinkScheme;
+    final isCustom = uri.scheme == AppStrings.partyLinkScheme;
     if (!isHttp && !isCustom) {
       return false;
     }

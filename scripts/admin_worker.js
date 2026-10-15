@@ -1,4 +1,4 @@
-// Cloudflare Worker "checkers-admin" — advertisement admin console on
+// Cloudflare Worker "checkers-admin" — the operations console currently on
 // checkers.contribution.club/admin*. Basic-auth protected (secrets
 // ADMIN_USER / ADMIN_PASS); talks to Supabase with the service role key
 // (secrets SUPABASE_URL / SERVICE_KEY), which never reaches the browser.
@@ -61,6 +61,51 @@ async function sbJson(env, path, init = {}) {
   });
   if (!response.ok) {
     throw new Error(await response.text());
+  }
+  return response.json();
+}
+
+function parsePushAudience(url) {
+  const platform = (url.searchParams.get("platform") ?? "all").toLowerCase();
+  const hoursRaw = url.searchParams.get("active_within_hours");
+  const activeWithinHours = hoursRaw == null || hoursRaw === ""
+    ? null
+    : parseInt(hoursRaw, 10);
+  if (!["all", "android", "ios"].includes(platform)) {
+    throw new Error("platform must be all, android, or ios");
+  }
+  if (activeWithinHours !== null &&
+      (!Number.isInteger(activeWithinHours) || activeWithinHours < 1 ||
+       activeWithinHours > 87600)) {
+    throw new Error("invalid activity window");
+  }
+  return { platform, activeWithinHours };
+}
+
+async function pushAudience(env, platform, activeWithinHours) {
+  return sbJson(env, "/rest/v1/rpc/admin_push_audience", {
+    method: "POST",
+    body: JSON.stringify({
+      p_platform: platform,
+      p_active_within_hours: activeWithinHours,
+    }),
+  });
+}
+
+async function relayPushBatch(env, payload) {
+  if (!env.PUSH_RELAY_URL || !env.ADMIN_RELAY_KEY) {
+    throw new Error("push relay is not configured");
+  }
+  const response = await fetch(env.PUSH_RELAY_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.ADMIN_RELAY_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`push relay failed (${response.status})`);
   }
   return response.json();
 }
@@ -248,6 +293,135 @@ async function handleApi(request, env, path) {
     return Response.json(result);
   }
 
+  if (path === "/push/audience" && method === "GET") {
+    try {
+      const audience = parsePushAudience(url);
+      const result = await pushAudience(
+        env,
+        audience.platform,
+        audience.activeWithinHours,
+      );
+      const { tokens: _tokens, ...summary } = result;
+      return Response.json(summary);
+    } catch (error) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+  }
+
+  if (path === "/push/history" && method === "GET") {
+    return sb(
+      env,
+      "/rest/v1/push_broadcasts?select=*&order=created_at.desc&limit=50",
+    );
+  }
+
+  if (path === "/push/send" && method === "POST") {
+    const b = await request.json();
+    const title = String(b.title ?? "").trim();
+    const body = String(b.body ?? "").trim();
+    const platform = String(b.platform ?? "all").toLowerCase();
+    const activeWithinHours = b.active_within_hours == null
+      ? null
+      : parseInt(b.active_within_hours, 10);
+    if (!title || title.length > 100) {
+      return Response.json(
+        { error: "title must be between 1 and 100 characters" },
+        { status: 400 },
+      );
+    }
+    if (!body || body.length > 500) {
+      return Response.json(
+        { error: "message must be between 1 and 500 characters" },
+        { status: 400 },
+      );
+    }
+    let audience;
+    try {
+      const query = new URL("https://local.invalid");
+      query.searchParams.set("platform", platform);
+      if (activeWithinHours !== null) {
+        query.searchParams.set(
+          "active_within_hours",
+          String(activeWithinHours),
+        );
+      }
+      const parsed = parsePushAudience(query);
+      audience = await pushAudience(
+        env,
+        parsed.platform,
+        parsed.activeWithinHours,
+      );
+    } catch (error) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    if (audience.truncated) {
+      return Response.json(
+        { error: "audience exceeds the 20,000-device safety limit" },
+        { status: 400 },
+      );
+    }
+
+    const inserted = await sbJson(env, "/rest/v1/push_broadcasts", {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        body,
+        platform,
+        active_within_hours: activeWithinHours,
+        targeted_count: audience.devices ?? 0,
+        status: "sending",
+      }),
+    });
+    const broadcast = inserted[0];
+    let sent = 0;
+    let failed = 0;
+    try {
+      const tokens = audience.tokens ?? [];
+      for (let offset = 0; offset < tokens.length; offset += 500) {
+        const result = await relayPushBatch(env, {
+          tokens: tokens.slice(offset, offset + 500),
+          title,
+          body,
+          data: {
+            type: "admin_broadcast",
+            broadcast_id: broadcast.id,
+          },
+        });
+        sent += result.sent ?? 0;
+        failed += result.failed ?? 0;
+      }
+      const status = failed === 0 ? "sent" : sent > 0 ? "partial" : "failed";
+      await sbJson(env, `/rest/v1/push_broadcasts?id=eq.${broadcast.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          sent_count: sent,
+          failed_count: failed,
+          status,
+          completed_at: new Date().toISOString(),
+        }),
+      });
+      return Response.json({
+        id: broadcast.id,
+        targeted: audience.devices ?? 0,
+        sent,
+        failed,
+        status,
+      });
+    } catch (error) {
+      await sbJson(env, `/rest/v1/push_broadcasts?id=eq.${broadcast.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          sent_count: sent,
+          failed_count: Math.max(failed, (audience.devices ?? 0) - sent),
+          status: "failed",
+          error: error.message.slice(0, 500),
+          completed_at: new Date().toISOString(),
+        }),
+      });
+      return Response.json({ error: error.message }, { status: 502 });
+    }
+  }
+
   if (path === "/settings" && method === "GET") {
     const rows = await sbJson(
       env,
@@ -255,6 +429,7 @@ async function handleApi(request, env, path) {
     );
     const config = rows[0]?.config ?? {};
     const ads = config.ads ?? {};
+    const points = config.points ?? {};
     return Response.json({
       adsEnabled: ads.enabled ?? true,
       interstitialFrequency: ads.interstitialFrequency ?? 15,
@@ -275,6 +450,14 @@ async function handleApi(request, env, path) {
       turnMs: config.turn_ms ?? 15000,
       bankMs: config.bank_ms ?? 300000,
       leaderboardMinGames: config.leaderboard_min_games ?? 1,
+      pointRules: {
+        pcEasyWin: points.pc_easy_win ?? 1,
+        pcMediumWin: points.pc_medium_win ?? 5,
+        pcHardWin: points.pc_hard_win ?? 10,
+        tournamentPerParticipant:
+          points.tournament_per_participant ?? 1,
+        tournamentBonus: points.tournament_bonus ?? 0,
+      },
     });
   }
   if (path === "/settings" && method === "PATCH") {
@@ -320,6 +503,29 @@ async function handleApi(request, env, path) {
         positiveInt(b.leaderboardMinGames, "Leaderboard minimum games", 0, 1000),
       b.interstitialFrequency !== undefined &&
         positiveInt(b.interstitialFrequency, "Interstitial frequency", 1, 1000),
+      b.pointRules !== undefined &&
+        (typeof b.pointRules !== "object" || b.pointRules === null ||
+          Array.isArray(b.pointRules)) && "Point rules must be an object",
+      b.pointRules?.pcEasyWin !== undefined &&
+        positiveInt(b.pointRules.pcEasyWin, "Easy PC win points", 0, 100000),
+      b.pointRules?.pcMediumWin !== undefined &&
+        positiveInt(b.pointRules.pcMediumWin, "Medium PC win points", 0, 100000),
+      b.pointRules?.pcHardWin !== undefined &&
+        positiveInt(b.pointRules.pcHardWin, "Hard PC win points", 0, 100000),
+      b.pointRules?.tournamentPerParticipant !== undefined &&
+        positiveInt(
+          b.pointRules.tournamentPerParticipant,
+          "Tournament points per participant",
+          0,
+          100000,
+        ),
+      b.pointRules?.tournamentBonus !== undefined &&
+        positiveInt(
+          b.pointRules.tournamentBonus,
+          "Tournament winner bonus",
+          0,
+          100000,
+        ),
     ].filter(Boolean);
     if (checks.length) return bad(checks[0]);
 
@@ -363,6 +569,26 @@ async function handleApi(request, env, path) {
     if (b.bankMs !== undefined) config.bank_ms = b.bankMs;
     if (b.leaderboardMinGames !== undefined) {
       config.leaderboard_min_games = b.leaderboardMinGames;
+    }
+    if (b.pointRules !== undefined) {
+      const points = { ...(config.points ?? {}) };
+      if (b.pointRules.pcEasyWin !== undefined) {
+        points.pc_easy_win = b.pointRules.pcEasyWin;
+      }
+      if (b.pointRules.pcMediumWin !== undefined) {
+        points.pc_medium_win = b.pointRules.pcMediumWin;
+      }
+      if (b.pointRules.pcHardWin !== undefined) {
+        points.pc_hard_win = b.pointRules.pcHardWin;
+      }
+      if (b.pointRules.tournamentPerParticipant !== undefined) {
+        points.tournament_per_participant =
+          b.pointRules.tournamentPerParticipant;
+      }
+      if (b.pointRules.tournamentBonus !== undefined) {
+        points.tournament_bonus = b.pointRules.tournamentBonus;
+      }
+      config.points = points;
     }
 
     return sb(env, "/rest/v1/app_config?id=eq.public", {
@@ -416,7 +642,7 @@ const PAGE = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Checkers Ads Admin</title>
+<title>Checkers Admin</title>
 <style>
 :root {
   --bg: #0d1d14; --panel: #12261b; --panel2: #1a3325; --line: #2c4a38;
@@ -487,7 +713,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 </head>
 <body>
 <header>
-  <h1>Checkers &mdash; Ads Admin</h1>
+  <h1>Checkers Admin</h1>
   <nav id="nav"></nav>
 </header>
 <main>
@@ -497,6 +723,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <section id="tab-camps" hidden></section>
   <section id="tab-custs" hidden></section>
   <section id="tab-msgs" hidden></section>
+  <section id="tab-push" hidden></section>
   <section id="tab-players" hidden></section>
   <section id="tab-settings" hidden></section>
 </main>
@@ -514,6 +741,7 @@ let messages = [], blocks = [], settings = {};
 let feedback = { items: [], open_count: 0 }, feedbackScope = 'open';
 let ops = null, opsDays = 7;
 let pstats = null, pstatsDays = 7;
+let pushPreview = null, pushHistory = [];
 
 // --- Routing: one URL per page, so a refresh stays put. ----------------
 const ROUTES = [
@@ -523,6 +751,7 @@ const ROUTES = [
   ['camps', '/admin/campaigns', 'Campaigns'],
   ['custs', '/admin/customers', 'Customers'],
   ['msgs', '/admin/messages', 'Messages'],
+  ['push', '/admin/push', 'Push notifications'],
   ['players', '/admin/players', 'Players'],
   ['settings', '/admin/settings', 'Settings'],
 ];
@@ -559,6 +788,7 @@ function showTab(tab) {
   document.title = 'Checkers Admin — ' + (hit ? hit[2] : 'Dashboard');
   if (tab === 'ops') loadOps();
   if (tab === 'pstats') loadPstats();
+  if (tab === 'push') loadPush();
 }
 
 window.addEventListener('popstate', () => showTab(tabForPath(location.pathname)));
@@ -1190,6 +1420,146 @@ async function sendMsg() {
   } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
 }
 
+function pushAudienceQuery() {
+  const platform = document.getElementById('push-platform')?.value ?? 'all';
+  const hours = document.getElementById('push-active')?.value ?? '';
+  return '?platform=' + encodeURIComponent(platform)
+    + (hours ? '&active_within_hours=' + encodeURIComponent(hours) : '');
+}
+
+async function loadPush() {
+  const el = document.getElementById('tab-push');
+  if (!el.innerHTML) renderPush();
+  try {
+    [pushPreview, pushHistory] = await Promise.all([
+      api('/push/audience' + pushAudienceQuery()),
+      api('/push/history'),
+    ]);
+    renderPush();
+  } catch (e) {
+    el.innerHTML = '<div class="card msg err">Failed to load: '
+      + esc(e.message) + '</div>';
+  }
+}
+
+function renderPush() {
+  const el = document.getElementById('tab-push');
+  const previousPlatform = document.getElementById('push-platform')?.value ?? 'all';
+  const previousActive = document.getElementById('push-active')?.value ?? '';
+  const title = document.getElementById('push-title')?.value ?? 'Checkers';
+  const body = document.getElementById('push-body')?.value ?? '';
+  const devices = pushPreview?.devices ?? 0;
+  const users = pushPreview?.users ?? 0;
+  const historyRows = pushHistory.map(item => {
+    const activity = item.active_within_hours == null
+      ? 'any activity'
+      : 'active within ' + item.active_within_hours + 'h';
+    return '<tr><td>' + esc((item.created_at ?? '').slice(0, 16).replace('T', ' '))
+      + '</td><td><b>' + esc(item.title) + '</b>'
+      + '<div class="muted" style="font-size:12px;max-width:360px">'
+      + esc(item.body) + '</div></td><td>' + esc(item.platform)
+      + '<div class="muted" style="font-size:12px">' + activity + '</div></td>'
+      + '<td class="num">' + item.targeted_count + '</td>'
+      + '<td class="num">' + item.sent_count + '</td>'
+      + '<td class="num">' + item.failed_count + '</td>'
+      + '<td><span class="pill '
+      + (item.status === 'sent' ? 'on">' : 'off">') + esc(item.status)
+      + '</span></td></tr>';
+  }).join('');
+  el.innerHTML =
+    '<div class="card"><h2>Send a push notification</h2>'
+    + '<div class="muted" style="font-size:13px;margin-bottom:8px">'
+    + 'Only devices whose users granted notification permission are included. '
+    + 'The activity filter uses the last time that device opened or resumed the app.'
+    + '</div>'
+    + '<div class="row"><div><label>Platform</label><select id="push-platform">'
+    + '<option value="all">Android and iOS</option>'
+    + '<option value="android">Android only</option>'
+    + '<option value="ios">iOS only</option></select></div>'
+    + '<div><label>Last connected</label><select id="push-active">'
+    + '<option value="">Any time</option>'
+    + '<option value="1">Within the last hour</option>'
+    + '<option value="24">Within the last 24 hours</option>'
+    + '<option value="168">Within the last 7 days</option>'
+    + '<option value="720">Within the last 30 days</option>'
+    + '<option value="2160">Within the last 90 days</option>'
+    + '</select></div></div>'
+    + '<div class="cards" style="margin-top:14px;margin-bottom:8px">'
+    + '<div class="stat"><div class="n">' + devices + '</div>'
+    + '<div class="l">target devices</div></div>'
+    + '<div class="stat"><div class="n">' + users + '</div>'
+    + '<div class="l">unique users</div></div>'
+    + '<div class="stat"><div class="n">' + (pushPreview?.android ?? 0) + '</div>'
+    + '<div class="l">Android</div></div>'
+    + '<div class="stat"><div class="n">' + (pushPreview?.ios ?? 0) + '</div>'
+    + '<div class="l">iOS</div></div></div>'
+    + '<label>Title</label><input id="push-title" maxlength="100" value="'
+    + esc(title) + '">'
+    + '<label>Message</label><textarea id="push-body" maxlength="500" rows="4" '
+    + 'placeholder="What should players know?">' + esc(body) + '</textarea>'
+    + '<button class="primary" id="push-send"'
+    + (devices === 0 ? ' disabled' : '') + '>Send to ' + devices + ' device'
+    + (devices === 1 ? '' : 's') + '</button>'
+    + '<div class="msg" id="push-msg"></div></div>'
+    + '<div class="card"><h2>Recent push notifications</h2><table>'
+    + '<tr><th>Sent at</th><th>Notification</th><th>Audience</th>'
+    + '<th class="num">Targeted</th><th class="num">Sent</th>'
+    + '<th class="num">Failed</th><th>Status</th></tr>'
+    + (historyRows || '<tr><td colspan="7" class="muted">No broadcasts yet.</td></tr>')
+    + '</table></div>';
+  document.getElementById('push-platform').value = previousPlatform;
+  document.getElementById('push-active').value = previousActive;
+  document.getElementById('push-platform').onchange = refreshPushPreview;
+  document.getElementById('push-active').onchange = refreshPushPreview;
+  document.getElementById('push-send').onclick = sendPush;
+}
+
+async function refreshPushPreview() {
+  const platform = document.getElementById('push-platform').value;
+  const hours = document.getElementById('push-active').value;
+  pushPreview = await api('/push/audience?platform=' + encodeURIComponent(platform)
+    + (hours ? '&active_within_hours=' + encodeURIComponent(hours) : ''));
+  renderPush();
+}
+
+async function sendPush() {
+  const msg = document.getElementById('push-msg');
+  const title = document.getElementById('push-title').value.trim();
+  const body = document.getElementById('push-body').value.trim();
+  const platform = document.getElementById('push-platform').value;
+  const hours = document.getElementById('push-active').value;
+  if (!title || !body) {
+    msg.className = 'msg err';
+    msg.textContent = 'A title and message are required.';
+    return;
+  }
+  const count = pushPreview?.devices ?? 0;
+  if (!count) return;
+  if (!confirm('Send this notification to ' + count + ' device'
+      + (count === 1 ? '' : 's') + '?')) return;
+  msg.className = 'msg'; msg.textContent = 'Sending…';
+  try {
+    const result = await api('/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        body,
+        platform,
+        active_within_hours: hours ? parseInt(hours) : null,
+      }),
+    });
+    const summary = 'Sent to ' + result.sent + ' device'
+      + (result.sent === 1 ? '' : 's')
+      + (result.failed ? '; ' + result.failed + ' failed.' : '.');
+    pushHistory = await api('/push/history');
+    renderPush();
+    document.getElementById('push-msg').textContent = summary;
+  } catch (e) {
+    msg.className = 'msg err'; msg.textContent = e.message;
+  }
+}
+
 function renderPlayers() {
   const el = document.getElementById('tab-players');
   const rows = blocks.map(b =>
@@ -1272,6 +1642,7 @@ async function saveSettings(cardId, build) {
 function renderSettings() {
   const el = document.getElementById('tab-settings');
   const units = settings.adUnits ?? { android: {}, ios: {} };
+  const pointRules = settings.pointRules ?? {};
   el.innerHTML =
     // --- App releases -------------------------------------------------
     '<div class="card"><h2>App releases</h2>'
@@ -1311,6 +1682,31 @@ function renderSettings() {
     + 'Clock settings apply to new online games only.</div>'
     + '<button class="primary" id="s-save-play">Save gameplay</button>'
     + '<div class="msg" id="s-msg-play"></div></div>'
+    // --- Points -------------------------------------------------------
+    + '<div class="card"><h2>Points</h2>'
+    + '<div class="muted" style="font-size:13px;margin-bottom:6px">'
+    + 'These rules apply when a new result finishes. Existing awards are '
+    + 'never recalculated.</div>'
+    + '<div class="row4">'
+    + '<div><label>Easy PC win</label><input type="number" id="s-pt-easy" '
+    + 'min="0" max="100000" value="' + (pointRules.pcEasyWin ?? 1) + '"></div>'
+    + '<div><label>Medium PC win</label><input type="number" id="s-pt-medium" '
+    + 'min="0" max="100000" value="' + (pointRules.pcMediumWin ?? 5) + '"></div>'
+    + '<div><label>Hard PC win</label><input type="number" id="s-pt-hard" '
+    + 'min="0" max="100000" value="' + (pointRules.pcHardWin ?? 10) + '"></div>'
+    + '<div></div></div>'
+    + '<div class="row">'
+    + '<div><label>Tournament points per participant</label>'
+    + '<input type="number" id="s-pt-per" min="0" max="100000" value="'
+    + (pointRules.tournamentPerParticipant ?? 1) + '"></div>'
+    + '<div><label>Tournament winner bonus</label>'
+    + '<input type="number" id="s-pt-bonus" min="0" max="100000" value="'
+    + (pointRules.tournamentBonus ?? 0) + '"></div></div>'
+    + '<div class="muted" style="font-size:12px;margin-top:4px">'
+    + 'Tournament award = participants × points per participant + bonus.'
+    + '</div>'
+    + '<button class="primary" id="s-save-points">Save point rules</button>'
+    + '<div class="msg" id="s-msg-points"></div></div>'
     // --- Advertising --------------------------------------------------
     + '<div class="card"><h2>Advertising</h2>'
     + '<div class="row"><div>'
@@ -1349,6 +1745,16 @@ function renderSettings() {
       bankMs: Math.round(numVal('s-bank') * 60000),
       leaderboardMinGames: intVal('s-lbmin'),
     }));
+  document.getElementById('s-save-points').onclick = () =>
+    saveSettings('s-msg-points', () => ({
+      pointRules: {
+        pcEasyWin: intVal('s-pt-easy'),
+        pcMediumWin: intVal('s-pt-medium'),
+        pcHardWin: intVal('s-pt-hard'),
+        tournamentPerParticipant: intVal('s-pt-per'),
+        tournamentBonus: intVal('s-pt-bonus'),
+      },
+    }));
   document.getElementById('s-save-ads').onclick = () =>
     saveSettings('s-msg-ads', () => ({
       interstitialFrequency: intVal('s-freq'),
@@ -1380,6 +1786,7 @@ const PAGE_ROUTES = new Set([
   "/admin/campaigns",
   "/admin/customers",
   "/admin/messages",
+  "/admin/push",
   "/admin/players",
   "/admin/settings",
 ]);

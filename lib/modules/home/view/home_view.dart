@@ -7,6 +7,7 @@ import '../../../data/models/tournament.dart';
 import '../../../routes/app_routes.dart';
 import '../../../shared/tournament_display.dart';
 import '../../../services/block_service.dart';
+import '../../../services/online_game_service.dart';
 import '../../../shared/widgets/checkers_ad_banner.dart';
 import '../../../shared/seat_display.dart';
 import '../../../shared/widgets/checkers_background.dart';
@@ -414,6 +415,54 @@ class _HomeProfileHeader extends GetView<HomeController> {
   }
 }
 
+String _formatCompletedAgo(DateTime completedAt, {DateTime? now}) {
+  final elapsed = (now ?? DateTime.now()).toUtc().difference(
+    completedAt.toUtc(),
+  );
+  if (elapsed.inMinutes < 1) {
+    return TranslationKeys.watchCompletedJustNow.tr;
+  }
+  if (elapsed.inHours < 1) {
+    return TranslationKeys.watchCompletedMinutesAgo.trParams({
+      'count': elapsed.inMinutes.toString(),
+    });
+  }
+  if (elapsed.inDays < 1) {
+    return TranslationKeys.watchCompletedHoursAgo.trParams({
+      'count': elapsed.inHours.toString(),
+    });
+  }
+  if (elapsed.inDays < 7) {
+    return elapsed.inDays == 1
+        ? TranslationKeys.watchCompletedDayAgo.tr
+        : TranslationKeys.watchCompletedDaysAgo.trParams({
+            'count': elapsed.inDays.toString(),
+          });
+  }
+  if (elapsed.inDays < 30) {
+    final weeks = elapsed.inDays ~/ 7;
+    return weeks == 1
+        ? TranslationKeys.watchCompletedWeekAgo.tr
+        : TranslationKeys.watchCompletedWeeksAgo.trParams({
+            'count': weeks.toString(),
+          });
+  }
+  if (elapsed.inDays < 365) {
+    final months = elapsed.inDays ~/ 30;
+    return months == 1
+        ? TranslationKeys.watchCompletedMonthAgo.tr
+        : TranslationKeys.watchCompletedMonthsAgo.trParams({
+            'count': months.toString(),
+          });
+  }
+  final years = elapsed.inDays ~/ 365;
+  return years == 1
+      ? TranslationKeys.watchCompletedYearAgo.tr
+      : TranslationKeys.watchCompletedYearsAgo.trParams({
+          'count': years.toString(),
+        });
+}
+
 class _WatchTab extends GetView<HomeController> {
   const _WatchTab();
 
@@ -469,6 +518,8 @@ class _WatchTab extends GetView<HomeController> {
       required VoidCallback onTap,
       required String centerLabel,
       Widget? trailing,
+      String? footerLabel,
+      Key? footerKey,
     }) {
       final white = game.players
           .where((p) => p.color?.name == 'white')
@@ -491,58 +542,76 @@ class _WatchTab extends GetView<HomeController> {
               width: 2,
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _SeatAvatar(
-                player: white.isEmpty ? null : white.first,
-                theme: theme,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  seatDisplayName(
-                    white.isEmpty ? null : white.first,
-                    aiLevel: game.aiLevel,
+              Row(
+                children: [
+                  _SeatAvatar(
+                    player: white.isEmpty ? null : white.first,
+                    theme: theme,
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      seatDisplayName(
+                        white.isEmpty ? null : white.first,
+                        aiLevel: game.aiLevel,
+                      ),
+                      textAlign: TextAlign.end,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      centerLabel,
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: brand.brandGold,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      seatDisplayName(
+                        black.isEmpty ? null : black.first,
+                        aiLevel: game.aiLevel,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _SeatAvatar(
+                    player: black.isEmpty ? null : black.first,
+                    theme: theme,
+                  ),
+                  if (trailing != null) ...[const SizedBox(width: 8), trailing],
+                ],
+              ),
+              if (footerLabel != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  footerLabel,
+                  key: footerKey,
                   textAlign: TextAlign.end,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge!.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w600,
+                  style: theme.textTheme.bodySmall!.copyWith(
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.58),
+                    fontSize: 10,
+                    height: 1,
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  centerLabel,
-                  style: theme.textTheme.bodyLarge!.copyWith(
-                    color: brand.brandGold,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  seatDisplayName(
-                    black.isEmpty ? null : black.first,
-                    aiLevel: game.aiLevel,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge!.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _SeatAvatar(
-                player: black.isEmpty ? null : black.first,
-                theme: theme,
-              ),
-              if (trailing != null) ...[const SizedBox(width: 8), trailing],
+              ],
             ],
           ),
         ),
@@ -571,6 +640,10 @@ class _WatchTab extends GetView<HomeController> {
         size: 22,
         color: brand.brandGold.withValues(alpha: 0.9),
       ),
+      footerLabel: game.finishedAt == null
+          ? null
+          : _formatCompletedAgo(game.finishedAt!),
+      footerKey: Key('recent-game-${game.id}-completed-at'),
     );
 
     return Obx(() {
@@ -946,32 +1019,129 @@ class _TournamentRow extends GetView<HomeController> {
 class _LeaderboardTab extends GetView<HomeController> {
   const _LeaderboardTab();
 
+  void _showPointsInfo(BuildContext context, PointRules rules) {
+    showCheckersModal<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final brand = theme.extension<CheckersThemeExtension>()!;
+
+        Widget ruleRow(IconData icon, String text) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: brand.brandGold, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: theme.textTheme.bodyLarge!.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontSize: 16,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          key: const Key('points-info-modal'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CheckersModalHeader(
+                title: TranslationKeys.pointsInfoTitle.tr,
+                onClose: () => Navigator.of(dialogContext).pop(),
+              ),
+              ruleRow(
+                Icons.computer,
+                TranslationKeys.pointsInfoPcWin.trParams({
+                  'easy': '${rules.pcEasyWin}',
+                  'medium': '${rules.pcMediumWin}',
+                  'hard': '${rules.pcHardWin}',
+                }),
+              ),
+              ruleRow(
+                Icons.emoji_events,
+                TranslationKeys.pointsInfoTournament.trParams({
+                  'points': '${rules.tournamentPerParticipant}',
+                }),
+              ),
+              if (rules.tournamentBonus > 0)
+                ruleRow(
+                  Icons.add_circle_outline,
+                  TranslationKeys.pointsInfoTournamentBonus.trParams({
+                    'points': '${rules.tournamentBonus}',
+                  }),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _metricButton({
+    required BuildContext context,
+    required CheckersThemeExtension brand,
+    required LeaderboardMetric metric,
+    required String label,
+    required bool selected,
+  }) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: InkWell(
+        key: Key('leaderboard-${metric.name}-tab'),
+        onTap: () => controller.selectLeaderboardMetric(metric),
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? brand.brandGold.withValues(alpha: 0.2)
+                : theme.colorScheme.shadow.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected
+                  ? brand.brandGold
+                  : theme.colorScheme.onPrimary.withValues(alpha: 0.45),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge!.copyWith(
+              color: selected ? brand.brandGold : theme.colorScheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final brand = theme.extension<CheckersThemeExtension>()!;
 
     return Obx(() {
-      if (controller.leaderboardLoading.value) {
-        return Center(child: CircularProgressIndicator(color: brand.brandGold));
-      }
-      final players = controller.leaderboard;
-      if (players.isEmpty) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Text(
-              TranslationKeys.leaderboardEmpty.tr,
-              key: const Key('leaderboard-empty'),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge!.copyWith(
-                color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
-                fontSize: 16,
-              ),
-            ),
-          ),
-        );
-      }
+      final metric = controller.leaderboardMetric.value;
+      final showingPoints = metric == LeaderboardMetric.points;
+      final players = showingPoints
+          ? controller.pointsLeaderboard
+          : controller.leaderboard;
+      final loading = showingPoints
+          ? controller.pointsLeaderboardLoading.value
+          : controller.leaderboardLoading.value;
+
       Widget playerRow(int index) {
         final player = players[index];
         final isPodium = index < 3;
@@ -982,7 +1152,11 @@ class _LeaderboardTab extends GetView<HomeController> {
           _ => theme.colorScheme.onPrimary.withValues(alpha: 0.7),
         };
         return Container(
-          key: Key('leaderboard-row-$index'),
+          key: Key(
+            showingPoints
+                ? 'points-leaderboard-row-$index'
+                : 'leaderboard-row-$index',
+          ),
           margin: const EdgeInsets.only(bottom: 8),
           padding: EdgeInsets.symmetric(
             horizontal: 14,
@@ -1061,8 +1235,12 @@ class _LeaderboardTab extends GetView<HomeController> {
                       ),
                     ),
                     Text(
-                      '${player.wins}W · ${player.losses}L · '
-                      '${player.draws}D',
+                      showingPoints
+                          ? TranslationKeys.eloValue.trParams({
+                              'rating': '${player.rating}',
+                            })
+                          : '${player.wins}W · ${player.losses}L · '
+                                '${player.draws}D',
                       style: theme.textTheme.bodyLarge!.copyWith(
                         color: theme.colorScheme.onPrimary.withValues(
                           alpha: 0.6,
@@ -1074,7 +1252,11 @@ class _LeaderboardTab extends GetView<HomeController> {
                 ),
               ),
               Text(
-                '${player.rating}',
+                showingPoints
+                    ? TranslationKeys.pointsValue.trParams({
+                        'points': '${player.points}',
+                      })
+                    : '${player.rating}',
                 style: theme.textTheme.headlineMedium!.copyWith(
                   color: brand.brandGold,
                   fontSize: isPodium ? 22 : 18,
@@ -1085,13 +1267,80 @@ class _LeaderboardTab extends GetView<HomeController> {
         );
       }
 
-      return ListView(
-        padding: const EdgeInsets.all(16),
+      return Column(
         children: [
-          CheckersStaggeredEntrance(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            itemDelay: const Duration(milliseconds: 60),
-            children: [for (var i = 0; i < players.length; i++) playerRow(i)],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Row(
+              children: [
+                _metricButton(
+                  context: context,
+                  brand: brand,
+                  metric: LeaderboardMetric.elo,
+                  label: TranslationKeys.leaderboardEloScore.tr,
+                  selected: !showingPoints,
+                ),
+                const SizedBox(width: 8),
+                _metricButton(
+                  context: context,
+                  brand: brand,
+                  metric: LeaderboardMetric.points,
+                  label: TranslationKeys.leaderboardPoints.tr,
+                  selected: showingPoints,
+                ),
+                if (showingPoints) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    key: const Key('points-info-button'),
+                    onPressed: () =>
+                        _showPointsInfo(context, controller.pointRules.value),
+                    icon: Icon(Icons.info_outline, color: brand.brandGold),
+                    tooltip: TranslationKeys.pointsInfoTooltip.tr,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Expanded(
+            child: loading
+                ? Center(
+                    child: CircularProgressIndicator(color: brand.brandGold),
+                  )
+                : players.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(
+                        showingPoints
+                            ? TranslationKeys.pointsLeaderboardEmpty.tr
+                            : TranslationKeys.leaderboardEmpty.tr,
+                        key: Key(
+                          showingPoints
+                              ? 'points-leaderboard-empty'
+                              : 'leaderboard-empty',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme.colorScheme.onPrimary.withValues(
+                            alpha: 0.7,
+                          ),
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      CheckersStaggeredEntrance(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        itemDelay: const Duration(milliseconds: 60),
+                        children: [
+                          for (var i = 0; i < players.length; i++) playerRow(i),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
         ],
       );

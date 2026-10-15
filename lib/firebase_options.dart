@@ -18,7 +18,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyB03Hhi3ooOCdslihg1UcYk23fcsK2h9Sk',
-    appId: '1:558217605941:android:a02ded512d0b9c455dd27c',
+    appId: '1:558217605941:android:d5862ce1237c6a3d5dd27c',
     messagingSenderId: '558217605941',
     projectId: 'checkers-club',
     storageBucket: 'checkers-club.firebasestorage.app',
@@ -26,10 +26,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBv8qWns-Fj7rfOgRjw0qL4fvd3yjFbYgc',
-    appId: '1:558217605941:ios:e5bce26a48359bcc5dd27c',
+    appId: '1:558217605941:ios:b151759f7e9bc5c25dd27c',
     messagingSenderId: '558217605941',
     projectId: 'checkers-club',
     storageBucket: 'checkers-club.firebasestorage.app',
-    iosBundleId: 'club.contribution.checkers',
+    iosBundleId: 'cd.dame',
   );
 }

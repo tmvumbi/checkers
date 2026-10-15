@@ -1,0 +1,7 @@
+{
+  "name": "checkers-push",
+  "main": "scripts/push_worker.js",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false
+}

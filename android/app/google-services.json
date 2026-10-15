@@ -7,26 +7,34 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:558217605941:android:a02ded512d0b9c455dd27c",
+        "mobilesdk_app_id": "1:558217605941:android:d5862ce1237c6a3d5dd27c",
         "android_client_info": {
-          "package_name": "club.contribution.checkers"
+          "package_name": "cd.dame"
         }
       },
       "oauth_client": [
         {
-          "client_id": "558217605941-t070ein07hfi15orfqro5ualghvgbeff.apps.googleusercontent.com",
+          "client_id": "558217605941-3meid5g8r0a48v8ptcq7n8e0sb9heifi.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "club.contribution.checkers",
-            "certificate_hash": "c1f7965e716fe45a5969d84d0d4e7c5936c09e4a"
+            "package_name": "cd.dame",
+            "certificate_hash": "799ab1ebd17fd1fb3d8e409736fc015e33cb5dac"
           }
         },
         {
-          "client_id": "558217605941-tqng1fmqcbmdh996gha9j6hnu192ui69.apps.googleusercontent.com",
+          "client_id": "558217605941-rrjdo4gq1jj9l9k36datnhvslbt0419t.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "club.contribution.checkers",
+            "package_name": "cd.dame",
             "certificate_hash": "87e30f1c02b5470a1b457bc4f3fc8dd87c25bda7"
+          }
+        },
+        {
+          "client_id": "558217605941-sp2ucujg0qs1l6ecd479henjogm6mvq9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "cd.dame",
+            "certificate_hash": "c1f7965e716fe45a5969d84d0d4e7c5936c09e4a"
           }
         },
         {
@@ -47,10 +55,10 @@
               "client_type": 3
             },
             {
-              "client_id": "558217605941-krshtf5j0ljfd8v6uv076a2s7ri1ct3m.apps.googleusercontent.com",
+              "client_id": "558217605941-930d77vu3l5gphsiodh58vqofa3n66kf.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "club.contribution.checkers"
+                "bundle_id": "cd.dame"
               }
             }
           ]

@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../data/models/online_game.dart';
 import '../../../engine/ai/ai_config.dart';
@@ -152,6 +153,14 @@ class GameBoardController extends GetxController {
   List<Move> _replayMoves = const [];
   Timer? _replayTimer;
 
+  /// Set when a watched game has ended and the result dialog was dismissed:
+  /// the board then behaves as a replay of the finished game, parked on the
+  /// last move.
+  final RxBool watchReplayActive = false.obs;
+
+  /// Replay transport (play/pause/step/scrub) is on screen.
+  bool get replayUiActive => isReplay || watchReplayActive.value;
+
   Future<void> _startReplay() async {
     final gameId = args.gameId!;
     final gameResult = await _onlineGameService.fetchGame(gameId);
@@ -219,6 +228,38 @@ class GameBoardController extends GetxController {
     _replayTimer?.cancel();
     _replayTimer = null;
     replayPlaying.value = false;
+  }
+
+  /// Jump straight to [target] plies into the game (progress-bar scrub).
+  void replaySeek(int target) {
+    final clamped = target.clamp(0, _replayMoves.length);
+    if (clamped == replayIndex.value) {
+      return;
+    }
+    _stopReplayAutoplay();
+    while (replayIndex.value < clamped) {
+      engine.applyMove(_replayMoves[replayIndex.value]);
+      replayIndex.value++;
+    }
+    while (replayIndex.value > clamped) {
+      engine.undoMove();
+      replayIndex.value--;
+    }
+    selectedSquare.value = null;
+    boardVersion.value++;
+  }
+
+  /// Close the result dialog on a watched game and switch the board to
+  /// replay mode, showing the final position. The engine already holds the
+  /// whole game (watch mode replays every move through it), so its history
+  /// doubles as the replay track.
+  void dismissWatchResult() {
+    _replayMoves = List.of(engine.moveHistory);
+    replayTotal.value = _replayMoves.length;
+    replayIndex.value = _replayMoves.length;
+    _clockTimer?.cancel();
+    _gameSubscription?.cancel();
+    watchReplayActive.value = true;
   }
 
   OnlineGamePlayer? playerOfColor(PieceColor color) {
@@ -326,6 +367,10 @@ class GameBoardController extends GetxController {
   @override
   void onReady() {
     super.onReady();
+    // A board on screen means someone is playing or watching a live game:
+    // never let the phone sleep mid-move. catchError: the plugin is absent
+    // in test harnesses.
+    unawaited(WakelockPlus.enable().catchError((Object _) {}));
     if (!isWatching) {
       _loadOwnProfilePhoto();
     }
@@ -476,6 +521,7 @@ class GameBoardController extends GetxController {
 
   @override
   void onClose() {
+    unawaited(WakelockPlus.disable().catchError((Object _) {}));
     _gameSubscription?.cancel();
     _adEventWorker?.dispose();
     _emotesSubscription?.cancel();

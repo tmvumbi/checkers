@@ -44,7 +44,8 @@ class GameBoardView extends GetView<GameBoardController> {
                   ),
                   const _EmotePickerBar(),
                   _OwnHeader(),
-                  const WatchersBar(),
+                  const _ReplayControlsBar(),
+                  const _BottomSpectatorBar(),
                   const SizedBox(height: 4),
                 ],
               ),
@@ -230,8 +231,21 @@ class _OpponentHeader extends GetView<GameBoardController> {
             opponent?.isBot != true) {
           name = '$name ($rating)';
         }
+        // Watchers get an explicit "<name>'s turn" readout; players keep
+        // the your-turn/opponent's-turn wording.
+        final gameLive =
+            controller.result.value == GameResult.ongoing &&
+            !controller.watchReplayActive.value;
+        final sideToMove = controller.engine.sideToMove;
         final subtitle = controller.spectatorLayout
-            ? ''
+            ? (controller.isWatching && gameLive
+                  ? TranslationKeys.playersTurn.trParams({
+                      'name': seatDisplayName(
+                        controller.playerOfColor(sideToMove),
+                        aiLevel: controller.snapshot.value?.aiLevel,
+                      ),
+                    })
+                  : '')
             : controller.isOnline && !controller.opponentConnected.value
             ? TranslationKeys.opponentDisconnected.tr
             : (controller.aiThinking.value ||
@@ -240,6 +254,13 @@ class _OpponentHeader extends GetView<GameBoardController> {
                   : (controller.isHumanTurn
                         ? TranslationKeys.yourTurn.tr
                         : ''));
+        // The side shown in this (top) header: black for spectators, the
+        // opponent for players.
+        final topColor = controller.spectatorLayout
+            ? PieceColor.black
+            : (controller.humanColor == PieceColor.white
+                  ? PieceColor.black
+                  : PieceColor.white);
 
         return Row(
           children: [
@@ -254,6 +275,7 @@ class _OpponentHeader extends GetView<GameBoardController> {
                       : Icons.person,
                   borderColor: theme.colorScheme.onPrimary,
                   photoUrl: opponent?.photoUrl,
+                  isActive: gameLive && sideToMove == topColor,
                 ),
                 // Emote bubble hangs just below the avatar.
                 Positioned(
@@ -298,7 +320,8 @@ class _OpponentHeader extends GetView<GameBoardController> {
             ),
             const SizedBox(width: 4),
             if (controller.isOnline &&
-                !(controller.snapshot.value?.vsPc ?? false))
+                !(controller.snapshot.value?.vsPc ?? false) &&
+                !controller.watchReplayActive.value)
               _ClockDisplay(isOwn: false, theme: theme, brand: brand)
             else if (controller.isOnline)
               const SizedBox(width: 26, height: 26)
@@ -413,12 +436,19 @@ class _OwnHeader extends GetView<GameBoardController> {
                 ? white?.photoUrl
                 : controller.ownPlayer?.photoUrl ??
                       controller.ownProfilePhotoUrl.value;
+            final bottomColor = controller.spectatorLayout
+                ? PieceColor.white
+                : controller.humanColor;
+            final gameLive =
+                controller.result.value == GameResult.ongoing &&
+                !controller.watchReplayActive.value;
             return _AvatarBadge(
               icon: controller.spectatorLayout && (white?.isBot ?? false)
                   ? Icons.smart_toy
                   : Icons.person,
               borderColor: AppColors.gold,
               photoUrl: photoUrl,
+              isActive: gameLive && controller.engine.sideToMove == bottomColor,
             );
           }),
           _CapturedCountChip(
@@ -435,98 +465,9 @@ class _OwnHeader extends GetView<GameBoardController> {
               if (controller.isReplay) {
                 final white = controller.playerOfColor(PieceColor.white);
                 final theme = Theme.of(context);
-                return FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    children: [
-                      Text(
-                        seatDisplayName(
-                          white,
-                          aiLevel: controller.snapshot.value?.aiLevel,
-                        ),
-                        maxLines: 1,
-                        style: theme.textTheme.bodyLarge!.copyWith(
-                          color: theme.colorScheme.onPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 17,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      CheckersSquareIconButton(
-                        key: const Key('replay-close'),
-                        icon: Icons.close,
-                        dimension: 44,
-                        iconSize: 26,
-                        tooltip: TranslationKeys.close.tr,
-                        onPressed: Get.back<void>,
-                      ),
-                      const SizedBox(width: 8),
-                      CheckersSquareIconButton(
-                        key: const Key('replay-prev'),
-                        icon: Icons.skip_previous,
-                        dimension: 44,
-                        iconSize: 26,
-                        tooltip: TranslationKeys.replayPrevious.tr,
-                        onPressed: controller.replayIndex.value > 0
-                            ? controller.replayPrev
-                            : null,
-                      ),
-                      const SizedBox(width: 8),
-                      CheckersSquareIconButton(
-                        key: const Key('replay-play'),
-                        icon: controller.replayPlaying.value
-                            ? Icons.pause
-                            : Icons.play_arrow,
-                        dimension: 44,
-                        iconSize: 26,
-                        tooltip: TranslationKeys.replayPlay.tr,
-                        onPressed: controller.replayTogglePlay,
-                      ),
-                      const SizedBox(width: 8),
-                      CheckersSquareIconButton(
-                        key: const Key('replay-next'),
-                        icon: Icons.skip_next,
-                        dimension: 44,
-                        iconSize: 26,
-                        tooltip: TranslationKeys.replayNext.tr,
-                        onPressed:
-                            controller.replayIndex.value <
-                                controller.replayTotal.value
-                            ? controller.replayNext
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '${controller.replayIndex.value}'
-                        '/${controller.replayTotal.value}',
-                        key: const Key('replay-counter'),
-                        style: theme.textTheme.bodyLarge!.copyWith(
-                          color: theme
-                              .extension<CheckersThemeExtension>()!
-                              .brandGold,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              if (controller.isWatching) {
-                final white = controller.playerOfColor(PieceColor.white);
-                final theme = Theme.of(context);
+                // Transport controls live in their own bar below the header.
                 return Row(
                   children: [
-                    CheckersSquareIconButton(
-                      key: const Key('game-rules-button'),
-                      icon: Icons.info_outline,
-                      dimension: 46,
-                      iconSize: 26,
-                      tooltip: TranslationKeys.rules.tr,
-                      onPressed: () => _showRulesModal(context, controller),
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         seatDisplayName(
@@ -542,15 +483,59 @@ class _OwnHeader extends GetView<GameBoardController> {
                         ),
                       ),
                     ),
-                    if (!(controller.snapshot.value?.vsPc ?? false)) ...[
+                    const SizedBox(width: 10),
+                    CheckersSquareIconButton(
+                      key: const Key('replay-close'),
+                      icon: Icons.close,
+                      dimension: 46,
+                      iconSize: 26,
+                      tooltip: TranslationKeys.close.tr,
+                      onPressed: Get.back<void>,
+                    ),
+                  ],
+                );
+              }
+              if (controller.isWatching) {
+                final white = controller.playerOfColor(PieceColor.white);
+                final theme = Theme.of(context);
+                // The nickname sits right after the captured-pieces chip;
+                // clocks freeze out of the layout once the game is over
+                // and the board has switched to replay.
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        seatDisplayName(
+                          white,
+                          aiLevel: controller.snapshot.value?.aiLevel,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ),
+                    if (!(controller.snapshot.value?.vsPc ?? false) &&
+                        !controller.watchReplayActive.value) ...[
+                      const SizedBox(width: 10),
                       _ClockDisplay(
                         isOwn: true,
                         theme: theme,
                         brand: theme.extension<CheckersThemeExtension>()!,
                       ),
-                      const SizedBox(width: 10),
                     ],
-                    const _LeaveWatchButton(),
+                    const SizedBox(width: 10),
+                    CheckersSquareIconButton(
+                      key: const Key('game-rules-button'),
+                      icon: Icons.info_outline,
+                      dimension: 46,
+                      iconSize: 26,
+                      tooltip: TranslationKeys.rules.tr,
+                      onPressed: () => _showRulesModal(context, controller),
+                    ),
                   ],
                 );
               }
@@ -678,6 +663,125 @@ class _OwnHeader extends GetView<GameBoardController> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Replay transport on its own line: a scrubbable progress bar over the
+/// move list, with large step/play controls beneath it. Shown for archive
+/// replays and for watched games that ended and switched to replay.
+class _ReplayControlsBar extends GetView<GameBoardController> {
+  const _ReplayControlsBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final brand = theme.extension<CheckersThemeExtension>()!;
+    return Obx(() {
+      if (!controller.replayUiActive) {
+        return const SizedBox.shrink();
+      }
+      final total = controller.replayTotal.value;
+      final index = controller.replayIndex.value;
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 4,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 9,
+                ),
+                overlayShape: const RoundSliderOverlayShape(
+                  overlayRadius: 18,
+                ),
+                activeTrackColor: brand.brandGold,
+                thumbColor: brand.brandGold,
+                inactiveTrackColor: theme.colorScheme.onPrimary.withValues(
+                  alpha: 0.25,
+                ),
+              ),
+              child: Slider(
+                key: const Key('replay-progress'),
+                value: index.toDouble(),
+                max: (total == 0 ? 1 : total).toDouble(),
+                divisions: total == 0 ? null : total,
+                onChanged: total == 0
+                    ? null
+                    : (value) => controller.replaySeek(value.round()),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CheckersSquareIconButton(
+                  key: const Key('replay-prev'),
+                  icon: Icons.skip_previous,
+                  dimension: 56,
+                  iconSize: 32,
+                  tooltip: TranslationKeys.replayPrevious.tr,
+                  onPressed: index > 0 ? controller.replayPrev : null,
+                ),
+                const SizedBox(width: 14),
+                CheckersSquareIconButton(
+                  key: const Key('replay-play'),
+                  icon: controller.replayPlaying.value
+                      ? Icons.pause
+                      : Icons.play_arrow,
+                  dimension: 64,
+                  iconSize: 40,
+                  tooltip: TranslationKeys.replayPlay.tr,
+                  onPressed: controller.replayTogglePlay,
+                ),
+                const SizedBox(width: 14),
+                CheckersSquareIconButton(
+                  key: const Key('replay-next'),
+                  icon: Icons.skip_next,
+                  dimension: 56,
+                  iconSize: 32,
+                  tooltip: TranslationKeys.replayNext.tr,
+                  onPressed: index < total ? controller.replayNext : null,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  '$index/$total',
+                  key: const Key('replay-counter'),
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: brand.brandGold,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+/// Bottom line of the board page. While watching it pairs the leave button
+/// (left) with the watcher avatars (right); everywhere else it is just the
+/// watcher avatars.
+class _BottomSpectatorBar extends GetView<GameBoardController> {
+  const _BottomSpectatorBar();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!controller.isWatching) {
+      return const WatchersBar();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, top: 6),
+      child: Row(
+        children: [
+          const _LeaveWatchButton(),
+          const Expanded(child: WatchersBar()),
+        ],
+      ),
     );
   }
 }
@@ -946,22 +1050,40 @@ class _AvatarBadge extends StatelessWidget {
     required this.icon,
     required this.borderColor,
     this.photoUrl,
+    this.isActive = false,
   });
 
   final IconData icon;
   final Color borderColor;
   final String? photoUrl;
 
+  /// This side is to move: gold ring + glow, so whose turn it is reads at
+  /// a glance for players and watchers alike.
+  final bool isActive;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final url = photoUrl;
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
       width: 46,
       height: 46,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 2),
+        border: Border.all(
+          color: isActive ? AppColors.gold : borderColor,
+          width: isActive ? 3 : 2,
+        ),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: AppColors.gold.withValues(alpha: 0.55),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
         color: theme.colorScheme.shadow.withValues(alpha: 0.35),
         image: url == null
             ? null
@@ -981,7 +1103,10 @@ class _GameOverOverlay extends GetView<GameBoardController> {
   Widget build(BuildContext context) {
     return Obx(() {
       final result = controller.result.value;
-      if (result == GameResult.ongoing) {
+      // A dismissed watch result stays dismissed: the board is now a
+      // replay of the finished game.
+      if (result == GameResult.ongoing ||
+          controller.watchReplayActive.value) {
         return const SizedBox.shrink();
       }
       return _GameOverBanner(
@@ -1086,7 +1211,13 @@ class _GameOverBanner extends GetView<GameBoardController> {
                 ),
                 const SizedBox(height: 20),
                 if (controller.isWatching)
-                  const SizedBox.shrink()
+                  // Watchers just close the dialog; the board switches to
+                  // replay mode parked on the last move.
+                  CheckersGradientButton(
+                    key: const Key('game-close-result'),
+                    label: TranslationKeys.close.tr,
+                    onPressed: controller.dismissWatchResult,
+                  )
                 else if (controller.isTournamentMatch)
                   // No rematch in a bracket: the next round is what matters,
                   // and it is already on the clock.
@@ -1133,13 +1264,15 @@ class _GameOverBanner extends GetView<GameBoardController> {
                     label: TranslationKeys.playAgain.tr,
                     onPressed: controller.playAgain,
                   ),
-                const SizedBox(height: 10),
-                CheckersGradientButton(
-                  key: const Key('game-back-home'),
-                  label: TranslationKeys.backHome.tr,
-                  gradientStyle: CheckersGradientButtonStyle.logo,
-                  onPressed: controller.goHome,
-                ),
+                if (!controller.isWatching) ...[
+                  const SizedBox(height: 10),
+                  CheckersGradientButton(
+                    key: const Key('game-back-home'),
+                    label: TranslationKeys.backHome.tr,
+                    gradientStyle: CheckersGradientButtonStyle.logo,
+                    onPressed: controller.goHome,
+                  ),
+                ],
               ],
             ),
           ),

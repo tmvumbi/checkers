@@ -12,7 +12,7 @@ import sys
 import time
 import urllib.request
 
-API = "https://checkers-api.contribution.club"
+API = "https://api.dame.cd"
 
 
 def read_file(path):

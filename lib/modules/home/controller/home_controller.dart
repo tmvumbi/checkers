@@ -13,6 +13,8 @@ import '../../../data/models/user_profile.dart';
 import '../../../modules/game_board/models/game_board_arguments.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/ad_service.dart';
+import '../../../services/account_deletion_service.dart';
+import '../../../core/network/api_result.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/app_rating_service.dart';
 import '../../../services/auth_service.dart';
@@ -20,20 +22,25 @@ import '../../../services/online_game_service.dart';
 import '../../../services/party_link_service.dart';
 import '../../../services/player_message_service.dart';
 import '../../../services/profile_service.dart';
+import '../../../services/push_notification_service.dart';
 import '../../../services/tournament_service.dart';
 import '../../../translations/translation_keys.dart';
 
 enum HomeTab { play, watch, tournament, leaderboard, more }
 
+enum LeaderboardMetric { elo, points }
+
 class HomeController extends GetxController {
   HomeController({
+    AccountDeletionService? accountDeletionService,
     AuthService? authService,
     ProfileService? profileService,
     AnalyticsService? analyticsService,
     OnlineGameService? onlineGameService,
     PlayerMessageService? playerMessageService,
     TournamentService? tournamentService,
-  }) : _authService = authService ?? Get.find(),
+  }) : _accountDeletionService = accountDeletionService,
+       _authService = authService ?? Get.find(),
        _profileService = profileService ?? Get.find(),
        _analyticsService = analyticsService ?? Get.find(),
        _onlineGameServiceOverride = onlineGameService,
@@ -41,6 +48,8 @@ class HomeController extends GetxController {
        _tournamentServiceOverride = tournamentService;
 
   final AuthService _authService;
+  final AccountDeletionService? _accountDeletionService;
+  bool _isDeletingAccount = false;
   final ProfileService _profileService;
   final AnalyticsService _analyticsService;
   final OnlineGameService? _onlineGameServiceOverride;
@@ -84,6 +93,10 @@ class HomeController extends GetxController {
   Worker? _recentSearchWorker;
   final RxList<LeaderboardPlayer> leaderboard = <LeaderboardPlayer>[].obs;
   final RxBool leaderboardLoading = false.obs;
+  final RxList<LeaderboardPlayer> pointsLeaderboard = <LeaderboardPlayer>[].obs;
+  final RxBool pointsLeaderboardLoading = false.obs;
+  final Rx<LeaderboardMetric> leaderboardMetric = LeaderboardMetric.elo.obs;
+  final Rx<PointRules> pointRules = const PointRules().obs;
 
   static const int tournamentsPageSize = 10;
   final RxList<TournamentSummary> tournaments = <TournamentSummary>[].obs;
@@ -119,6 +132,11 @@ class HomeController extends GetxController {
     refreshProfile();
     refreshActiveGame();
     _maybeQueueRatingPrompt();
+    // Ask once, after onboarding, so this device can receive tournament
+    // reminders and administrator announcements. Denial remains optional.
+    if (Get.isRegistered<PushNotificationService>()) {
+      unawaited(Get.find<PushNotificationService>().requestToken());
+    }
     // A deep link may have arrived before sign-in; now that the player is
     // here with a nickname, take them where the link pointed.
     if (Get.isRegistered<PartyLinkService>()) {
@@ -196,6 +214,7 @@ class HomeController extends GetxController {
       );
     } else if (newTab == HomeTab.leaderboard) {
       refreshLeaderboard();
+      refreshPointsLeaderboard();
     } else if (newTab == HomeTab.tournament) {
       refreshTournaments();
     }
@@ -341,6 +360,34 @@ class HomeController extends GetxController {
     leaderboardLoading.value = false;
   }
 
+  void selectLeaderboardMetric(LeaderboardMetric metric) {
+    if (leaderboardMetric.value == metric) {
+      return;
+    }
+    leaderboardMetric.value = metric;
+    _analyticsService.logEvent('leaderboard_metric_selected', {
+      'metric': metric.name,
+    });
+    if (metric == LeaderboardMetric.points && pointsLeaderboard.isEmpty) {
+      refreshPointsLeaderboard();
+    }
+  }
+
+  Future<void> refreshPointsLeaderboard() async {
+    pointsLeaderboardLoading.value = pointsLeaderboard.isEmpty;
+    final leaderboardResult = await _onlineGameService.fetchPointsLeaderboard();
+    leaderboardResult.when(
+      success: (players) => pointsLeaderboard.value = players,
+      failure: (_) {},
+    );
+    final rulesResult = await _onlineGameService.fetchPointRules();
+    rulesResult.when(
+      success: (rules) => pointRules.value = rules,
+      failure: (_) {},
+    );
+    pointsLeaderboardLoading.value = false;
+  }
+
   /// Look for a game left in progress (app killed, crash, phone died).
   /// Runs on every home entry, so it must not throw in harnesses that
   /// never registered the online service.
@@ -350,10 +397,7 @@ class HomeController extends GetxController {
       return;
     }
     final result = await _onlineGameService.fetchMyActiveGame();
-    result.when(
-      success: (game) => activeGame.value = game,
-      failure: (_) {},
-    );
+    result.when(success: (game) => activeGame.value = game, failure: (_) {});
   }
 
   /// Board arguments for [activeGame] — split out from the navigation so
@@ -378,10 +422,7 @@ class HomeController extends GetxController {
       return;
     }
     _analyticsService.logEvent('online_game_resumed');
-    Get.toNamed<void>(
-      AppRoutes.gameBoard,
-      arguments: arguments,
-    )?.then((_) {
+    Get.toNamed<void>(AppRoutes.gameBoard, arguments: arguments)?.then((_) {
       // It may have finished (or timed out) while we were in there.
       refreshActiveGame();
     });
@@ -422,14 +463,21 @@ class HomeController extends GetxController {
   }
 
   Future<bool> deleteAccount() async {
-    await _analyticsService.logEvent('account_delete_attempt');
+    if (_isDeletingAccount) return false;
+    _isDeletingAccount = true;
     try {
-      await Supabase.instance.client.rpc<dynamic>('delete_account');
+      await _analyticsService.logEvent('account_delete_attempt');
+      final service =
+          _accountDeletionService ?? Get.find<AccountDeletionService>();
+      final result = await service.deleteCurrentAccount();
+      if (result is Failure<void>) return false;
       await _authService.signOut();
       Get.offAllNamed<void>(AppRoutes.landing);
       return true;
     } catch (_) {
       return false;
+    } finally {
+      _isDeletingAccount = false;
     }
   }
 

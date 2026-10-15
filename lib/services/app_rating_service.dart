@@ -76,7 +76,7 @@ class RateMyAppRatingService extends AppRatingService {
       preferencesPrefix: 'checkers_rate_my_app_',
       minDays: 0,
       minLaunches: 0,
-      googlePlayIdentifier: 'club.contribution.checkers',
+      googlePlayIdentifier: 'cd.dame',
       appStoreIdentifier: iosAppStoreId,
     );
     await rateMyApp.init();

@@ -10,7 +10,7 @@ set -euo pipefail
 
 SQL_FILE="${1:?usage: db_apply.sh <sql-file>}"
 AUTH_FILE="${CHECKERS_DASHBOARD_AUTH_FILE:-$HOME/.config/checkers_supabase_dashboard_auth}"
-API="${CHECKERS_SUPABASE_URL:-https://checkers-api.contribution.club}"
+API="${CHECKERS_SUPABASE_URL:-https://api.dame.cd}"
 
 python3 - "$SQL_FILE" <<'EOF' > /tmp/checkers_db_apply_payload.json
 import json, sys

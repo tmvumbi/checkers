@@ -30,6 +30,8 @@ void main() {
 
   tearDown(Get.reset);
 
+  _watchReplayTests();
+
   test('human move triggers an AI reply', () async {
     final controller = _pcController();
     final move = controller.legalMoves.first;
@@ -93,5 +95,48 @@ void main() {
     expect(controller.result.value, GameResult.ongoing);
     expect(controller.engine.moveHistory, isEmpty);
     expect(controller.legalMoves.length, 9);
+  });
+}
+
+// Appended: watch-to-replay handoff and progress-bar scrubbing.
+void _watchReplayTests() {
+  test('dismissWatchResult parks a finished game on its last move', () {
+    final controller = _pcController();
+    // Watch mode replays every move through the engine, so seeding the
+    // engine directly mirrors the state a finished watched game holds.
+    for (var i = 0; i < 4; i++) {
+      controller.engine.applyMove(controller.engine.legalMoves().first);
+    }
+
+    controller.dismissWatchResult();
+
+    expect(controller.watchReplayActive.value, isTrue);
+    expect(controller.replayUiActive, isTrue);
+    expect(controller.replayTotal.value, 4);
+    expect(controller.replayIndex.value, 4);
+    expect(controller.engine.moveHistory.length, 4);
+  });
+
+  test('replaySeek jumps to any position and clamps out-of-range', () {
+    final controller = _pcController();
+    for (var i = 0; i < 4; i++) {
+      controller.engine.applyMove(controller.engine.legalMoves().first);
+    }
+    controller.dismissWatchResult();
+
+    controller.replaySeek(0);
+    expect(controller.replayIndex.value, 0);
+    expect(controller.engine.moveHistory, isEmpty);
+
+    controller.replaySeek(2);
+    expect(controller.replayIndex.value, 2);
+    expect(controller.engine.moveHistory.length, 2);
+
+    controller.replaySeek(99);
+    expect(controller.replayIndex.value, 4);
+    expect(controller.engine.moveHistory.length, 4);
+
+    controller.replaySeek(-3);
+    expect(controller.replayIndex.value, 0);
   });
 }

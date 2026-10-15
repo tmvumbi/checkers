@@ -4,7 +4,7 @@
 # account on the same device inherits the block), full block, unblock.
 set -euo pipefail
 
-API="${CHECKERS_SUPABASE_URL:-https://checkers-api.contribution.club}"
+API="${CHECKERS_SUPABASE_URL:-https://api.dame.cd}"
 ANON="${CHECKERS_ANON_KEY:-$(grep -A2 "SUPABASE_ANON_KEY" "$(dirname "$0")/../lib/core/config/supabase_config.dart" | grep -o "'ey[^']*'" | tr -d "'")}"
 AUTH_FILE="${CHECKERS_DASHBOARD_AUTH_FILE:-$HOME/.config/checkers_supabase_dashboard_auth}"
 

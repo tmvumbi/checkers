@@ -8,44 +8,37 @@ void main() {
   group('PartyLinkService.gameIdFromUri', () {
     test('parses https party links', () {
       expect(
-        service.gameIdFromUri(
-          Uri.parse('https://checkers.contribution.club/party/abc-123'),
-        ),
+        service.gameIdFromUri(Uri.parse('https://dame.cd/party/abc-123')),
         'abc-123',
       );
     });
 
     test('parses custom scheme links', () {
+      expect(service.gameIdFromUri(Uri.parse('dame://party/xyz')), 'xyz');
+    });
+
+    test('rejects unregistered schemes and hosts', () {
+      expect(
+        service.gameIdFromUri(Uri.parse('legacy-checkers://party/xyz')),
+        isNull,
+      );
+      expect(service.gameIdFromUri(Uri.parse('checkers://party/xyz')), isNull);
       expect(
         service.gameIdFromUri(
-          Uri.parse('club.contribution.checkers://party/xyz'),
+          Uri.parse('https://legacy.example/party/old-link'),
         ),
-        'xyz',
+        isNull,
       );
     });
 
-    test('still parses the legacy scheme shared before the rename', () {
-      expect(
-        service.gameIdFromUri(Uri.parse('checkers://party/xyz')),
-        'xyz',
-      );
-    });
-
-    test('recognizes tournament links on both schemes', () {
-      expect(
-        service.isTournamentUri(
-          Uri.parse('club.contribution.checkers://tournament'),
-        ),
-        isTrue,
-      );
+    test('recognizes tournament links on dame.cd schemes', () {
+      expect(service.isTournamentUri(Uri.parse('dame://tournament')), isTrue);
       expect(
         service.isTournamentUri(Uri.parse('checkers://tournament')),
-        isTrue,
+        isFalse,
       );
       expect(
-        service.isTournamentUri(
-          Uri.parse('https://checkers.contribution.club/tournament'),
-        ),
+        service.isTournamentUri(Uri.parse('https://dame.cd/tournament')),
         isTrue,
       );
     });
@@ -56,17 +49,10 @@ void main() {
         isNull,
       );
       expect(
-        service.gameIdFromUri(
-          Uri.parse('https://checkers.contribution.club/other/abc'),
-        ),
+        service.gameIdFromUri(Uri.parse('https://dame.cd/other/abc')),
         isNull,
       );
-      expect(
-        service.gameIdFromUri(
-          Uri.parse('https://checkers.contribution.club/party'),
-        ),
-        isNull,
-      );
+      expect(service.gameIdFromUri(Uri.parse('https://dame.cd/party')), isNull);
     });
   });
 }

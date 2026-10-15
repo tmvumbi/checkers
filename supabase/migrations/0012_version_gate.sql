@@ -11,7 +11,8 @@ set config = config || jsonb_build_object(
   'allowed_android_versions', jsonb_build_array('1.0.0'),
   'allowed_ios_versions', jsonb_build_array('1.0.0'),
   'android_app_url',
-    'https://play.google.com/store/apps/details?id=club.contribution.checkers',
-  'ios_app_url', 'https://checkers.contribution.club'
+    'https://play.google.com/store/apps/details?id=cd.dame',
+  'ios_app_url',
+    'https://apps.apple.com/app/checkers-tournaments/id6806184531'
 ) - 'min_app_version'
 where id = 'public';

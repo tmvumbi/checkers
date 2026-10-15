@@ -32,7 +32,7 @@ the international family and the 40-move rule for American. Online clocks:
   clients are read-only; every move goes through security-definer RPCs.
   The two engines are locked together by a generated test-vector suite.
 - **Backend**: self-hosted Supabase (Coolify), public API at
-  `https://checkers-api.contribution.club`.
+  `https://api.dame.cd`.
 
 ## Development
 

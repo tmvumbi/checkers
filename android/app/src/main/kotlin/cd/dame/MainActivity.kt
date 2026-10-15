@@ -1,4 +1,4 @@
-package club.contribution.checkers
+package cd.dame
 
 import io.flutter.embedding.android.FlutterActivity
 

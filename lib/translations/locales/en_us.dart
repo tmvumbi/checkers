@@ -55,8 +55,7 @@ const Map<String, String> enUs = {
 
   TranslationKeys.moreShareApp: 'Share App',
   TranslationKeys.moreFeedback: 'Write to Admins',
-  TranslationKeys.shareAppText:
-      'Play checkers with me! https://checkers.contribution.club',
+  TranslationKeys.shareAppText: 'Play checkers with me! https://dame.cd',
   TranslationKeys.feedbackTitle: 'Write to Admins',
   TranslationKeys.feedbackHint: 'Your message to the admins…',
   TranslationKeys.feedbackSend: 'Send',
@@ -83,6 +82,17 @@ const Map<String, String> enUs = {
   TranslationKeys.watchRecentMine: 'My games',
   TranslationKeys.watchRecentSearchHint: 'Search by player…',
   TranslationKeys.watchRecentEmpty: 'No recent games found.',
+  TranslationKeys.watchCompletedJustNow: 'just now',
+  TranslationKeys.watchCompletedMinutesAgo: '@count min ago',
+  TranslationKeys.watchCompletedHoursAgo: '@count h ago',
+  TranslationKeys.watchCompletedDayAgo: '1 day ago',
+  TranslationKeys.watchCompletedDaysAgo: '@count days ago',
+  TranslationKeys.watchCompletedWeekAgo: '1 week ago',
+  TranslationKeys.watchCompletedWeeksAgo: '@count weeks ago',
+  TranslationKeys.watchCompletedMonthAgo: '1 month ago',
+  TranslationKeys.watchCompletedMonthsAgo: '@count months ago',
+  TranslationKeys.watchCompletedYearAgo: '1 year ago',
+  TranslationKeys.watchCompletedYearsAgo: '@count years ago',
   TranslationKeys.searchPlayersHint: 'Search players…',
   TranslationKeys.linkSignInForGame:
       'Sign in first — we\'ll take you to the game right after.',
@@ -90,6 +100,20 @@ const Map<String, String> enUs = {
       'Sign in first — we\'ll take you to the tournament right after.',
   TranslationKeys.leaderboardEmpty:
       'No ranked players yet. Play online games to enter the Top 30!',
+  TranslationKeys.leaderboardEloScore: 'Elo Score',
+  TranslationKeys.leaderboardPoints: 'Points',
+  TranslationKeys.pointsLeaderboardEmpty:
+      'No points have been awarded yet. Beat the PC or win a tournament!',
+  TranslationKeys.pointsInfoTooltip: 'How to earn points',
+  TranslationKeys.pointsInfoTitle: 'How to earn points',
+  TranslationKeys.pointsInfoPcWin:
+      'Beat the PC: Easy @easy pt · Medium @medium pts · Hard @hard pts',
+  TranslationKeys.pointsInfoTournament:
+      'Win a tournament: @points point(s) per participant',
+  TranslationKeys.pointsInfoTournamentBonus:
+      'Tournament winner bonus: @points point(s)',
+  TranslationKeys.pointsValue: '@points pts',
+  TranslationKeys.eloValue: 'Elo @rating',
   TranslationKeys.spectatorWinner: '@name wins!',
 
   TranslationKeys.joinOnlineGame: 'Join Online Game',
@@ -100,8 +124,7 @@ const Map<String, String> enUs = {
   TranslationKeys.invite: 'Invite',
   TranslationKeys.inviteFailed: 'Could not send the invite. Try again.',
   TranslationKeys.inviteReceivedTitle: 'Game Invite',
-  TranslationKeys.inviteReceivedMessage:
-      '@name invites you to play checkers!',
+  TranslationKeys.inviteReceivedMessage: '@name invites you to play checkers!',
   TranslationKeys.shareInviteLink: 'Share Invite Link',
   TranslationKeys.shareInviteText: 'Join my game of Checkers: @url',
 
@@ -173,6 +196,7 @@ const Map<String, String> enUs = {
 
   TranslationKeys.yourTurn: 'Your turn',
   TranslationKeys.opponentTurn: "Opponent's turn",
+  TranslationKeys.playersTurn: "@name's turn",
   TranslationKeys.youWon: 'You won!',
   TranslationKeys.youLost: 'You lost',
   TranslationKeys.draw: 'Draw',
@@ -252,8 +276,7 @@ const Map<String, String> enUs = {
   TranslationKeys.tournamentMinPlayers:
       'Starts every 30 minutes with at least 4 players.',
   TranslationKeys.tournamentLobbyPlayers: 'Players in the lobby: @count',
-  TranslationKeys.tournamentJoinFailed:
-      'Could not join the tournament lobby.',
+  TranslationKeys.tournamentJoinFailed: 'Could not join the tournament lobby.',
   TranslationKeys.tournamentYourMatchReady: 'Your match is ready — play!',
   TranslationKeys.tournamentFixtures: 'Fixtures',
   TranslationKeys.tournamentTable: 'Table',
@@ -277,8 +300,7 @@ const Map<String, String> enUs = {
   TranslationKeys.tournamentInviteTitle: 'Invite to the Tournament',
   TranslationKeys.tournamentSendInvites: 'Send invites (@count)',
   TranslationKeys.tournamentInvitesSent: '@count invitation(s) sent.',
-  TranslationKeys.shareTournamentText:
-      'Join my Checkers tournament: @url',
+  TranslationKeys.shareTournamentText: 'Join my Checkers tournament: @url',
   TranslationKeys.tournamentInviteReceivedTitle: 'Tournament invite',
   TranslationKeys.tournamentInviteReceivedMessage:
       '@name invites you to join a tournament!',

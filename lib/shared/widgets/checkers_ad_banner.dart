@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -149,6 +150,7 @@ class _AdaptiveBannerState extends State<_AdaptiveBanner> {
   AdSize? _adSize;
   int? _loadedWidth;
   bool _loadFailed = false;
+  Timer? _retryTimer;
 
   @override
   void didUpdateWidget(covariant _AdaptiveBanner oldWidget) {
@@ -158,6 +160,7 @@ class _AdaptiveBannerState extends State<_AdaptiveBanner> {
             widget.shouldRequestNonPersonalizedAds ||
         oldWidget.size != widget.size) {
       _disposeAd();
+      _retryTimer?.cancel();
       _loadFailed = false;
       _loadedWidth = null;
     }
@@ -165,8 +168,26 @@ class _AdaptiveBannerState extends State<_AdaptiveBanner> {
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _disposeAd();
     super.dispose();
+  }
+
+  /// A no-fill response is often transient (fresh units, thin iOS
+  /// inventory), so try again after a minute instead of hiding the slot
+  /// for the rest of the screen's life. 60s respects AdMob's guidance on
+  /// request pacing.
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(seconds: 60), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loadFailed = false;
+        _loadedWidth = null;
+      });
+    });
   }
 
   @override
@@ -242,6 +263,7 @@ class _AdaptiveBannerState extends State<_AdaptiveBanner> {
               _adSize = null;
               _loadFailed = true;
             });
+            _scheduleRetry();
           }
         },
       ),

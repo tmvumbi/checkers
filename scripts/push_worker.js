@@ -1,7 +1,7 @@
 // Cloudflare Worker "checkers-push" — FCM v1 relay for tournament
-// reminders. Postgres (pg_net) POSTs { tokens, title, body, data } to
-// /send with the shared RELAY_KEY; the worker mints a Google OAuth token
-// from the FCM_SA service-account secret and fans out to FCM.
+// reminders and administrator broadcasts. Authorized callers POST
+// { tokens, title, body, data } to /send; the worker mints a Google OAuth
+// token from the FCM_SA service-account secret and fans out to FCM.
 //
 // Deploy:   npx wrangler deploy scripts/push_worker.js --name checkers-push
 // Secrets:  npx wrangler secret put FCM_SA --name checkers-push   (service-account JSON)
@@ -107,7 +107,10 @@ export default {
       return new Response("not found", { status: 404 });
     }
     const auth = request.headers.get("Authorization") ?? "";
-    if (!env.RELAY_KEY || auth !== `Bearer ${env.RELAY_KEY}`) {
+    const relayAuthorized = env.RELAY_KEY && auth === `Bearer ${env.RELAY_KEY}`;
+    const adminAuthorized = env.ADMIN_RELAY_KEY &&
+      auth === `Bearer ${env.ADMIN_RELAY_KEY}`;
+    if (!relayAuthorized && !adminAuthorized) {
       return new Response("unauthorized", { status: 401 });
     }
     let payload;

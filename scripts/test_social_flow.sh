@@ -3,7 +3,7 @@
 # private invites, social link games.
 set -euo pipefail
 
-API="${CHECKERS_SUPABASE_URL:-https://checkers-api.contribution.club}"
+API="${CHECKERS_SUPABASE_URL:-https://api.dame.cd}"
 ANON=$(cat "$HOME/.config/checkers_supabase_anon_key")
 
 jqpy() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }

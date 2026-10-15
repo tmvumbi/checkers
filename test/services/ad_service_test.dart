@@ -130,6 +130,27 @@ void main() {
       expect(shown, 2);
     });
 
+    test('interstitial event count survives an app service restart', () async {
+      var shown = 0;
+      final firstService = _service(onInterstitialShown: () => shown++);
+      await firstService.initialize();
+
+      for (var event = 1; event <= 14; event++) {
+        expect(await firstService.recordPcGameFinished(), isFalse);
+      }
+      expect(shown, 0);
+
+      // A new service instance represents a fully relaunched app. The event
+      // count remains in platform local storage rather than process memory.
+      final relaunchedService = _service(onInterstitialShown: () => shown++);
+      await relaunchedService.initialize();
+
+      expect(await relaunchedService.recordPcGameFinished(), isTrue);
+      expect(shown, 1);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getInt('ad_interstitial_event_count'), 15);
+    });
+
     test('disabled config never shows ads', () async {
       var shown = 0;
       final service = _service(

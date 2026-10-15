@@ -5,7 +5,7 @@
 abstract final class SupabaseConfig {
   static const String url = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://checkers-api.contribution.club',
+    defaultValue: 'https://api.dame.cd',
   );
 
   static const String anonKey = String.fromEnvironment(

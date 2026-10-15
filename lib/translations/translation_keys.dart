@@ -80,10 +80,32 @@ abstract final class TranslationKeys {
   static const String watchRecentMine = 'watch_recent_mine';
   static const String watchRecentSearchHint = 'watch_recent_search_hint';
   static const String watchRecentEmpty = 'watch_recent_empty';
+  static const String watchCompletedJustNow = 'watch_completed_just_now';
+  static const String watchCompletedMinutesAgo = 'watch_completed_minutes_ago';
+  static const String watchCompletedHoursAgo = 'watch_completed_hours_ago';
+  static const String watchCompletedDayAgo = 'watch_completed_day_ago';
+  static const String watchCompletedDaysAgo = 'watch_completed_days_ago';
+  static const String watchCompletedWeekAgo = 'watch_completed_week_ago';
+  static const String watchCompletedWeeksAgo = 'watch_completed_weeks_ago';
+  static const String watchCompletedMonthAgo = 'watch_completed_month_ago';
+  static const String watchCompletedMonthsAgo = 'watch_completed_months_ago';
+  static const String watchCompletedYearAgo = 'watch_completed_year_ago';
+  static const String watchCompletedYearsAgo = 'watch_completed_years_ago';
   static const String searchPlayersHint = 'search_players_hint';
   static const String linkSignInForGame = 'link_sign_in_for_game';
   static const String linkSignInForTournament = 'link_sign_in_for_tournament';
   static const String leaderboardEmpty = 'leaderboard_empty';
+  static const String leaderboardEloScore = 'leaderboard_elo_score';
+  static const String leaderboardPoints = 'leaderboard_points';
+  static const String pointsLeaderboardEmpty = 'points_leaderboard_empty';
+  static const String pointsInfoTooltip = 'points_info_tooltip';
+  static const String pointsInfoTitle = 'points_info_title';
+  static const String pointsInfoPcWin = 'points_info_pc_win';
+  static const String pointsInfoTournament = 'points_info_tournament';
+  static const String pointsInfoTournamentBonus =
+      'points_info_tournament_bonus';
+  static const String pointsValue = 'points_value';
+  static const String eloValue = 'elo_value';
   static const String spectatorWinner = 'spectator_winner';
 
   // Invites
@@ -150,6 +172,7 @@ abstract final class TranslationKeys {
   // Game board
   static const String yourTurn = 'your_turn';
   static const String opponentTurn = 'opponent_turn';
+  static const String playersTurn = 'players_turn';
   static const String youWon = 'you_won';
   static const String youLost = 'you_lost';
   static const String draw = 'draw';

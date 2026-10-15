@@ -6,7 +6,7 @@ import os
 import sys
 import urllib.request
 
-API = "https://checkers-api.contribution.club"
+API = "https://api.dame.cd"
 ANON = open(os.path.expanduser(
     "~/.config/checkers_supabase_anon_key")).read().strip()
 

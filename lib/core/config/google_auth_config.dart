@@ -14,5 +14,5 @@ abstract final class GoogleAuthConfig {
   /// programmatically (firebase_options.dart), so that plist is not part
   /// of the Xcode resources and the SDK would find no client id.
   static const String iosClientId =
-      '558217605941-krshtf5j0ljfd8v6uv076a2s7ri1ct3m.apps.googleusercontent.com';
+      '558217605941-930d77vu3l5gphsiodh58vqofa3n66kf.apps.googleusercontent.com';
 }

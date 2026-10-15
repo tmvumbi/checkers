@@ -33,8 +33,7 @@ class LandingController extends GetxController {
   final AnalyticsService _analyticsService;
 
   final RxBool isBusy = false.obs;
-  late final Rx<Locale> locale =
-      AppLocales.supportedLocaleFor(Get.locale).obs;
+  late final Rx<Locale> locale = AppLocales.supportedLocaleFor(Get.locale).obs;
 
   bool get supportsAppleSignIn => _authService.supportsAppleSignIn;
 
@@ -118,7 +117,8 @@ class LandingController extends GetxController {
     });
   }
 
-  Future<void> signInAsGuest() => _signIn('guest', _authService.signInAnonymously);
+  Future<void> signInAsGuest() =>
+      _signIn('guest', _authService.signInAnonymously);
 
   Future<void> signInWithGoogle() =>
       _signIn('google', _authService.signInWithGoogle);
@@ -158,10 +158,10 @@ class LandingController extends GetxController {
           return;
         }
         // The user-facing message stays generic; the cause goes to the
-        // device log, where sign-in problems are actually diagnosable.
-        if (kDebugMode) {
-          debugPrint('sign-in failed [$method] ${error.code}: ${error.message}');
-        }
+        // device log, where sign-in problems are actually diagnosable. Keep
+        // this in release builds too so physical-device auth failures can be
+        // diagnosed without shipping a special debug build.
+        debugPrint('sign-in failed [$method] ${error.code}: ${error.message}');
         showCheckersSnackbar(TranslationKeys.signInFailed.tr);
       },
     );

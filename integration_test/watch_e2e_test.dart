@@ -166,7 +166,26 @@ void main() {
     // Spectators get no rematch button.
     expect(find.byKey(const Key('game-rematch')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('game-back-home')));
+    // Closing the result switches the board to replay mode, parked on the
+    // final position with the transport bar showing.
+    await tester.tap(find.byKey(const Key('game-close-result')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('game-over-title')), findsNothing);
+    expect(find.byKey(const Key('replay-progress')), findsOneWidget);
+    expect(controller.watchReplayActive.value, isTrue);
+    expect(
+      controller.replayIndex.value,
+      controller.replayTotal.value,
+      reason: 'replay parks on the last move played',
+    );
+
+    // Stepping back through the finished game works from there.
+    await tester.tap(find.byKey(const Key('replay-prev')));
+    await tester.pumpAndSettle();
+    expect(controller.replayIndex.value, controller.replayTotal.value - 1);
+
+    // The leave button now lives on the bottom line, next to the watchers.
+    await tester.tap(find.byKey(const Key('game-leave-watch')));
     await _settleUntil(
       tester,
       () => find.byKey(const Key('home-tab-leaderboard')).evaluate().isNotEmpty,

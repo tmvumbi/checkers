@@ -3,9 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>558217605941-krshtf5j0ljfd8v6uv076a2s7ri1ct3m.apps.googleusercontent.com</string>
+	<string>558217605941-930d77vu3l5gphsiodh58vqofa3n66kf.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.558217605941-krshtf5j0ljfd8v6uv076a2s7ri1ct3m</string>
+	<string>com.googleusercontent.apps.558217605941-930d77vu3l5gphsiodh58vqofa3n66kf</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>558217605941-rrjdo4gq1jj9l9k36datnhvslbt0419t.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyBv8qWns-Fj7rfOgRjw0qL4fvd3yjFbYgc</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>club.contribution.checkers</string>
+	<string>cd.dame</string>
 	<key>PROJECT_ID</key>
 	<string>checkers-club</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:558217605941:ios:e5bce26a48359bcc5dd27c</string>
+	<string>1:558217605941:ios:b151759f7e9bc5c25dd27c</string>
 </dict>
 </plist>

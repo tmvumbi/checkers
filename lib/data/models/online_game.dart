@@ -82,6 +82,7 @@ class OnlineGameSnapshot {
     required this.blackBankMs,
     this.turnStartedAt,
     this.turnDeadlineAt,
+    this.finishedAt,
     this.lastMove,
     this.drawOfferColor,
     this.result,
@@ -105,6 +106,7 @@ class OnlineGameSnapshot {
   final int blackBankMs;
   final DateTime? turnStartedAt;
   final DateTime? turnDeadlineAt;
+  final DateTime? finishedAt;
   final Move? lastMove;
   final PieceColor? drawOfferColor;
   final String? result;
@@ -136,7 +138,9 @@ class OnlineGameSnapshot {
         majorityCapture: row['majority_capture'] as bool,
       ),
       ply: state == null ? 0 : ((state['ply'] as num?)?.toInt() ?? 0),
-      sideToMove: state?['side'] == 'black' ? PieceColor.black : PieceColor.white,
+      sideToMove: state?['side'] == 'black'
+          ? PieceColor.black
+          : PieceColor.white,
       board: state == null
           ? const []
           : [for (final v in state['board'] as List) (v as num).toInt()],
@@ -148,6 +152,9 @@ class OnlineGameSnapshot {
       turnDeadlineAt: row['turn_deadline_at'] == null
           ? null
           : DateTime.parse(row['turn_deadline_at'] as String),
+      finishedAt: row['finished_at'] == null
+          ? null
+          : DateTime.parse(row['finished_at'] as String),
       lastMove: lastMoveJson == null ? null : Move.fromJson(lastMoveJson),
       drawOfferColor: switch (row['draw_offer_color'] as String?) {
         'white' => PieceColor.white,

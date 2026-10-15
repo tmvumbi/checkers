@@ -56,8 +56,7 @@ const Map<String, String> frFr = {
 
   TranslationKeys.moreShareApp: "Partager l'application",
   TranslationKeys.moreFeedback: 'Écrire aux admins',
-  TranslationKeys.shareAppText:
-      'Joue aux dames avec moi ! https://checkers.contribution.club',
+  TranslationKeys.shareAppText: 'Joue aux dames avec moi ! https://dame.cd',
   TranslationKeys.feedbackTitle: 'Écrire aux admins',
   TranslationKeys.feedbackHint: 'Votre message aux admins…',
   TranslationKeys.feedbackSend: 'Envoyer',
@@ -85,6 +84,17 @@ const Map<String, String> frFr = {
   TranslationKeys.watchRecentMine: 'Mes parties',
   TranslationKeys.watchRecentSearchHint: 'Rechercher par joueur…',
   TranslationKeys.watchRecentEmpty: 'Aucune partie récente trouvée.',
+  TranslationKeys.watchCompletedJustNow: "à l'instant",
+  TranslationKeys.watchCompletedMinutesAgo: 'il y a @count min',
+  TranslationKeys.watchCompletedHoursAgo: 'il y a @count h',
+  TranslationKeys.watchCompletedDayAgo: 'il y a 1 jour',
+  TranslationKeys.watchCompletedDaysAgo: 'il y a @count jours',
+  TranslationKeys.watchCompletedWeekAgo: 'il y a 1 semaine',
+  TranslationKeys.watchCompletedWeeksAgo: 'il y a @count semaines',
+  TranslationKeys.watchCompletedMonthAgo: 'il y a 1 mois',
+  TranslationKeys.watchCompletedMonthsAgo: 'il y a @count mois',
+  TranslationKeys.watchCompletedYearAgo: 'il y a 1 an',
+  TranslationKeys.watchCompletedYearsAgo: 'il y a @count ans',
   TranslationKeys.searchPlayersHint: 'Rechercher un joueur…',
   TranslationKeys.linkSignInForGame:
       'Connectez-vous d\'abord — nous vous emmenons ensuite à la partie.',
@@ -92,6 +102,22 @@ const Map<String, String> frFr = {
       'Connectez-vous d\'abord — nous vous emmenons ensuite au tournoi.',
   TranslationKeys.leaderboardEmpty:
       'Aucun joueur classé. Jouez en ligne pour entrer dans le Top 30 !',
+  TranslationKeys.leaderboardEloScore: 'Score Elo',
+  TranslationKeys.leaderboardPoints: 'Points',
+  TranslationKeys.pointsLeaderboardEmpty:
+      "Aucun point n'a encore été attribué. Battez l'ordinateur ou gagnez "
+      'un tournoi !',
+  TranslationKeys.pointsInfoTooltip: 'Comment gagner des points',
+  TranslationKeys.pointsInfoTitle: 'Comment gagner des points',
+  TranslationKeys.pointsInfoPcWin:
+      "Battez l'ordinateur : Facile @easy pt · Moyen @medium pts · "
+      'Difficile @hard pts',
+  TranslationKeys.pointsInfoTournament:
+      'Gagnez un tournoi : @points point(s) par participant',
+  TranslationKeys.pointsInfoTournamentBonus:
+      'Bonus du vainqueur du tournoi : @points point(s)',
+  TranslationKeys.pointsValue: '@points pts',
+  TranslationKeys.eloValue: 'Elo @rating',
   TranslationKeys.spectatorWinner: '@name gagne !',
 
   TranslationKeys.joinOnlineGame: 'Rejoindre une partie',
@@ -101,8 +127,7 @@ const Map<String, String> frFr = {
       "Aucun joueur disponible pour l'instant. Partagez un lien "
       "d'invitation !",
   TranslationKeys.invite: 'Inviter',
-  TranslationKeys.inviteFailed:
-      "Impossible d'envoyer l'invitation. Réessayez.",
+  TranslationKeys.inviteFailed: "Impossible d'envoyer l'invitation. Réessayez.",
   TranslationKeys.inviteReceivedTitle: 'Invitation',
   TranslationKeys.inviteReceivedMessage:
       '@name vous invite à jouer aux dames !',
@@ -181,6 +206,7 @@ const Map<String, String> frFr = {
 
   TranslationKeys.yourTurn: 'À vous de jouer',
   TranslationKeys.opponentTurn: "Au tour de l'adversaire",
+  TranslationKeys.playersTurn: 'Au tour de @name',
   TranslationKeys.youWon: 'Vous avez gagné !',
   TranslationKeys.youLost: 'Vous avez perdu',
   TranslationKeys.draw: 'Partie nulle',
@@ -195,8 +221,7 @@ const Map<String, String> frFr = {
   TranslationKeys.mandatoryCaptureHint:
       'La prise est obligatoire : jouez une prise en surbrillance.',
   TranslationKeys.drawReasonAgreement: 'Nulle par accord mutuel',
-  TranslationKeys.drawReasonRepetition:
-      'Nulle : position répétée trois fois',
+  TranslationKeys.drawReasonRepetition: 'Nulle : position répétée trois fois',
   TranslationKeys.drawReason25Moves: 'Nulle : 25 coups de dame sans progrès',
   TranslationKeys.drawReason16Moves: 'Nulle : règle des 16 coups',
   TranslationKeys.drawReason5Moves: 'Nulle : règle des 5 coups',
@@ -269,8 +294,7 @@ const Map<String, String> frFr = {
   TranslationKeys.tournamentLobbyPlayers: 'Joueurs présents : @count',
   TranslationKeys.tournamentJoinFailed:
       'Impossible de rejoindre la salle du tournoi.',
-  TranslationKeys.tournamentYourMatchReady:
-      'Votre match est prêt — jouez !',
+  TranslationKeys.tournamentYourMatchReady: 'Votre match est prêt — jouez !',
   TranslationKeys.tournamentFixtures: 'Affiches',
   TranslationKeys.tournamentTable: 'Tableau',
   TranslationKeys.tournamentStandings: 'Classement',

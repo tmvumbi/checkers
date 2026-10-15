@@ -15,6 +15,7 @@ class LeaderboardPlayer {
     required this.nickname,
     this.photoUrl,
     required this.rating,
+    this.points = 0,
     required this.ratedGames,
     required this.wins,
     required this.losses,
@@ -25,6 +26,7 @@ class LeaderboardPlayer {
   final String nickname;
   final String? photoUrl;
   final int rating;
+  final int points;
   final int ratedGames;
   final int wins;
   final int losses;
@@ -36,10 +38,38 @@ class LeaderboardPlayer {
       nickname: (json['nickname'] as String?) ?? '',
       photoUrl: json['photo_url'] as String?,
       rating: (json['rating'] as num).toInt(),
+      points: (json['points'] as num?)?.toInt() ?? 0,
       ratedGames: (json['rated_games'] as num?)?.toInt() ?? 0,
       wins: (json['wins'] as num?)?.toInt() ?? 0,
       losses: (json['losses'] as num?)?.toInt() ?? 0,
       draws: (json['draws'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class PointRules {
+  const PointRules({
+    this.pcEasyWin = 1,
+    this.pcMediumWin = 5,
+    this.pcHardWin = 10,
+    this.tournamentPerParticipant = 1,
+    this.tournamentBonus = 0,
+  });
+
+  final int pcEasyWin;
+  final int pcMediumWin;
+  final int pcHardWin;
+  final int tournamentPerParticipant;
+  final int tournamentBonus;
+
+  factory PointRules.fromJson(Map<String, dynamic> json) {
+    return PointRules(
+      pcEasyWin: (json['pc_easy_win'] as num?)?.toInt() ?? 1,
+      pcMediumWin: (json['pc_medium_win'] as num?)?.toInt() ?? 5,
+      pcHardWin: (json['pc_hard_win'] as num?)?.toInt() ?? 10,
+      tournamentPerParticipant:
+          (json['tournament_per_participant'] as num?)?.toInt() ?? 1,
+      tournamentBonus: (json['tournament_bonus'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -129,6 +159,8 @@ abstract class OnlineGameService {
     int limit,
   });
   Future<ApiResult<List<LeaderboardPlayer>>> fetchLeaderboard();
+  Future<ApiResult<List<LeaderboardPlayer>>> fetchPointsLeaderboard();
+  Future<ApiResult<PointRules>> fetchPointRules();
   Future<ApiResult<OnlineGameSnapshot>> fetchGame(String gameId);
   Stream<OnlineGameSnapshot> watchGame(String gameId);
   Future<ApiResult<void>> submitMove(String gameId, Move move, int expectedPly);
@@ -186,18 +218,14 @@ class SupabaseOnlineGameService implements OnlineGameService {
     try {
       return Success(await action());
     } on PostgrestException catch (error) {
-      return Failure(
-        ApiError(code: error.message, message: error.message),
-      );
+      return Failure(ApiError(code: error.message, message: error.message));
     } catch (error) {
       return Failure(ApiError(code: 'unknown', message: error.toString()));
     }
   }
 
   @override
-  Future<ApiResult<({String gameId, int seat})>> joinOnlineGame(
-    String preset,
-  ) {
+  Future<ApiResult<({String gameId, int seat})>> joinOnlineGame(String preset) {
     return _guard(() async {
       final response = await _client.rpc<dynamic>(
         'join_online_game',
@@ -217,9 +245,7 @@ class SupabaseOnlineGameService implements OnlineGameService {
         .select()
         .eq('game_id', gameId)
         .order('seat', ascending: true);
-    return [
-      for (final row in rows) OnlineGamePlayer.fromJson(row),
-    ];
+    return [for (final row in rows) OnlineGamePlayer.fromJson(row)];
   }
 
   @override
@@ -259,18 +285,22 @@ class SupabaseOnlineGameService implements OnlineGameService {
     int expectedPly,
   ) {
     return _guard(() async {
-      await _client.rpc<dynamic>('submit_move', params: {
-        'p_game_id': gameId,
-        'p_move': move.toJson(),
-        'p_expected_ply': expectedPly,
-      });
+      await _client.rpc<dynamic>(
+        'submit_move',
+        params: {
+          'p_game_id': gameId,
+          'p_move': move.toJson(),
+          'p_expected_ply': expectedPly,
+        },
+      );
     });
   }
 
   @override
   Future<ApiResult<void>> claimTimeout(String gameId) {
     return _guard(
-      () => _client.rpc<dynamic>('claim_timeout', params: {'p_game_id': gameId}),
+      () =>
+          _client.rpc<dynamic>('claim_timeout', params: {'p_game_id': gameId}),
     );
   }
 
@@ -291,10 +321,10 @@ class SupabaseOnlineGameService implements OnlineGameService {
   @override
   Future<ApiResult<void>> touchConnection(String gameId, bool connected) {
     return _guard(
-      () => _client.rpc<dynamic>('touch_game_connection', params: {
-        'p_game_id': gameId,
-        'p_connected': connected,
-      }),
+      () => _client.rpc<dynamic>(
+        'touch_game_connection',
+        params: {'p_game_id': gameId, 'p_connected': connected},
+      ),
     );
   }
 
@@ -388,6 +418,25 @@ class SupabaseOnlineGameService implements OnlineGameService {
   }
 
   @override
+  Future<ApiResult<List<LeaderboardPlayer>>> fetchPointsLeaderboard() {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>('get_points_leaderboard');
+      return [
+        for (final row in response as List)
+          LeaderboardPlayer.fromJson((row as Map).cast<String, dynamic>()),
+      ];
+    });
+  }
+
+  @override
+  Future<ApiResult<PointRules>> fetchPointRules() {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>('get_point_rules');
+      return PointRules.fromJson((response as Map).cast<String, dynamic>());
+    });
+  }
+
+  @override
   Future<ApiResult<String>> startPcGame({
     required RulesConfig rules,
     required String aiLevel,
@@ -395,15 +444,18 @@ class SupabaseOnlineGameService implements OnlineGameService {
     required String humanColor,
   }) {
     return _guard(() async {
-      final response = await _client.rpc<dynamic>('start_pc_game', params: {
-        'p_board_size': rules.boardSize,
-        'p_backward_capture': rules.backwardCapture,
-        'p_flying_king': rules.flyingKing,
-        'p_majority_capture': rules.majorityCapture,
-        'p_ai_level': aiLevel,
-        'p_allow_undo': allowUndo,
-        'p_human_color': humanColor,
-      });
+      final response = await _client.rpc<dynamic>(
+        'start_pc_game',
+        params: {
+          'p_board_size': rules.boardSize,
+          'p_backward_capture': rules.backwardCapture,
+          'p_flying_king': rules.flyingKing,
+          'p_majority_capture': rules.majorityCapture,
+          'p_ai_level': aiLevel,
+          'p_allow_undo': allowUndo,
+          'p_human_color': humanColor,
+        },
+      );
       return (response as Map)['game_id'] as String;
     });
   }
@@ -415,37 +467,41 @@ class SupabaseOnlineGameService implements OnlineGameService {
     int expectedPly,
   ) {
     return _guard(
-      () => _client.rpc<dynamic>('submit_pc_move', params: {
-        'p_game_id': gameId,
-        'p_move': move.toJson(),
-        'p_expected_ply': expectedPly,
-      }),
+      () => _client.rpc<dynamic>(
+        'submit_pc_move',
+        params: {
+          'p_game_id': gameId,
+          'p_move': move.toJson(),
+          'p_expected_ply': expectedPly,
+        },
+      ),
     );
   }
 
   @override
   Future<ApiResult<void>> undoPcMoves(String gameId, int count) {
     return _guard(
-      () => _client.rpc<dynamic>('undo_pc_moves', params: {
-        'p_game_id': gameId,
-        'p_count': count,
-      }),
+      () => _client.rpc<dynamic>(
+        'undo_pc_moves',
+        params: {'p_game_id': gameId, 'p_count': count},
+      ),
     );
   }
 
   @override
   Future<ApiResult<void>> watchHeartbeat(String gameId) {
     return _guard(
-      () => _client
-          .rpc<dynamic>('watch_heartbeat', params: {'p_game_id': gameId}),
+      () => _client.rpc<dynamic>(
+        'watch_heartbeat',
+        params: {'p_game_id': gameId},
+      ),
     );
   }
 
   @override
   Future<ApiResult<void>> unwatchGame(String gameId) {
     return _guard(
-      () =>
-          _client.rpc<dynamic>('unwatch_game', params: {'p_game_id': gameId}),
+      () => _client.rpc<dynamic>('unwatch_game', params: {'p_game_id': gameId}),
     );
   }
 
@@ -479,9 +535,7 @@ class SupabaseOnlineGameService implements OnlineGameService {
         .stream(primaryKey: ['game_id', 'uid'])
         .eq('game_id', gameId)
         .map((rows) {
-          final watchers = [
-            for (final row in rows) GameWatcher.fromJson(row),
-          ];
+          final watchers = [for (final row in rows) GameWatcher.fromJson(row)];
           watchers.sort((a, b) => a.uid.compareTo(b.uid));
           return watchers;
         });
@@ -514,10 +568,10 @@ class SupabaseOnlineGameService implements OnlineGameService {
   @override
   Future<ApiResult<void>> respondDraw(String gameId, bool accept) {
     return _guard(
-      () => _client.rpc<dynamic>('respond_draw', params: {
-        'p_game_id': gameId,
-        'p_accept': accept,
-      }),
+      () => _client.rpc<dynamic>(
+        'respond_draw',
+        params: {'p_game_id': gameId, 'p_accept': accept},
+      ),
     );
   }
 

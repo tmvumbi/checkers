@@ -147,6 +147,7 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<ApiResult<AuthUser>> signInWithApple() {
     return _guard(() async {
+      debugPrint('apple-sign-in: requesting native credential');
       final rawNonce = _generateNonce();
       final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
       final credential = await SignInWithApple.getAppleIDCredential(
@@ -156,15 +157,18 @@ class SupabaseAuthService implements AuthService {
         ],
         nonce: hashedNonce,
       );
+      debugPrint('apple-sign-in: native credential received');
       final idToken = credential.identityToken;
       if (idToken == null) {
         throw const AuthException('missing-apple-identity-token');
       }
+      debugPrint('apple-sign-in: exchanging credential with Supabase');
       final response = await _client.signInWithIdToken(
         provider: OAuthProvider.apple,
         idToken: idToken,
         nonce: rawNonce,
       );
+      debugPrint('apple-sign-in: Supabase exchange completed');
       return _requireUser(response.user);
     });
   }
