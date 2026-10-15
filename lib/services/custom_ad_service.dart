@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../engine/checkers_engine.dart' show PieceColor;
 import 'auth_service.dart';
+import 'convex/convex_gateway.dart';
 
 /// Backend half of [CustomAdService].
 abstract class CustomAdBackend {
@@ -16,25 +16,27 @@ abstract class CustomAdBackend {
   Future<void> recordClick(String campaignId);
 }
 
-class SupabaseCustomAdBackend implements CustomAdBackend {
-  SupabaseCustomAdBackend({SupabaseClient? client}) : _client = client;
+class ConvexCustomAdBackend implements CustomAdBackend {
+  ConvexCustomAdBackend({ConvexGateway? gateway}) : _gatewayOverride = gateway;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
   @override
   Future<Map<String, dynamic>?> getActiveAd() async {
-    final response = await client.rpc<dynamic>('get_active_ad');
-    return response == null ? null : (response as Map).cast<String, dynamic>();
+    final response = await _convex.query('ads:getActive');
+    return response == null ? null : asRow(response);
   }
 
   @override
-  Future<void> recordPrint(String campaignId) =>
-      client.rpc<void>('record_ad_print', params: {'p_campaign': campaignId});
+  Future<void> recordPrint(String campaignId) async {
+    await _convex.mutation('ads:recordPrint', {'campaignId': campaignId});
+  }
 
   @override
-  Future<void> recordClick(String campaignId) =>
-      client.rpc<void>('record_ad_click', params: {'p_campaign': campaignId});
+  Future<void> recordClick(String campaignId) async {
+    await _convex.mutation('ads:recordClick', {'campaignId': campaignId});
+  }
 }
 
 /// A backend-managed advertisement campaign: banner + target URL, and

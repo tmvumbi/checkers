@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../data/models/player_message.dart';
 import 'auth_service.dart';
+import 'convex/convex_gateway.dart';
 
 /// Streams admin → player messages (kopo parity): public broadcasts plus
 /// private messages for the signed-in player, in the active language, and
@@ -19,8 +19,8 @@ abstract class PlayerMessageService extends GetxService {
   Future<void> markVisibleMessagesRead();
 }
 
-class SupabasePlayerMessageService extends PlayerMessageService {
-  SupabasePlayerMessageService({
+class ConvexPlayerMessageService extends PlayerMessageService {
+  ConvexPlayerMessageService({
     AuthService? authService,
     Stream<List<Map<String, dynamic>>> Function()? rowsStreamFactory,
   }) : _authServiceOverride = authService,
@@ -125,7 +125,7 @@ class SupabasePlayerMessageService extends PlayerMessageService {
       return;
     }
 
-    // Row-level security scopes rows to public + own private messages.
+    // The backend scopes rows to public + own private messages.
     _rowsSubscription = _rowsStream().listen(
       _handleRows,
       onError: (Object _) {
@@ -141,9 +141,9 @@ class SupabasePlayerMessageService extends PlayerMessageService {
     if (factory != null) {
       return factory();
     }
-    return Supabase.instance.client
-        .from('player_messages')
-        .stream(primaryKey: ['id']);
+    return Get.find<ConvexGateway>()
+        .watch('messages:mine')
+        .map((rows) => asRows(rows));
   }
 
   void _handleRows(List<Map<String, dynamic>> rows) {

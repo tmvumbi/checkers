@@ -36,7 +36,7 @@ void main() {
 
   late MockAuthService auth;
   late StreamController<List<Map<String, dynamic>>> rows;
-  late SupabasePlayerMessageService service;
+  late ConvexPlayerMessageService service;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -46,7 +46,7 @@ void main() {
       const AuthUser(uid: 'uid-1', isAnonymous: true),
     );
     when(() => auth.userChanges).thenAnswer((_) => const Stream.empty());
-    service = SupabasePlayerMessageService(
+    service = ConvexPlayerMessageService(
       authService: auth,
       rowsStreamFactory: () => rows.stream,
     );

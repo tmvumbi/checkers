@@ -1,4 +1,6 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get/get.dart';
+
+import 'convex/convex_gateway.dart';
 
 /// Player feedback inbox (emailed to the team and listed in the admin
 /// console).
@@ -7,14 +9,15 @@ abstract class FeedbackService {
   Future<void> submit({required String uid, required String text});
 }
 
-class SupabaseFeedbackService implements FeedbackService {
-  SupabaseFeedbackService({SupabaseClient? client}) : _client = client;
+class ConvexFeedbackService implements FeedbackService {
+  ConvexFeedbackService({ConvexGateway? gateway}) : _gatewayOverride = gateway;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
+  /// The backend attributes feedback to the authenticated caller.
   @override
   Future<void> submit({required String uid, required String text}) async {
-    await client.from('feedback').insert({'uid': uid, 'text': text});
+    await _convex.mutation('feedback:submit', {'text': text});
   }
 }

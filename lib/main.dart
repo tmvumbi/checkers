@@ -1,14 +1,19 @@
+import 'package:dartvex/dartvex.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'bindings/initial_binding.dart';
 import 'firebase_options.dart';
+import 'core/config/convex_config.dart';
 import 'core/config/supabase_config.dart';
 import 'core/constants/app_strings.dart';
 import 'core/locale_preference.dart';
+import 'services/convex/convex_gateway.dart';
+import 'services/convex/convex_session.dart';
 import 'routes/app_pages.dart';
 import 'routes/app_routes.dart';
 import 'themes/app_theme.dart';
@@ -25,14 +30,36 @@ Future<void> main() async {
     // (e.g. emulators without Play services).
   }
   final savedLocale = await LocalePreference.load();
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    // The self-hosted stack issues legacy JWT keys; publishableKey does not
-    // apply there yet.
-    // ignore: deprecated_member_use
-    anonKey: SupabaseConfig.anonKey,
-  );
+  await _initLegacySupabaseForHandoff();
+
+  final gateway = DartvexGateway(ConvexClient(ConvexConfig.url));
+  final session = ConvexSession(gateway: gateway);
+  Get.put<ConvexGateway>(gateway, permanent: true);
+  Get.put<ConvexSession>(session, permanent: true);
+  if (Firebase.apps.isNotEmpty) {
+    await session.start();
+  }
   runApp(CheckersApp(locale: savedLocale));
+}
+
+/// Players upgrading from the Supabase-era app still have that session on
+/// the device; it is only used once, to claim their old account
+/// (LegacyAccountHandoff). Skipped after the handoff completed.
+Future<void> _initLegacySupabaseForHandoff() async {
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    if (preferences.getBool('legacy_supabase_claim_done') ?? false) {
+      return;
+    }
+    await Supabase.initialize(
+      url: SupabaseConfig.url,
+      // The self-hosted stack issues legacy JWT keys.
+      // ignore: deprecated_member_use
+      anonKey: SupabaseConfig.anonKey,
+    );
+  } catch (_) {
+    // No legacy session to hand off; the app runs on Convex regardless.
+  }
 }
 
 class CheckersApp extends StatelessWidget {

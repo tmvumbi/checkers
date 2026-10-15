@@ -36,6 +36,8 @@ dependencies:
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
   firebase_analytics: ^12.4.6
+  firebase_auth: ^6.7.0
+  dartvex: ^0.2.0
 
 dev_dependencies:
   flutter_test:

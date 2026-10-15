@@ -1,12 +1,12 @@
-import 'package:checkers/core/config/supabase_config.dart';
+import 'package:checkers/services/convex/convex_gateway.dart';
 import 'package:checkers/main.dart' as app;
 import 'package:checkers/modules/game_board/controller/game_board_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'
-    show Supabase, SupabaseClient;
+
+import 'support/headless_player.dart';
 
 /// E2E: a signed-in PC game is streamed to the backend (vs_pc, moves,
 /// allow_undo flag) and a headless watcher shows up live in the avatars bar.
@@ -25,7 +25,10 @@ void main() {
       await _settleUntil(
         tester,
         () =>
-            find.byKey(const Key('edit-profile-nickname')).evaluate().isNotEmpty ||
+            find
+                .byKey(const Key('edit-profile-nickname'))
+                .evaluate()
+                .isNotEmpty ||
             find.byKey(const Key('home-tab-play')).evaluate().isNotEmpty,
       );
       final nick = find.byKey(const Key('edit-profile-nickname'));
@@ -65,8 +68,9 @@ void main() {
     final gameId = controller.watchableGameId!;
 
     // Backend row carries the PC-game flags.
-    final own = Supabase.instance.client;
-    final row = await own.from('games').select().eq('id', gameId).single();
+    final own = Get.find<ConvexGateway>();
+    final row = (await own.query('games:get', {'gameId': gameId}) as Map)
+        .cast<String, dynamic>();
     expect(row['vs_pc'], isTrue);
     expect(row['allow_undo'], isFalse);
     expect(row['ai_level'], 'easy');
@@ -82,28 +86,14 @@ void main() {
       () => controller.engine.moveHistory.length >= 2 && controller.isHumanTurn,
       timeout: const Duration(seconds: 30),
     );
-    await _settleUntilAsync(
-      tester,
-      () async {
-        final moves =
-            await own.from('game_moves').select('ply').eq('game_id', gameId);
-        return moves.length >= 2;
-      },
-      timeout: const Duration(seconds: 15),
-    );
+    await _settleUntilAsync(tester, () async {
+      final moves = await own.query('games:moves', {'gameId': gameId});
+      return (moves as List).length >= 2;
+    }, timeout: const Duration(seconds: 15));
 
     // A headless watcher heartbeats; the avatars bar appears live.
-    final watcher = SupabaseClient(SupabaseConfig.url, SupabaseConfig.anonKey);
-    final watcherAuth = await watcher.auth.signInAnonymously();
-    await watcher.from('profiles').upsert({
-      'id': watcherAuth.user!.id,
-      'nickname': 'Peek${DateTime.now().millisecondsSinceEpoch % 10000}',
-      'is_anonymous': true,
-    });
-    await watcher.rpc<dynamic>(
-      'watch_heartbeat',
-      params: {'p_game_id': gameId},
-    );
+    final watcher = await HeadlessPlayer.signUp('Peek');
+    await watcher.mutate('watch:heartbeat', {'gameId': gameId});
 
     await _settleUntil(
       tester,
@@ -126,15 +116,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('game-resign-confirm')));
     await tester.pumpAndSettle();
-    await _settleUntilAsync(
-      tester,
-      () async {
-        final finalRow =
-            await own.from('games').select('status').eq('id', gameId).single();
-        return finalRow['status'] == 'finished';
-      },
-      timeout: const Duration(seconds: 15),
-    );
+    await _settleUntilAsync(tester, () async {
+      final finalRow = await own.query('games:get', {'gameId': gameId});
+      return (finalRow as Map)['status'] == 'finished';
+    }, timeout: const Duration(seconds: 15));
 
     await tester.tap(find.byKey(const Key('game-back-home')));
     await _settleUntil(

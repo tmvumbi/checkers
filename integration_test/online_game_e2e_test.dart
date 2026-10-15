@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:checkers/core/config/supabase_config.dart';
 import 'package:checkers/engine/checkers_engine.dart';
 import 'package:checkers/engine/move.dart';
 import 'package:checkers/engine/rules_config.dart';
@@ -10,9 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
 
-/// E2E online game: the app UI is player A; a headless Supabase client in
+import 'support/headless_player.dart';
+
+/// E2E online game: the app UI is player A; a headless Convex client in
 /// this test process is player B. Both hit the live backend.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -21,18 +21,10 @@ void main() {
     tester,
   ) async {
     // ---- Player B: headless client joins matchmaking first.
-    final b = SupabaseClient(SupabaseConfig.url, SupabaseConfig.anonKey);
-    final bAuth = await b.auth.signInAnonymously();
-    final bUid = bAuth.user!.id;
-    await b.from('profiles').upsert({
-      'id': bUid,
-      'nickname': 'BotB${DateTime.now().millisecondsSinceEpoch % 10000}',
-      'is_anonymous': true,
-    });
-    final bJoin = await b.rpc<dynamic>(
-      'join_online_game',
-      params: {'p_preset': 'american'},
-    ) as Map;
+    final b = await HeadlessPlayer.signUp('BotB');
+    final bUid = b.uid;
+    final bJoin =
+        await b.mutate('games:joinOnlineGame', {'preset': 'american'}) as Map;
     final gameId = bJoin['game_id'] as String;
 
     // Player B's turn loop runs concurrently with the UI flow below.
@@ -44,27 +36,20 @@ void main() {
       while (!bDone.isCompleted) {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         try {
-          final row = await b
-              .from('games')
-              .select()
-              .eq('id', gameId)
-              .single();
+          final row = await b.game(gameId);
           if (row['status'] == 'finished' || row['status'] == 'abandoned') {
             bDone.complete();
             return;
           }
           if (row['status'] != 'playing') {
             // Keep the lobby seat alive against matchmaking GC.
-            await b.rpc<dynamic>('touch_game_connection', params: {
-              'p_game_id': gameId,
-              'p_connected': true,
+            await b.mutate('games:touchConnection', {
+              'gameId': gameId,
+              'connected': true,
             });
             continue;
           }
-          final players = await b
-              .from('game_players')
-              .select()
-              .eq('game_id', gameId);
+          final players = await b.players(gameId);
           final mine = players.firstWhere((p) => p['uid'] == bUid);
           final myColor = mine['color'] as String?;
           final state = (row['state'] as Map).cast<String, dynamic>();
@@ -72,11 +57,7 @@ void main() {
             continue;
           }
           // Rebuild local engine to current ply and pick the first move.
-          final moveRows = await b
-              .from('game_moves')
-              .select('ply, move')
-              .eq('game_id', gameId)
-              .order('ply', ascending: true);
+          final moveRows = await b.moves(gameId);
           engine.reset();
           for (final mr in moveRows) {
             engine.applyMove(
@@ -84,18 +65,15 @@ void main() {
             );
           }
           if (resignAfterOwnMoves == 0) {
-            await b.rpc<dynamic>(
-              'resign_game',
-              params: {'p_game_id': gameId},
-            );
+            await b.mutate('games:resignGame', {'gameId': gameId});
             bResigned = true;
             continue;
           }
           final move = engine.legalMoves().first;
-          await b.rpc<dynamic>('submit_move', params: {
-            'p_game_id': gameId,
-            'p_move': move.toJson(),
-            'p_expected_ply': engine.moveHistory.length,
+          await b.mutate('games:submitMove', {
+            'gameId': gameId,
+            'move': move.toJson(),
+            'expectedPly': engine.moveHistory.length,
           });
           resignAfterOwnMoves--;
         } catch (_) {
@@ -116,7 +94,10 @@ void main() {
       await _settleUntil(
         tester,
         () =>
-            find.byKey(const Key('edit-profile-nickname')).evaluate().isNotEmpty ||
+            find
+                .byKey(const Key('edit-profile-nickname'))
+                .evaluate()
+                .isNotEmpty ||
             find.byKey(const Key('home-tab-play')).evaluate().isNotEmpty,
       );
       final nick = find.byKey(const Key('edit-profile-nickname'));
@@ -130,8 +111,10 @@ void main() {
     }
     await _settleUntil(
       tester,
-      () =>
-          find.byKey(const Key('home-play-people-button')).evaluate().isNotEmpty,
+      () => find
+          .byKey(const Key('home-play-people-button'))
+          .evaluate()
+          .isNotEmpty,
     );
 
     await tester.tap(find.byKey(const Key('home-play-people-button')));

@@ -4,7 +4,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../routes/app_routes.dart';
 import '../shared/widgets/checkers_gradient_button.dart';
@@ -12,6 +11,7 @@ import '../shared/widgets/checkers_modal.dart';
 import '../themes/app_theme.dart';
 import '../translations/translation_keys.dart';
 import 'auth_service.dart';
+import 'convex/convex_gateway.dart';
 
 /// Backend half of [PushNotificationService].
 abstract class PushDeviceBackend {
@@ -22,20 +22,23 @@ abstract class PushDeviceBackend {
   });
 }
 
-class SupabasePushDeviceBackend implements PushDeviceBackend {
-  SupabasePushDeviceBackend({SupabaseClient? client}) : _client = client;
+class ConvexPushDeviceBackend implements PushDeviceBackend {
+  ConvexPushDeviceBackend({ConvexGateway? gateway})
+    : _gatewayOverride = gateway;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
   @override
   Future<void> registerDevice({
     required String token,
     required String platform,
-  }) => client.rpc<void>(
-    'register_push_device',
-    params: {'p_token': token, 'p_platform': platform},
-  );
+  }) async {
+    await _convex.mutation('push:registerDevice', {
+      'token': token,
+      'platform': platform,
+    });
+  }
 }
 
 /// FCM plumbing for tournament reminders and administrator broadcasts.

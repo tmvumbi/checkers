@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:checkers/core/config/supabase_config.dart';
 import 'package:checkers/engine/checkers_engine.dart';
 import 'package:checkers/main.dart' as app;
 import 'package:checkers/modules/game_board/controller/game_board_controller.dart';
@@ -8,7 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
+
+import 'support/headless_player.dart';
 
 /// E2E: draw by agreement — the app offers a draw via the UI button and a
 /// headless opponent accepts; the overlay shows the agreed draw.
@@ -18,18 +18,10 @@ void main() {
   testWidgets('draw offer through the UI is accepted by the opponent', (
     tester,
   ) async {
-    final b = SupabaseClient(SupabaseConfig.url, SupabaseConfig.anonKey);
-    final bAuth = await b.auth.signInAnonymously();
-    final bUid = bAuth.user!.id;
-    await b.from('profiles').upsert({
-      'id': bUid,
-      'nickname': 'DrawB${DateTime.now().millisecondsSinceEpoch % 10000}',
-      'is_anonymous': true,
-    });
-    final bJoin = await b.rpc<dynamic>(
-      'join_online_game',
-      params: {'p_preset': 'brazilian'},
-    ) as Map;
+    final b = await HeadlessPlayer.signUp('DrawB');
+    final bUid = b.uid;
+    final bJoin =
+        await b.mutate('games:joinOnlineGame', {'preset': 'brazilian'}) as Map;
     final gameId = bJoin['game_id'] as String;
 
     // Headless B: accept a draw offer as soon as it appears.
@@ -39,22 +31,20 @@ void main() {
       while (!done.isCompleted) {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         try {
-          final row =
-              await b.from('games').select().eq('id', gameId).single();
+          final row = await b.game(gameId);
           if (row['status'] == 'finished') {
             if (!done.isCompleted) {
               done.complete();
             }
             return;
           }
-          final players =
-              await b.from('game_players').select().eq('game_id', gameId);
+          final players = await b.players(gameId);
           final mine = players.firstWhere((p) => p['uid'] == bUid);
           final offer = row['draw_offer_color'] as String?;
           if (offer != null && offer != mine['color']) {
-            await b.rpc<dynamic>('respond_draw', params: {
-              'p_game_id': gameId,
-              'p_accept': true,
+            await b.mutate('games:respondDraw', {
+              'gameId': gameId,
+              'accept': true,
             });
             accepted = true;
           }
@@ -71,7 +61,10 @@ void main() {
       await _settleUntil(
         tester,
         () =>
-            find.byKey(const Key('edit-profile-nickname')).evaluate().isNotEmpty ||
+            find
+                .byKey(const Key('edit-profile-nickname'))
+                .evaluate()
+                .isNotEmpty ||
             find.byKey(const Key('home-tab-play')).evaluate().isNotEmpty,
       );
       final nick = find.byKey(const Key('edit-profile-nickname'));
@@ -85,8 +78,10 @@ void main() {
     }
     await _settleUntil(
       tester,
-      () =>
-          find.byKey(const Key('home-play-people-button')).evaluate().isNotEmpty,
+      () => find
+          .byKey(const Key('home-play-people-button'))
+          .evaluate()
+          .isNotEmpty,
     );
 
     await tester.tap(find.byKey(const Key('home-play-people-button')));
@@ -128,16 +123,12 @@ void main() {
       while (true) {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         try {
-          final row =
-              await b.from('games').select().eq('id', gameId).single();
+          final row = await b.game(gameId);
           if (row['rematch_game_id'] != null) {
             return;
           }
           if (row['rematch_requested_by'] != null) {
-            await b.rpc<dynamic>(
-              'request_rematch',
-              params: {'p_game_id': gameId},
-            );
+            await b.mutate('games:requestRematch', {'gameId': gameId});
             return;
           }
         } catch (_) {}
@@ -145,18 +136,14 @@ void main() {
     }());
 
     await tester.tap(find.byKey(const Key('game-rematch')));
-    await _settleUntil(
-      tester,
-      () {
-        if (find.byKey(const Key('game-turn-label')).evaluate().isEmpty) {
-          return false;
-        }
-        final fresh = Get.find<GameBoardController>();
-        return fresh.args.gameId != gameId &&
-            fresh.result.value == GameResult.ongoing;
-      },
-      timeout: const Duration(seconds: 30),
-    );
+    await _settleUntil(tester, () {
+      if (find.byKey(const Key('game-turn-label')).evaluate().isEmpty) {
+        return false;
+      }
+      final fresh = Get.find<GameBoardController>();
+      return fresh.args.gameId != gameId &&
+          fresh.result.value == GameResult.ongoing;
+    }, timeout: const Duration(seconds: 30));
 
     final rematchController = Get.find<GameBoardController>();
     expect(rematchController.args.gameId, isNot(gameId));

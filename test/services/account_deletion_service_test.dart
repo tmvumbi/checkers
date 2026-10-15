@@ -1,124 +1,84 @@
-import 'dart:async';
-
-import 'package:checkers/core/network/api_error.dart';
 import 'package:checkers/core/network/api_result.dart';
 import 'package:checkers/services/account_deletion_service.dart';
-import 'package:checkers/services/profile_photo_service.dart';
+import 'package:checkers/services/auth_service.dart';
+import 'package:checkers/services/convex/convex_session.dart';
+import 'package:dartvex/dartvex.dart' show ConvexException;
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-class _Client extends Mock implements SupabaseClient {}
+import '../support/fake_convex_gateway.dart';
 
-class _Auth extends Mock implements GoTrueClient {}
+class _Auth extends Mock implements AuthService {}
 
-class _Photos extends Mock implements ProfilePhotoService {}
+class _Session extends Mock implements ConvexSession {}
 
-class _Rpc extends Fake implements PostgrestFilterBuilder<dynamic> {
-  _Rpc(this.action);
-  final Future<dynamic> Function() action;
+class _Firebase extends Mock implements fb.FirebaseAuth {}
 
-  @override
-  Future<R> then<R>(
-    FutureOr<R> Function(dynamic) onValue, {
-    Function? onError,
-  }) {
-    return action().then(onValue, onError: onError);
-  }
-}
+class _User extends Mock implements fb.User {}
 
 void main() {
-  late _Client client;
+  late FakeConvexGateway convex;
   late _Auth auth;
-  late _Photos photos;
-  late SupabaseAccountDeletionService service;
+  late _Session session;
+  late _Firebase firebase;
+  late _User user;
+  late ConvexAccountDeletionService service;
 
   setUp(() {
-    client = _Client();
+    convex = FakeConvexGateway();
     auth = _Auth();
-    photos = _Photos();
-    when(() => client.auth).thenReturn(auth);
-    when(() => auth.currentUser).thenReturn(
-      User(
-        id: 'test-user',
-        appMetadata: {},
-        userMetadata: {},
-        aud: 'authenticated',
-        createdAt: '2026-09-15T00:00:00Z',
-      ),
-    );
-    service = SupabaseAccountDeletionService(
-      client: client,
-      photoService: photos,
+    session = _Session();
+    firebase = _Firebase();
+    user = _User();
+    when(
+      () => auth.currentUser,
+    ).thenReturn(const AuthUser(uid: 'profile-1', isAnonymous: true));
+    when(() => firebase.currentUser).thenReturn(user);
+    when(() => user.delete()).thenAnswer((_) async {});
+    when(() => firebase.signOut()).thenAnswer((_) async {});
+    when(() => session.detach()).thenAnswer((_) async {});
+    service = ConvexAccountDeletionService(
+      gateway: convex,
+      authService: auth,
+      session: session,
+      firebaseAuth: firebase,
     );
   });
 
-  test('waits for successful avatar removal before deleting account', () async {
-    final cleanup = Completer<ApiResult<void>>();
-    when(
-      () => photos.deleteAvatar('test-user'),
-    ).thenAnswer((_) => cleanup.future);
-    when(
-      () => client.rpc<dynamic>('delete_account'),
-    ).thenAnswer((_) => _Rpc(() async => null));
-
-    final deletion = service.deleteCurrentAccount();
-    verifyNever(() => client.rpc<dynamic>('delete_account'));
-    cleanup.complete(const Success(null));
-    expect(await deletion, isA<Success<void>>());
-    verify(() => client.rpc<dynamic>('delete_account')).called(1);
-  });
-
-  test('storage failure preserves account and allows a later retry', () async {
-    const error = ApiError(
-      code: 'delete-failed',
-      message: 'Storage unavailable',
-    );
-    when(
-      () => photos.deleteAvatar('test-user'),
-    ).thenAnswer((_) async => const Failure(error));
-    final failure = await service.deleteCurrentAccount();
-    expect(failure, isA<Failure<void>>());
-    expect((failure as Failure<void>).error, same(error));
-    verifyNever(() => client.rpc<dynamic>('delete_account'));
-
-    when(
-      () => photos.deleteAvatar('test-user'),
-    ).thenAnswer((_) async => const Success(null));
-    when(
-      () => client.rpc<dynamic>('delete_account'),
-    ).thenAnswer((_) => _Rpc(() async => null));
+  test('deletes backend data, then the Firebase user', () async {
+    convex.on('account:deleteMine', (_) => null);
     expect(await service.deleteCurrentAccount(), isA<Success<void>>());
+    expect(convex.callsTo('account:deleteMine'), hasLength(1));
+    verify(() => user.delete()).called(1);
+    verify(() => session.detach()).called(1);
   });
 
-  test('RPC failure can be retried after the avatar is already gone', () async {
-    when(
-      () => photos.deleteAvatar('test-user'),
-    ).thenAnswer((_) async => const Success(null));
-    when(() => client.rpc<dynamic>('delete_account')).thenAnswer(
-      (_) => _Rpc(
-        () async =>
-            throw const PostgrestException(message: 'Unavailable', code: '503'),
-      ),
+  test('a backend failure keeps the Firebase account for a retry', () async {
+    convex.on(
+      'account:deleteMine',
+      (_) => throw const ConvexException('Server Error', data: 'busy'),
     );
     final result = await service.deleteCurrentAccount();
-    expect((result as Failure<void>).error.code, '503');
-
-    when(
-      () => client.rpc<dynamic>('delete_account'),
-    ).thenAnswer((_) => _Rpc(() async => null));
-    expect(await service.deleteCurrentAccount(), isA<Success<void>>());
-    verify(() => photos.deleteAvatar('test-user')).called(2);
+    expect((result as Failure<void>).error.code, 'busy');
+    verifyNever(() => user.delete());
+    verifyNever(() => session.detach());
   });
 
-  test(
-    'missing session never removes files or calls the deletion RPC',
-    () async {
-      when(() => auth.currentUser).thenReturn(null);
-      final result = await service.deleteCurrentAccount();
-      expect((result as Failure<void>).error.code, 'not-authenticated');
-      verifyNever(() => photos.deleteAvatar(any()));
-      verifyNever(() => client.rpc<dynamic>('delete_account'));
-    },
-  );
+  test('an old Google session that needs re-login is signed out', () async {
+    convex.on('account:deleteMine', (_) => null);
+    when(
+      () => user.delete(),
+    ).thenThrow(fb.FirebaseAuthException(code: 'requires-recent-login'));
+    expect(await service.deleteCurrentAccount(), isA<Success<void>>());
+    verify(() => firebase.signOut()).called(1);
+    verify(() => session.detach()).called(1);
+  });
+
+  test('no session: nothing is deleted', () async {
+    when(() => auth.currentUser).thenReturn(null);
+    final result = await service.deleteCurrentAccount();
+    expect((result as Failure<void>).error.code, 'not-authenticated');
+    expect(convex.calls, isEmpty);
+  });
 }

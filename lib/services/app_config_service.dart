@@ -1,4 +1,6 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get/get.dart';
+
+import 'convex/convex_gateway.dart';
 
 /// Reads the public remote config (`app_config` row `public`): version gate,
 /// AdMob settings, clocks, points rules. Readable before sign-in.
@@ -7,19 +9,15 @@ abstract class AppConfigService {
   Future<Map<String, dynamic>> fetchPublicConfig();
 }
 
-class SupabaseAppConfigService implements AppConfigService {
-  SupabaseAppConfigService({SupabaseClient? client}) : _client = client;
+class ConvexAppConfigService implements AppConfigService {
+  ConvexAppConfigService({ConvexGateway? gateway}) : _gatewayOverride = gateway;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
   @override
   Future<Map<String, dynamic>> fetchPublicConfig() async {
-    final row = await client
-        .from('app_config')
-        .select('config')
-        .eq('id', 'public')
-        .maybeSingle();
-    return (row?['config'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final config = await _convex.query('config:getPublic');
+    return config is Map ? config.cast<String, dynamic>() : const {};
   }
 }

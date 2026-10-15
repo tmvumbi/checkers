@@ -1,59 +1,39 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get/get.dart';
 
-import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
 import '../data/models/user_profile.dart';
+import 'convex/convex_gateway.dart';
 
 abstract class ProfileService {
   Future<ApiResult<UserProfile?>> getProfile(String uid);
   Future<ApiResult<UserProfile>> upsertProfile(UserProfile profile);
 }
 
-class SupabaseProfileService implements ProfileService {
-  SupabaseProfileService({SupabaseClient? client})
-    : _client = client ?? Supabase.instance.client;
+class ConvexProfileService implements ProfileService {
+  ConvexProfileService({ConvexGateway? gateway}) : _gatewayOverride = gateway;
 
-  final SupabaseClient _client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
   @override
-  Future<ApiResult<UserProfile?>> getProfile(String uid) async {
-    try {
-      final row = await _client
-          .from('profiles')
-          .select()
-          .eq('id', uid)
-          .maybeSingle();
-      return Success(row == null ? null : UserProfile.fromJson(row));
-    } on PostgrestException catch (error) {
-      return Failure(
-        ApiError(
-          code: error.code ?? 'profile-load-failed',
-          message: error.message,
-        ),
-      );
-    } catch (error) {
-      return Failure(ApiError(code: 'unknown', message: error.toString()));
-    }
+  Future<ApiResult<UserProfile?>> getProfile(String uid) {
+    return guardConvex(() async {
+      final row = await _convex.query('profiles:get', {'uid': uid});
+      return row == null ? null : UserProfile.fromJson(asRow(row));
+    });
   }
 
+  /// Saves the caller's identity columns (nickname, photo, anonymity);
+  /// stats stay server-owned.
   @override
-  Future<ApiResult<UserProfile>> upsertProfile(UserProfile profile) async {
-    try {
-      final row = await _client
-          .from('profiles')
-          .upsert(profile.toUpsertJson())
-          .select()
-          .single();
-      return Success(UserProfile.fromJson(row));
-    } on PostgrestException catch (error) {
-      return Failure(
-        ApiError(
-          code: error.code ?? 'profile-save-failed',
-          message: error.message,
-        ),
-      );
-    } catch (error) {
-      return Failure(ApiError(code: 'unknown', message: error.toString()));
-    }
+  Future<ApiResult<UserProfile>> upsertProfile(UserProfile profile) {
+    return guardConvex(() async {
+      final row = await _convex.mutation('profiles:updateMine', {
+        'nickname': profile.nickname,
+        'photoUrl': profile.photoUrl,
+        'isAnonymous': profile.isAnonymous,
+      });
+      return UserProfile.fromJson(asRow(row));
+    });
   }
 }

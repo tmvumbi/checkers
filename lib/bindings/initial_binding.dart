@@ -32,31 +32,32 @@ class InitialBinding extends Bindings {
           : FirebaseAnalyticsService(),
       fenix: true,
     );
-    // Backend implementations: swapping the backend means swapping this
-    // block only.
-    Get.lazyPut<AuthService>(SupabaseAuthService.new, fenix: true);
-    Get.lazyPut<AppConfigService>(SupabaseAppConfigService.new, fenix: true);
-    Get.lazyPut<FeedbackService>(SupabaseFeedbackService.new, fenix: true);
-    Get.lazyPut<SocialService>(SupabaseSocialService.new, fenix: true);
-    Get.lazyPut<PresenceBackend>(SupabasePresenceBackend.new, fenix: true);
-    Get.lazyPut<BlockBackend>(SupabaseBlockBackend.new, fenix: true);
-    Get.lazyPut<CustomAdBackend>(SupabaseCustomAdBackend.new, fenix: true);
-    Get.lazyPut<PushDeviceBackend>(SupabasePushDeviceBackend.new, fenix: true);
+    // Backend implementations (Convex; the ConvexGateway and ConvexSession
+    // they use are registered in main()). Swapping the backend means
+    // swapping this block only.
+    Get.lazyPut<AuthService>(FirebaseAuthService.new, fenix: true);
+    Get.lazyPut<AppConfigService>(ConvexAppConfigService.new, fenix: true);
+    Get.lazyPut<FeedbackService>(ConvexFeedbackService.new, fenix: true);
+    Get.lazyPut<SocialService>(ConvexSocialService.new, fenix: true);
+    Get.lazyPut<PresenceBackend>(ConvexPresenceBackend.new, fenix: true);
+    Get.lazyPut<BlockBackend>(ConvexBlockBackend.new, fenix: true);
+    Get.lazyPut<CustomAdBackend>(ConvexCustomAdBackend.new, fenix: true);
+    Get.lazyPut<PushDeviceBackend>(ConvexPushDeviceBackend.new, fenix: true);
     Get.lazyPut<AccountDeletionService>(
-      SupabaseAccountDeletionService.new,
+      ConvexAccountDeletionService.new,
       fenix: true,
     );
-    Get.lazyPut<ProfileService>(SupabaseProfileService.new, fenix: true);
+    Get.lazyPut<ProfileService>(ConvexProfileService.new, fenix: true);
     Get.lazyPut<ProfilePhotoService>(
-      SupabaseProfilePhotoService.new,
+      ConvexProfilePhotoService.new,
       fenix: true,
     );
     Get.lazyPut<AiService>(PersistentIsolateAiService.new, fenix: true);
-    Get.lazyPut<OnlineGameService>(SupabaseOnlineGameService.new, fenix: true);
-    Get.lazyPut<TournamentService>(SupabaseTournamentService.new, fenix: true);
+    Get.lazyPut<OnlineGameService>(ConvexOnlineGameService.new, fenix: true);
+    Get.lazyPut<TournamentService>(ConvexTournamentService.new, fenix: true);
     Get.put<PresenceService>(PresenceService(), permanent: true);
     Get.put<PlayerMessageService>(
-      SupabasePlayerMessageService(),
+      ConvexPlayerMessageService(),
       permanent: true,
     );
     Get.put<BlockService>(BlockService(), permanent: true);

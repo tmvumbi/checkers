@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:checkers/core/config/supabase_config.dart';
 import 'package:checkers/engine/checkers_engine.dart';
 import 'package:checkers/engine/move.dart';
 import 'package:checkers/engine/rules_config.dart';
@@ -10,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
+
+import 'support/headless_player.dart';
 
 /// E2E: two headless players play a public game; the app UI spectates it
 /// live from the Watch tab and the Top 30 tab shows ranked players.
@@ -21,30 +21,20 @@ void main() {
     tester,
   ) async {
     // Two headless players.
-    Future<(SupabaseClient, String)> makePlayer(String prefix) async {
-      final client = SupabaseClient(SupabaseConfig.url, SupabaseConfig.anonKey);
-      final auth = await client.auth.signInAnonymously();
-      final uid = auth.user!.id;
-      await client.from('profiles').upsert({
-        'id': uid,
-        'nickname': '$prefix${DateTime.now().millisecondsSinceEpoch % 10000}',
-        'is_anonymous': true,
-      });
-      return (client, uid);
-    }
-
-    final (clientA, uidA) = await makePlayer('WA');
-    final (clientB, uidB) = await makePlayer('WB');
-    final joinA = await clientA.rpc<dynamic>(
-      'join_online_game',
-      params: {'p_preset': 'brazilian'},
-    ) as Map;
-    final joinB = await clientB.rpc<dynamic>(
-      'join_online_game',
-      params: {'p_preset': 'brazilian'},
-    ) as Map;
-    expect(joinA['game_id'], joinB['game_id'],
-        reason: 'headless players should match each other');
+    final clientA = await HeadlessPlayer.signUp('WA');
+    final clientB = await HeadlessPlayer.signUp('WB');
+    final uidA = clientA.uid;
+    final joinA =
+        await clientA.mutate('games:joinOnlineGame', {'preset': 'brazilian'})
+            as Map;
+    final joinB =
+        await clientB.mutate('games:joinOnlineGame', {'preset': 'brazilian'})
+            as Map;
+    expect(
+      joinA['game_id'],
+      joinB['game_id'],
+      reason: 'headless players should match each other',
+    );
     final gameId = joinA['game_id'] as String;
 
     // Headless game loop: both players alternate slow moves, ~12 plies,
@@ -56,26 +46,17 @@ void main() {
       while (!done.isCompleted && plies < 60) {
         await Future<void>.delayed(const Duration(milliseconds: 900));
         try {
-          final row = await clientA
-              .from('games')
-              .select()
-              .eq('id', gameId)
-              .single();
+          final row = await clientA.game(gameId);
           if (row['status'] != 'playing') {
             continue;
           }
           final state = (row['state'] as Map).cast<String, dynamic>();
           final side = state['side'] as String;
-          final players =
-              await clientA.from('game_players').select().eq('game_id', gameId);
+          final players = await clientA.players(gameId);
           final mover = players.firstWhere((p) => p['color'] == side);
           final moverClient = mover['uid'] == uidA ? clientA : clientB;
 
-          final moveRows = await clientA
-              .from('game_moves')
-              .select('ply, move')
-              .eq('game_id', gameId)
-              .order('ply', ascending: true);
+          final moveRows = await clientA.moves(gameId);
           engine.reset();
           for (final mr in moveRows) {
             engine.applyMove(
@@ -84,20 +65,17 @@ void main() {
           }
           plies = engine.moveHistory.length;
           if (plies >= 12) {
-            await clientA.rpc<dynamic>(
-              'resign_game',
-              params: {'p_game_id': gameId},
-            );
+            await clientA.mutate('games:resignGame', {'gameId': gameId});
             if (!done.isCompleted) {
               done.complete();
             }
             return;
           }
           final move = engine.legalMoves().first;
-          await moverClient.rpc<dynamic>('submit_move', params: {
-            'p_game_id': gameId,
-            'p_move': move.toJson(),
-            'p_expected_ply': plies,
+          await moverClient.mutate('games:submitMove', {
+            'gameId': gameId,
+            'move': move.toJson(),
+            'expectedPly': plies,
           });
         } catch (_) {}
       }
@@ -115,7 +93,10 @@ void main() {
       await _settleUntil(
         tester,
         () =>
-            find.byKey(const Key('edit-profile-nickname')).evaluate().isNotEmpty ||
+            find
+                .byKey(const Key('edit-profile-nickname'))
+                .evaluate()
+                .isNotEmpty ||
             find.byKey(const Key('home-tab-play')).evaluate().isNotEmpty,
       );
       final nick = find.byKey(const Key('edit-profile-nickname'));

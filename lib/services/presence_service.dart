@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import 'auth_service.dart';
+import 'convex/convex_gateway.dart';
 
 /// Backend half of [PresenceService].
 abstract class PresenceBackend {
@@ -12,23 +12,20 @@ abstract class PresenceBackend {
   Future<void> leave();
 }
 
-class SupabasePresenceBackend implements PresenceBackend {
-  SupabasePresenceBackend({SupabaseClient? client}) : _client = client;
+class ConvexPresenceBackend implements PresenceBackend {
+  ConvexPresenceBackend({ConvexGateway? gateway}) : _gatewayOverride = gateway;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
   @override
   Future<void> heartbeat({required String busyMode}) async {
-    await client.rpc<dynamic>(
-      'heartbeat_presence',
-      params: {'p_busy_mode': busyMode},
-    );
+    await _convex.mutation('presence:heartbeat', {'busyMode': busyMode});
   }
 
   @override
   Future<void> leave() async {
-    await client.rpc<dynamic>('leave_presence');
+    await _convex.mutation('presence:leave');
   }
 }
 

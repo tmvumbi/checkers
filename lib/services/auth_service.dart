@@ -3,14 +3,17 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/google_auth_config.dart';
 import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
+import 'convex/convex_gateway.dart';
+import 'convex/convex_session.dart';
 
 /// Authenticated user snapshot, decoupled from the backend SDK.
 class AuthUser {
@@ -43,147 +46,130 @@ abstract class AuthService {
   bool get supportsAppleSignIn;
 }
 
-class SupabaseAuthService implements AuthService {
-  SupabaseAuthService({GoTrueClient? client})
-    : _client = client ?? Supabase.instance.client.auth;
+class FirebaseAuthService implements AuthService {
+  FirebaseAuthService({
+    ConvexSession? session,
+    fb.FirebaseAuth? firebaseAuth,
+    GoogleSignIn? googleSignIn,
+  }) : _sessionOverride = session,
+       _firebaseOverride = firebaseAuth,
+       _googleOverride = googleSignIn;
 
-  final GoTrueClient _client;
+  final ConvexSession? _sessionOverride;
+  final fb.FirebaseAuth? _firebaseOverride;
+  final GoogleSignIn? _googleOverride;
+
+  ConvexSession get _session => _sessionOverride ?? Get.find<ConvexSession>();
+  fb.FirebaseAuth get _firebase =>
+      _firebaseOverride ?? fb.FirebaseAuth.instance;
+  GoogleSignIn get _google => _googleOverride ?? GoogleSignIn.instance;
 
   @override
   bool get supportsAppleSignIn =>
       !kIsWeb && (Platform.isIOS || Platform.isMacOS);
 
   @override
-  AuthUser? get currentUser => _mapUser(_client.currentUser);
+  AuthUser? get currentUser => _session.user;
 
   @override
-  Stream<AuthUser?> get userChanges =>
-      _client.onAuthStateChange.map((state) => _mapUser(state.session?.user));
+  Stream<AuthUser?> get userChanges => _session.userChanges;
 
-  AuthUser? _mapUser(User? user) {
+  Future<AuthUser> _attach(fb.UserCredential credential) async {
+    final user = credential.user;
     if (user == null) {
-      return null;
+      throw fb.FirebaseAuthException(code: 'no-user-in-response');
     }
-    return AuthUser(
-      uid: user.id,
-      isAnonymous: user.isAnonymous,
-      email: user.email,
-      displayName: user.userMetadata?['full_name'] as String?,
-    );
+    return _session.attach(user);
   }
 
   @override
   Future<ApiResult<AuthUser>> signInAnonymously() {
-    return _guard(() async {
-      final response = await _client.signInAnonymously();
-      return _requireUser(response.user);
-    });
+    return _guard(() async => _attach(await _firebase.signInAnonymously()));
   }
 
   @override
   Future<ApiResult<AuthUser>> signInWithGoogle() {
     return _guard(() async {
       final credential = await _googleCredential();
-      final response = await _client.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: credential.idToken,
-        nonce: credential.rawNonce,
-      );
-      return _requireUser(response.user);
+      return _attach(await _firebase.signInWithCredential(credential));
     });
   }
 
+  /// Upgrades a guest to Google, keeping their Firebase uid (and so their
+  /// profile). If that Google account already has a Firebase user, the
+  /// player is switched to it instead.
   @override
   Future<ApiResult<AuthUser>> linkWithGoogle() {
     return _guard(() async {
       final credential = await _googleCredential();
-      final response = await _client.updateUser(
-        UserAttributes(),
-      ).then((_) async {
-        // Supabase links an anonymous user to an identity by signing in with
-        // the id token while a session exists; GoTrue merges when the
-        // anonymous flag is set.
-        return _client.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: credential.idToken,
-          nonce: credential.rawNonce,
+      final current = _firebase.currentUser;
+      if (current == null) {
+        return _attach(await _firebase.signInWithCredential(credential));
+      }
+      try {
+        await current.linkWithCredential(credential);
+        return _session.refresh();
+      } on fb.FirebaseAuthException catch (error) {
+        if (error.code != 'credential-already-in-use') rethrow;
+        return _attach(
+          await _firebase.signInWithCredential(error.credential ?? credential),
         );
-      });
-      return _requireUser(response.user);
+      }
     });
   }
 
-  /// Signs in with Google and returns the ID token together with the raw
-  /// nonce it was minted for.
-  ///
-  /// The nonce is not optional in practice: Google's iOS SDK puts one in
-  /// the ID token whether or not we ask, and GoTrue rejects a token whose
-  /// nonce it cannot verify ("Passed nonce and nonce in id_token should
-  /// either both exist or not"). So we mint the nonce ourselves, hand
-  /// Google its SHA-256 (which is what lands in the token) and keep the
-  /// raw value for GoTrue — the same handshake the Apple flow uses.
-  Future<_GoogleCredential> _googleCredential() async {
-    final googleSignIn = GoogleSignIn.instance;
-    final rawNonce = _generateNonce();
-    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+  Future<fb.AuthCredential> _googleCredential() async {
     // Apple platforms need their own OAuth client id; Android derives it
-    // from the signing certificate instead. GoTrue accepts tokens for
-    // either audience (both ids are in GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID).
-    await googleSignIn.initialize(
+    // from the signing certificate. Firebase accepts ID tokens minted for
+    // any OAuth client of the checkers-club project.
+    await _google.initialize(
       clientId: !kIsWeb && (Platform.isIOS || Platform.isMacOS)
           ? GoogleAuthConfig.iosClientId
           : null,
       serverClientId: GoogleAuthConfig.serverClientId,
-      nonce: hashedNonce,
     );
-    final account = await googleSignIn.authenticate();
+    final account = await _google.authenticate();
     final idToken = account.authentication.idToken;
     if (idToken == null) {
-      throw const AuthException('missing-google-id-token');
+      throw fb.FirebaseAuthException(code: 'missing-google-id-token');
     }
-    return _GoogleCredential(idToken: idToken, rawNonce: rawNonce);
+    return fb.GoogleAuthProvider.credential(idToken: idToken);
   }
 
   @override
   Future<ApiResult<AuthUser>> signInWithApple() {
     return _guard(() async {
-      debugPrint('apple-sign-in: requesting native credential');
       final rawNonce = _generateNonce();
       final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
-      final credential = await SignInWithApple.getAppleIDCredential(
+      final apple = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
         nonce: hashedNonce,
       );
-      debugPrint('apple-sign-in: native credential received');
-      final idToken = credential.identityToken;
+      final idToken = apple.identityToken;
       if (idToken == null) {
-        throw const AuthException('missing-apple-identity-token');
+        throw fb.FirebaseAuthException(code: 'missing-apple-identity-token');
       }
-      debugPrint('apple-sign-in: exchanging credential with Supabase');
-      final response = await _client.signInWithIdToken(
-        provider: OAuthProvider.apple,
+      final credential = fb.OAuthProvider('apple.com').credential(
         idToken: idToken,
-        nonce: rawNonce,
+        rawNonce: rawNonce,
+        accessToken: apple.authorizationCode,
       );
-      debugPrint('apple-sign-in: Supabase exchange completed');
-      return _requireUser(response.user);
+      return _attach(await _firebase.signInWithCredential(credential));
     });
   }
 
   @override
   Future<ApiResult<void>> signOut() {
-    return _guard(() => _client.signOut());
-  }
-
-  AuthUser _requireUser(User? user) {
-    final mapped = _mapUser(user);
-    if (mapped == null) {
-      throw const AuthException('no-user-in-response');
-    }
-    return mapped;
+    return _guard(() async {
+      await _firebase.signOut();
+      try {
+        await _google.signOut();
+      } catch (_) {}
+      await _session.detach();
+    });
   }
 
   String _generateNonce([int length = 32]) {
@@ -199,10 +185,8 @@ class SupabaseAuthService implements AuthService {
   Future<ApiResult<T>> _guard<T>(Future<T> Function() action) async {
     try {
       return Success(await action());
-    } on AuthException catch (error) {
-      return Failure(
-        ApiError(code: error.code ?? 'auth-error', message: error.message),
-      );
+    } on fb.FirebaseAuthException catch (error) {
+      return Failure(ApiError(code: error.code, message: error.message ?? ''));
     } on GoogleSignInException catch (error) {
       final cancelled = error.code == GoogleSignInExceptionCode.canceled;
       return Failure(
@@ -220,14 +204,9 @@ class SupabaseAuthService implements AuthService {
         ),
       );
     } catch (error) {
-      return Failure(ApiError(code: 'unknown', message: error.toString()));
+      return Failure(
+        ApiError(code: convexErrorCode(error), message: error.toString()),
+      );
     }
   }
-}
-
-class _GoogleCredential {
-  const _GoogleCredential({required this.idToken, required this.rawNonce});
-
-  final String idToken;
-  final String rawNonce;
 }

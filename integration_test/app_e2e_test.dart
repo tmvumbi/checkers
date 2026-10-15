@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-/// End-to-end smoke test against the real Supabase backend:
+/// End-to-end smoke test against the real (Convex) backend:
 /// guest sign-in -> profile creation -> home tabs -> log out.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

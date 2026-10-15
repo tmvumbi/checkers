@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/models/block_status.dart';
+import 'convex/convex_gateway.dart';
 import 'device_identity_service.dart';
 
 /// Backend half of [BlockService].
@@ -13,22 +13,18 @@ abstract class BlockBackend {
   );
 }
 
-class SupabaseBlockBackend implements BlockBackend {
-  SupabaseBlockBackend({SupabaseClient? client}) : _client = client;
+class ConvexBlockBackend implements BlockBackend {
+  ConvexBlockBackend({ConvexGateway? gateway}) : _gatewayOverride = gateway;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
   @override
   Future<Map<String, dynamic>> syncDeviceBlocks(
     List<Map<String, String>> devices,
-  ) async {
-    final response = await client.rpc<dynamic>(
-      'sync_device_blocks',
-      params: {'p_devices': devices},
-    );
-    return (response as Map).cast<String, dynamic>();
-  }
+  ) async => asRow(
+    await _convex.mutation('blocks:syncDeviceBlocks', {'devices': devices}),
+  );
 }
 
 /// Syncs this install's device identifiers with the backend and tracks the

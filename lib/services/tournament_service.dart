@@ -1,8 +1,9 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dartvex/dartvex.dart' show ConvexException;
+import 'package:get/get.dart';
 
-import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
 import '../data/models/tournament.dart';
+import 'convex/convex_gateway.dart';
 
 abstract class TournamentService {
   Future<ApiResult<void>> joinLobby();
@@ -20,164 +21,104 @@ abstract class TournamentService {
   Stream<List<TournamentMatch>> watchMatches(String tournamentId);
 }
 
-class SupabaseTournamentService implements TournamentService {
-  SupabaseTournamentService({SupabaseClient? client}) : _client = client;
+class ConvexTournamentService implements TournamentService {
+  ConvexTournamentService({ConvexGateway? gateway})
+    : _gatewayOverride = gateway;
 
-  final SupabaseClient? _client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
-  SupabaseClient get client => _client ?? Supabase.instance.client;
-
-  Future<ApiResult<T>> _guard<T>(Future<T> Function() action) async {
-    try {
-      return Success(await action());
-    } on PostgrestException catch (error) {
-      return Failure(ApiError(code: error.message, message: error.message));
-    } catch (error) {
-      return Failure(ApiError(code: 'unknown', message: error.toString()));
-    }
-  }
+  Future<ApiResult<void>> _call(
+    String name, [
+    Map<String, dynamic> args = const {},
+  ]) => guardConvex(() async {
+    await _convex.mutation(name, args);
+  });
 
   @override
-  Future<ApiResult<void>> joinLobby() {
-    return _guard(
-      () => client.rpc<void>('join_tournament_lobby'),
-    );
-  }
+  Future<ApiResult<void>> joinLobby() => _call('tournaments:joinLobby');
 
   @override
-  Future<ApiResult<void>> touchLobby() {
-    return _guard(() => client.rpc<void>('touch_tournament_lobby'));
-  }
+  Future<ApiResult<void>> touchLobby() => _call('tournaments:touchLobby');
 
   @override
-  Future<ApiResult<void>> leaveLobby() {
-    return _guard(() => client.rpc<void>('leave_tournament_lobby'));
-  }
+  Future<ApiResult<void>> leaveLobby() => _call('tournaments:leaveLobby');
 
   @override
-  Future<ApiResult<void>> optInNotify(String fcmToken) {
-    return _guard(
-      () => client.rpc<void>(
-        'opt_in_tournament_notify',
-        params: {'p_token': fcmToken},
-      ),
-    );
-  }
+  Future<ApiResult<void>> optInNotify(String fcmToken) =>
+      _call('tournaments:optInNotify', {'token': fcmToken});
 
   @override
-  Future<ApiResult<void>> cancelNotify() {
-    return _guard(() => client.rpc<void>('cancel_tournament_notify'));
-  }
+  Future<ApiResult<void>> cancelNotify() => _call('tournaments:cancelNotify');
 
   @override
   Stream<List<TournamentLobbyPlayer>> watchLobby() {
-    return client.from('tournament_lobby').stream(primaryKey: ['uid']).map((
-      rows,
-    ) {
-      // Dedupe defensively: the stream can briefly hold the initial
-      // fetch and the realtime insert of the same row.
-      final byUid = <String, TournamentLobbyPlayer>{
-        for (final row in rows)
-          row['uid'] as String: TournamentLobbyPlayer.fromJson(row),
-      };
-      final players = byUid.values.toList()
-        ..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
+    return _convex.watch('tournaments:lobby').map((rows) {
+      final players = [
+        for (final row in asRows(rows)) TournamentLobbyPlayer.fromJson(row),
+      ]..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
       return players;
     });
   }
 
   @override
-  Future<ApiResult<MyTournamentState>> myTournamentState() {
-    return _guard(() async {
-      final response = await client.rpc<dynamic>('my_tournament_state');
-      return MyTournamentState.fromJson(
-        (response as Map).cast<String, dynamic>(),
-      );
-    });
-  }
+  Future<ApiResult<MyTournamentState>> myTournamentState() => guardConvex(
+    () async => MyTournamentState.fromJson(
+      asRow(await _convex.query('tournaments:myState')),
+    ),
+  );
 
   @override
   Future<ApiResult<List<TournamentSummary>>> fetchTournaments({
     required int offset,
     required int limit,
   }) {
-    return _guard(() async {
-      final rows = await client
-          .from('tournaments')
-          .select()
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
-      var tournaments = [
-        for (final row in rows) TournamentSummary.fromJson(row),
-      ];
-
-      // Attach winner identity for the finished ones.
-      final finished = tournaments
-          .where((t) => t.isFinished && t.winnerUid != null)
-          .toList();
-      if (finished.isNotEmpty) {
-        final winnerRows = await client
-            .from('tournament_players')
-            .select('tournament_id, uid, nickname, photo_url')
-            .inFilter('tournament_id', [
-              for (final t in finished) t.id,
-            ]);
-        final winnersByTournament = <String, Map<String, dynamic>>{
-          for (final row in winnerRows)
-            '${row['tournament_id']}:${row['uid']}': row,
-        };
-        tournaments = [
-          for (final t in tournaments)
-            () {
-              final winner = winnersByTournament['${t.id}:${t.winnerUid}'];
-              return winner == null
-                  ? t
-                  : t.withWinner(
-                      winner['nickname'] as String?,
-                      winner['photo_url'] as String?,
-                    );
-            }(),
-        ];
-      }
-      return tournaments;
+    return guardConvex(() async {
+      final rows = asRows(
+        await _convex.query('tournaments:list', {
+          'offset': offset,
+          'limit': limit,
+        }),
+      );
+      return [for (final row in rows) TournamentSummary.fromJson(row)];
     });
   }
 
   @override
   Future<ApiResult<TournamentDetail>> fetchTournamentDetail(String id) {
-    return _guard(() async {
-      final tournamentRow = await client
-          .from('tournaments')
-          .select()
-          .eq('id', id)
-          .single();
-      final playerRows = await client
-          .from('tournament_players')
-          .select()
-          .eq('tournament_id', id);
-      final matchRows = await client
-          .from('tournament_matches')
-          .select()
-          .eq('tournament_id', id)
-          .order('created_at');
+    return guardConvex(() async {
+      final response = await _convex.query('tournaments:detail', {
+        'tournamentId': id,
+      });
+      if (response == null) {
+        throw ConvexException(
+          'tournament_not_found',
+          data: 'tournament_not_found',
+        );
+      }
+      final detail = asRow(response);
       return TournamentDetail(
-        summary: TournamentSummary.fromJson(tournamentRow),
+        summary: TournamentSummary.fromJson(asRow(detail['tournament'])),
         players: [
-          for (final row in playerRows) TournamentPlayer.fromJson(row),
+          for (final row in asRows(detail['players']))
+            TournamentPlayer.fromJson(row),
         ],
-        matches: [for (final row in matchRows) TournamentMatch.fromJson(row)],
+        matches: [
+          for (final row in asRows(detail['matches']))
+            TournamentMatch.fromJson(row),
+        ],
       );
     });
   }
 
   @override
   Stream<List<TournamentMatch>> watchMatches(String tournamentId) {
-    return client
-        .from('tournament_matches')
-        .stream(primaryKey: ['id'])
-        .eq('tournament_id', tournamentId)
+    return _convex
+        .watch('tournaments:matches', {'tournamentId': tournamentId})
         .map(
-          (rows) => [for (final row in rows) TournamentMatch.fromJson(row)],
+          (rows) => [
+            for (final row in asRows(rows)) TournamentMatch.fromJson(row),
+          ],
         );
   }
 }

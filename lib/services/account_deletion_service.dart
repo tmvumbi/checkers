@@ -1,28 +1,44 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:get/get.dart';
 
 import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
-import 'profile_photo_service.dart';
+import 'auth_service.dart';
+import 'convex/convex_gateway.dart';
+import 'convex/convex_session.dart';
 
 abstract class AccountDeletionService {
   Future<ApiResult<void>> deleteCurrentAccount();
 }
 
-class SupabaseAccountDeletionService implements AccountDeletionService {
-  SupabaseAccountDeletionService({
-    SupabaseClient? client,
-    ProfilePhotoService? photoService,
-  }) : _client = client ?? Supabase.instance.client,
-       _photoService =
-           photoService ?? SupabaseProfilePhotoService(client: client);
+/// Deletes the player's backend data (`account:deleteMine`: resigns live
+/// games, anonymises history, removes the avatar and personal rows), then
+/// the Firebase user itself.
+class ConvexAccountDeletionService implements AccountDeletionService {
+  ConvexAccountDeletionService({
+    ConvexGateway? gateway,
+    AuthService? authService,
+    ConvexSession? session,
+    fb.FirebaseAuth? firebaseAuth,
+  }) : _gatewayOverride = gateway,
+       _authOverride = authService,
+       _sessionOverride = session,
+       _firebaseOverride = firebaseAuth;
 
-  final SupabaseClient _client;
-  final ProfilePhotoService _photoService;
+  final ConvexGateway? _gatewayOverride;
+  final AuthService? _authOverride;
+  final ConvexSession? _sessionOverride;
+  final fb.FirebaseAuth? _firebaseOverride;
+
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
+  AuthService get _auth => _authOverride ?? Get.find<AuthService>();
+  ConvexSession get _session => _sessionOverride ?? Get.find<ConvexSession>();
+  fb.FirebaseAuth get _firebase =>
+      _firebaseOverride ?? fb.FirebaseAuth.instance;
 
   @override
   Future<ApiResult<void>> deleteCurrentAccount() async {
-    final uid = _client.auth.currentUser?.id;
-    if (uid == null) {
+    if (_auth.currentUser == null) {
       return const Failure(
         ApiError(
           code: 'not-authenticated',
@@ -30,28 +46,20 @@ class SupabaseAccountDeletionService implements AccountDeletionService {
         ),
       );
     }
-
-    try {
-      // Storage.remove handles missing files too, so this also works for
-      // guests and retries after the file was removed but the RPC failed.
-      // Keep the session/account intact when storage cleanup fails.
-      final cleanup = await _photoService.deleteAvatar(uid);
-      if (cleanup is Failure<void>) {
-        return cleanup;
-      }
-      await _client.rpc<dynamic>('delete_account');
-      return const Success(null);
-    } on PostgrestException catch (error) {
-      return Failure(
-        ApiError(
-          code: error.code ?? 'account-delete-failed',
-          message: error.message,
-        ),
-      );
-    } catch (error) {
-      return Failure(
-        ApiError(code: 'account-delete-failed', message: error.toString()),
-      );
+    final deleted = await guardConvex(() async {
+      await _convex.mutation('account:deleteMine');
+    });
+    if (deleted is Failure<void>) {
+      return deleted;
     }
+    try {
+      await _firebase.currentUser?.delete();
+    } on fb.FirebaseAuthException {
+      // e.g. requires-recent-login for an old Google session: the game data
+      // is already gone, so just end the session.
+      await _firebase.signOut();
+    }
+    await _session.detach();
+    return const Success(null);
   }
 }

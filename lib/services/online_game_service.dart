@@ -1,13 +1,14 @@
 import 'dart:async';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dartvex/dartvex.dart' show ConvexException;
+import 'package:get/get.dart';
 
-import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
 import '../data/models/online_game.dart';
 import '../engine/checkers_engine.dart';
 import '../engine/move.dart';
 import '../engine/rules_config.dart';
+import 'convex/convex_gateway.dart';
 
 class LeaderboardPlayer {
   const LeaderboardPlayer({
@@ -208,30 +209,42 @@ abstract class OnlineGameService {
   Future<int> serverTimeOffsetMs();
 }
 
-class SupabaseOnlineGameService implements OnlineGameService {
-  SupabaseOnlineGameService({SupabaseClient? client})
-    : _client = client ?? Supabase.instance.client;
+class ConvexOnlineGameService implements OnlineGameService {
+  ConvexOnlineGameService({ConvexGateway? gateway})
+    : _gatewayOverride = gateway;
 
-  final SupabaseClient _client;
+  final ConvexGateway? _gatewayOverride;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
 
-  Future<ApiResult<T>> _guard<T>(Future<T> Function() action) async {
-    try {
-      return Success(await action());
-    } on PostgrestException catch (error) {
-      return Failure(ApiError(code: error.message, message: error.message));
-    } catch (error) {
-      return Failure(ApiError(code: 'unknown', message: error.toString()));
-    }
+  OnlineGameSnapshot _snapshot(Map<String, dynamic> row) {
+    return OnlineGameSnapshot.fromRow(
+      row,
+      players: [
+        for (final playerRow in asRows(row['game_players']))
+          OnlineGamePlayer.fromJson(playerRow),
+      ]..sort((a, b) => a.seat.compareTo(b.seat)),
+    );
   }
+
+  List<OnlineGameSnapshot> _snapshots(Object? rows) => [
+    for (final row in asRows(rows)) _snapshot(row),
+  ];
+
+  List<LeaderboardPlayer> _leaders(Object? rows) => [
+    for (final row in asRows(rows)) LeaderboardPlayer.fromJson(row),
+  ];
+
+  Future<ApiResult<void>> _call(String name, Map<String, dynamic> args) =>
+      guardConvex(() async {
+        await _convex.mutation(name, args);
+      });
 
   @override
   Future<ApiResult<({String gameId, int seat})>> joinOnlineGame(String preset) {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>(
-        'join_online_game',
-        params: {'p_preset': preset},
+    return guardConvex(() async {
+      final map = asRow(
+        await _convex.mutation('games:joinOnlineGame', {'preset': preset}),
       );
-      final map = (response as Map).cast<String, dynamic>();
       return (
         gameId: map['game_id'] as String,
         seat: (map['seat'] as num).toInt(),
@@ -239,43 +252,25 @@ class SupabaseOnlineGameService implements OnlineGameService {
     });
   }
 
-  Future<List<OnlineGamePlayer>> _players(String gameId) async {
-    final rows = await _client
-        .from('game_players')
-        .select()
-        .eq('game_id', gameId)
-        .order('seat', ascending: true);
-    return [for (final row in rows) OnlineGamePlayer.fromJson(row)];
-  }
-
   @override
   Future<ApiResult<OnlineGameSnapshot>> fetchGame(String gameId) {
-    return _guard(() async {
-      final row = await _client
-          .from('games')
-          .select()
-          .eq('id', gameId)
-          .single();
-      return OnlineGameSnapshot.fromRow(row, players: await _players(gameId));
+    return guardConvex(() async {
+      final row = await _convex.query('games:get', {'gameId': gameId});
+      if (row == null) {
+        throw ConvexException('game_not_found', data: 'game_not_found');
+      }
+      return _snapshot(asRow(row));
     });
   }
 
   @override
   Stream<OnlineGameSnapshot> watchGame(String gameId) {
-    // Player rows change rarely; refresh them on each games-row event.
-    return _client
-        .from('games')
-        .stream(primaryKey: ['id'])
-        .eq('id', gameId)
-        .asyncMap((rows) async {
-          if (rows.isEmpty) {
-            throw StateError('game_disappeared');
-          }
-          return OnlineGameSnapshot.fromRow(
-            rows.first,
-            players: await _players(gameId),
-          );
-        });
+    return _convex.watch('games:get', {'gameId': gameId}).map((row) {
+      if (row == null) {
+        throw StateError('game_disappeared');
+      }
+      return _snapshot(asRow(row));
+    });
   }
 
   @override
@@ -283,63 +278,38 @@ class SupabaseOnlineGameService implements OnlineGameService {
     String gameId,
     Move move,
     int expectedPly,
-  ) {
-    return _guard(() async {
-      await _client.rpc<dynamic>(
-        'submit_move',
-        params: {
-          'p_game_id': gameId,
-          'p_move': move.toJson(),
-          'p_expected_ply': expectedPly,
-        },
-      );
-    });
-  }
+  ) => _call('games:submitMove', {
+    'gameId': gameId,
+    'move': move.toJson(),
+    'expectedPly': expectedPly,
+  });
 
   @override
-  Future<ApiResult<void>> claimTimeout(String gameId) {
-    return _guard(
-      () =>
-          _client.rpc<dynamic>('claim_timeout', params: {'p_game_id': gameId}),
-    );
-  }
+  Future<ApiResult<void>> claimTimeout(String gameId) =>
+      _call('games:claimTimeout', {'gameId': gameId});
 
   @override
-  Future<ApiResult<void>> resignGame(String gameId) {
-    return _guard(
-      () => _client.rpc<dynamic>('resign_game', params: {'p_game_id': gameId}),
-    );
-  }
+  Future<ApiResult<void>> resignGame(String gameId) =>
+      _call('games:resignGame', {'gameId': gameId});
 
   @override
-  Future<ApiResult<void>> leaveGame(String gameId) {
-    return _guard(
-      () => _client.rpc<dynamic>('leave_game', params: {'p_game_id': gameId}),
-    );
-  }
+  Future<ApiResult<void>> leaveGame(String gameId) =>
+      _call('games:leaveGame', {'gameId': gameId});
 
   @override
-  Future<ApiResult<void>> touchConnection(String gameId, bool connected) {
-    return _guard(
-      () => _client.rpc<dynamic>(
-        'touch_game_connection',
-        params: {'p_game_id': gameId, 'p_connected': connected},
-      ),
-    );
-  }
+  Future<ApiResult<void>> touchConnection(String gameId, bool connected) =>
+      _call('games:touchConnection', {
+        'gameId': gameId,
+        'connected': connected,
+      });
 
   @override
   Future<ApiResult<List<Move>>> fetchMoves(String gameId) {
-    return _guard(() async {
-      final rows = await _client
-          .from('game_moves')
-          .select('ply, move')
-          .eq('game_id', gameId)
-          .order('ply', ascending: true);
-      return [
-        for (final row in rows)
-          Move.fromJson((row['move'] as Map).cast<String, dynamic>()),
-      ];
+    return guardConvex(() async {
+      final rows = asRows(
+        await _convex.query('games:moves', {'gameId': gameId}),
+      );
+      return [for (final row in rows) Move.fromJson(asRow(row['move']))];
     });
   }
 
@@ -348,27 +318,21 @@ class SupabaseOnlineGameService implements OnlineGameService {
     int offset = 0,
     int limit = 30,
   }) {
-    return _guard(() async {
-      // Private games are listed too (migration 0030 opened the select
-      // policy); every live game is watchable.
-      final rows = await _client
-          .from('games')
-          .select('*, game_players(*)')
-          .eq('status', 'playing')
-          .order('started_at', ascending: false)
-          .range(offset, offset + limit - 1);
-      return [for (final row in rows) _snapshotWithPlayers(row)];
-    });
+    return guardConvex(
+      () async => _snapshots(
+        await _convex.query('games:watchable', {
+          'offset': offset,
+          'limit': limit,
+        }),
+      ),
+    );
   }
 
   @override
   Future<ApiResult<ResumableGame?>> fetchMyActiveGame() {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>('my_active_game');
-      if (response == null) {
-        return null;
-      }
-      return ResumableGame.fromJson((response as Map).cast<String, dynamic>());
+    return guardConvex(() async {
+      final response = await _convex.query('games:myActiveGame');
+      return response == null ? null : ResumableGame.fromJson(asRow(response));
     });
   }
 
@@ -379,62 +343,34 @@ class SupabaseOnlineGameService implements OnlineGameService {
     int offset = 0,
     int limit = 10,
   }) {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>(
-        'list_recent_games',
-        params: {
-          'p_search': search,
-          'p_mine': mine,
-          'p_offset': offset,
-          'p_limit': limit,
-        },
-      );
-      return [
-        for (final row in response as List)
-          _snapshotWithPlayers((row as Map).cast<String, dynamic>()),
-      ];
-    });
-  }
-
-  OnlineGameSnapshot _snapshotWithPlayers(Map<String, dynamic> row) {
-    return OnlineGameSnapshot.fromRow(
-      row,
-      players: [
-        for (final playerRow in (row['game_players'] as List? ?? []))
-          OnlineGamePlayer.fromJson((playerRow as Map).cast<String, dynamic>()),
-      ]..sort((a, b) => a.seat.compareTo(b.seat)),
+    return guardConvex(
+      () async => _snapshots(
+        await _convex.query('games:recent', {
+          'search': search,
+          'mine': mine,
+          'offset': offset,
+          'limit': limit,
+        }),
+      ),
     );
   }
 
   @override
-  Future<ApiResult<List<LeaderboardPlayer>>> fetchLeaderboard() {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>('get_leaderboard');
-      return [
-        for (final row in response as List)
-          LeaderboardPlayer.fromJson((row as Map).cast<String, dynamic>()),
-      ];
-    });
-  }
+  Future<ApiResult<List<LeaderboardPlayer>>> fetchLeaderboard() => guardConvex(
+    () async => _leaders(await _convex.query('games:leaderboard')),
+  );
 
   @override
-  Future<ApiResult<List<LeaderboardPlayer>>> fetchPointsLeaderboard() {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>('get_points_leaderboard');
-      return [
-        for (final row in response as List)
-          LeaderboardPlayer.fromJson((row as Map).cast<String, dynamic>()),
-      ];
-    });
-  }
+  Future<ApiResult<List<LeaderboardPlayer>>> fetchPointsLeaderboard() =>
+      guardConvex(
+        () async => _leaders(await _convex.query('games:pointsLeaderboard')),
+      );
 
   @override
-  Future<ApiResult<PointRules>> fetchPointRules() {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>('get_point_rules');
-      return PointRules.fromJson((response as Map).cast<String, dynamic>());
-    });
-  }
+  Future<ApiResult<PointRules>> fetchPointRules() => guardConvex(
+    () async =>
+        PointRules.fromJson(asRow(await _convex.query('games:pointRules'))),
+  );
 
   @override
   Future<ApiResult<String>> startPcGame({
@@ -443,20 +379,19 @@ class SupabaseOnlineGameService implements OnlineGameService {
     required bool allowUndo,
     required String humanColor,
   }) {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>(
-        'start_pc_game',
-        params: {
-          'p_board_size': rules.boardSize,
-          'p_backward_capture': rules.backwardCapture,
-          'p_flying_king': rules.flyingKing,
-          'p_majority_capture': rules.majorityCapture,
-          'p_ai_level': aiLevel,
-          'p_allow_undo': allowUndo,
-          'p_human_color': humanColor,
-        },
+    return guardConvex(() async {
+      final response = asRow(
+        await _convex.mutation('pcGames:start', {
+          'boardSize': rules.boardSize,
+          'backwardCapture': rules.backwardCapture,
+          'flyingKing': rules.flyingKing,
+          'majorityCapture': rules.majorityCapture,
+          'aiLevel': aiLevel,
+          'allowUndo': allowUndo,
+          'humanColor': humanColor,
+        }),
       );
-      return (response as Map)['game_id'] as String;
+      return response['game_id'] as String;
     });
   }
 
@@ -465,80 +400,46 @@ class SupabaseOnlineGameService implements OnlineGameService {
     String gameId,
     Move move,
     int expectedPly,
-  ) {
-    return _guard(
-      () => _client.rpc<dynamic>(
-        'submit_pc_move',
-        params: {
-          'p_game_id': gameId,
-          'p_move': move.toJson(),
-          'p_expected_ply': expectedPly,
-        },
-      ),
-    );
-  }
+  ) => _call('pcGames:submitMove', {
+    'gameId': gameId,
+    'move': move.toJson(),
+    'expectedPly': expectedPly,
+  });
 
   @override
-  Future<ApiResult<void>> undoPcMoves(String gameId, int count) {
-    return _guard(
-      () => _client.rpc<dynamic>(
-        'undo_pc_moves',
-        params: {'p_game_id': gameId, 'p_count': count},
-      ),
-    );
-  }
+  Future<ApiResult<void>> undoPcMoves(String gameId, int count) =>
+      _call('pcGames:undoMoves', {'gameId': gameId, 'count': count});
 
   @override
-  Future<ApiResult<void>> watchHeartbeat(String gameId) {
-    return _guard(
-      () => _client.rpc<dynamic>(
-        'watch_heartbeat',
-        params: {'p_game_id': gameId},
-      ),
-    );
-  }
+  Future<ApiResult<void>> watchHeartbeat(String gameId) =>
+      _call('watch:heartbeat', {'gameId': gameId});
 
   @override
-  Future<ApiResult<void>> unwatchGame(String gameId) {
-    return _guard(
-      () => _client.rpc<dynamic>('unwatch_game', params: {'p_game_id': gameId}),
-    );
-  }
+  Future<ApiResult<void>> unwatchGame(String gameId) =>
+      _call('watch:unwatch', {'gameId': gameId});
 
   @override
-  Future<ApiResult<void>> sendEmote(String gameId, String emoji) {
-    return _guard(() async {
-      await _client.rpc<void>(
-        'send_emote',
-        params: {'p_game_id': gameId, 'p_emoji': emoji},
-      );
+  Future<ApiResult<void>> sendEmote(String gameId, String emoji) =>
+      _call('watch:sendEmote', {'gameId': gameId, 'emoji': emoji});
+
+  @override
+  Stream<List<GameEmote>> watchEmotes(String gameId) {
+    return _convex.watch('watch:emotes', {'gameId': gameId}).map((rows) {
+      final emotes = [for (final row in asRows(rows)) GameEmote.fromJson(row)];
+      emotes.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return emotes;
     });
   }
 
   @override
-  Stream<List<GameEmote>> watchEmotes(String gameId) {
-    return _client
-        .from('game_emotes')
-        .stream(primaryKey: ['id'])
-        .eq('game_id', gameId)
-        .map((rows) {
-          final emotes = [for (final row in rows) GameEmote.fromJson(row)];
-          emotes.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-          return emotes;
-        });
-  }
-
-  @override
   Stream<List<GameWatcher>> watchWatchers(String gameId) {
-    return _client
-        .from('game_watchers')
-        .stream(primaryKey: ['game_id', 'uid'])
-        .eq('game_id', gameId)
-        .map((rows) {
-          final watchers = [for (final row in rows) GameWatcher.fromJson(row)];
-          watchers.sort((a, b) => a.uid.compareTo(b.uid));
-          return watchers;
-        });
+    return _convex.watch('watch:watchers', {'gameId': gameId}).map((rows) {
+      final watchers = [
+        for (final row in asRows(rows)) GameWatcher.fromJson(row),
+      ];
+      watchers.sort((a, b) => a.uid.compareTo(b.uid));
+      return watchers;
+    });
   }
 
   @override
@@ -547,44 +448,34 @@ class SupabaseOnlineGameService implements OnlineGameService {
     required int offset,
     required int limit,
   }) {
-    return _guard(() async {
-      final rows = await _client
-          .from('game_watchers')
-          .select()
-          .eq('game_id', gameId)
-          .order('joined_at', ascending: true)
-          .range(offset, offset + limit - 1);
+    return guardConvex(() async {
+      final rows = asRows(
+        await _convex.query('watch:watchers', {
+          'gameId': gameId,
+          'offset': offset,
+          'limit': limit,
+        }),
+      );
       return [for (final row in rows) GameWatcher.fromJson(row)];
     });
   }
 
   @override
-  Future<ApiResult<void>> offerDraw(String gameId) {
-    return _guard(
-      () => _client.rpc<dynamic>('offer_draw', params: {'p_game_id': gameId}),
-    );
-  }
+  Future<ApiResult<void>> offerDraw(String gameId) =>
+      _call('games:offerDraw', {'gameId': gameId});
 
   @override
-  Future<ApiResult<void>> respondDraw(String gameId, bool accept) {
-    return _guard(
-      () => _client.rpc<dynamic>(
-        'respond_draw',
-        params: {'p_game_id': gameId, 'p_accept': accept},
-      ),
-    );
-  }
+  Future<ApiResult<void>> respondDraw(String gameId, bool accept) =>
+      _call('games:respondDraw', {'gameId': gameId, 'accept': accept});
 
   @override
   Future<ApiResult<({String status, String? gameId})>> requestRematch(
     String gameId,
   ) {
-    return _guard(() async {
-      final response = await _client.rpc<dynamic>(
-        'request_rematch',
-        params: {'p_game_id': gameId},
+    return guardConvex(() async {
+      final map = asRow(
+        await _convex.mutation('games:requestRematch', {'gameId': gameId}),
       );
-      final map = (response as Map).cast<String, dynamic>();
       return (
         status: map['status'] as String,
         gameId: map['game_id'] as String?,
@@ -596,7 +487,7 @@ class SupabaseOnlineGameService implements OnlineGameService {
   Future<int> serverTimeOffsetMs() async {
     try {
       final before = DateTime.now();
-      final response = await _client.rpc<dynamic>('server_time');
+      final response = await _convex.mutation('games:serverTime');
       final after = DateTime.now();
       final serverNow = DateTime.parse(response as String);
       final midpoint = before.add(after.difference(before) ~/ 2);

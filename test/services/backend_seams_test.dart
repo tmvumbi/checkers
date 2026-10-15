@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 // The services below talk to the backend only through small interfaces, so
-// any backend (Supabase today, Convex next) plugs in via InitialBinding.
+// any backend implementation plugs in via InitialBinding.
 
 class _Auth extends Mock implements AuthService {}
 

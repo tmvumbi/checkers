@@ -1,14 +1,16 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/network/api_error.dart';
 import '../core/network/api_result.dart';
+import 'convex/convex_gateway.dart';
 
 /// Avatar handling (kopo flow minus the cropper): pick from the gallery,
-/// compress to a small JPEG, store at `avatars/{uid}/avatar.jpg`.
+/// compress to a small JPEG, store it as the player's avatar.
 abstract class ProfilePhotoService {
   /// Returns a local file path, or null when the user cancelled the picker.
   Future<ApiResult<String?>> pickImage();
@@ -19,15 +21,22 @@ abstract class ProfilePhotoService {
   Future<ApiResult<void>> deleteAvatar(String uid);
 }
 
-class SupabaseProfilePhotoService implements ProfilePhotoService {
-  SupabaseProfilePhotoService({SupabaseClient? client, ImagePicker? picker})
-    : _client = client,
-      _picker = picker;
+/// Uploads with a Convex storage upload URL; the backend keeps one avatar
+/// file per profile and deletes the previous one.
+class ConvexProfilePhotoService implements ProfilePhotoService {
+  ConvexProfilePhotoService({
+    ConvexGateway? gateway,
+    ImagePicker? picker,
+    Future<String> Function(Uri uploadUrl, List<int> bytes)? postFile,
+  }) : _gatewayOverride = gateway,
+       _picker = picker,
+       _postFile = postFile ?? _postWithHttpClient;
 
-  final SupabaseClient? _client;
+  final ConvexGateway? _gatewayOverride;
   final ImagePicker? _picker;
+  final Future<String> Function(Uri uploadUrl, List<int> bytes) _postFile;
 
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
   ImagePicker get picker => _picker ?? ImagePicker();
 
   @override
@@ -45,8 +54,8 @@ class SupabaseProfilePhotoService implements ProfilePhotoService {
   }
 
   @override
-  Future<ApiResult<String>> uploadAvatar(String uid, String localPath) async {
-    try {
+  Future<ApiResult<String>> uploadAvatar(String uid, String localPath) {
+    return guardConvex(() async {
       final compressed = await FlutterImageCompress.compressWithFile(
         localPath,
         minWidth: 512,
@@ -55,34 +64,38 @@ class SupabaseProfilePhotoService implements ProfilePhotoService {
         format: CompressFormat.jpeg,
       );
       final bytes = compressed ?? await File(localPath).readAsBytes();
-      final path = '$uid/avatar.jpg';
-      await client.storage.from('avatars').uploadBinary(
-            path,
-            bytes,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
-              upsert: true,
-            ),
-          );
-      final url = client.storage.from('avatars').getPublicUrl(path);
-      // The path is fixed, so bust image caches per upload.
-      return Success('$url?v=${DateTime.now().millisecondsSinceEpoch}');
-    } catch (error) {
-      return Failure(
-        ApiError(code: 'upload-failed', message: error.toString()),
-      );
-    }
+      final uploadUrl =
+          await _convex.mutation('profiles:generateAvatarUploadUrl') as String;
+      final storageId = await _postFile(Uri.parse(uploadUrl), bytes);
+      final url = await _convex.mutation('profiles:setAvatar', {
+        'storageId': storageId,
+      });
+      if (url is! String) {
+        throw StateError('upload-failed');
+      }
+      return url;
+    });
   }
 
   @override
-  Future<ApiResult<void>> deleteAvatar(String uid) async {
+  Future<ApiResult<void>> deleteAvatar(String uid) => guardConvex(() async {
+    await _convex.mutation('profiles:removeAvatar');
+  });
+
+  static Future<String> _postWithHttpClient(Uri url, List<int> bytes) async {
+    final client = HttpClient();
     try {
-      await client.storage.from('avatars').remove(['$uid/avatar.jpg']);
-      return const Success(null);
-    } catch (error) {
-      return Failure(
-        ApiError(code: 'delete-failed', message: error.toString()),
-      );
+      final request = await client.postUrl(url);
+      request.headers.contentType = ContentType('image', 'jpeg');
+      request.add(bytes);
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode != 200) {
+        throw HttpException('upload failed (${response.statusCode}): $body');
+      }
+      return (jsonDecode(body) as Map)['storageId'] as String;
+    } finally {
+      client.close();
     }
   }
 }
