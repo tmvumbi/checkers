@@ -17,7 +17,11 @@ class ConvexAppConfigService implements AppConfigService {
 
   @override
   Future<Map<String, dynamic>> fetchPublicConfig() async {
-    final config = await _convex.query('config:getPublic');
+    // Read at start-up before anything else: never hold the landing
+    // screen hostage to a slow network (callers fail open).
+    final config = await _convex
+        .query('config:getPublic')
+        .timeout(const Duration(seconds: 5));
     return config is Map ? config.cast<String, dynamic>() : const {};
   }
 }

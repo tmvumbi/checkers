@@ -32,7 +32,18 @@ Future<void> main() async {
   final savedLocale = await LocalePreference.load();
   await _initLegacySupabaseForHandoff();
 
-  final gateway = DartvexGateway(ConvexClient(ConvexConfig.url));
+  final gateway = DartvexGateway(
+    ConvexClient(
+      ConvexConfig.url,
+      // Fail calls instead of waiting forever while offline; mutations
+      // are idempotent server-side (expected ply, upserts) if replayed.
+      config: const ConvexClientConfig(
+        queryTimeout: Duration(seconds: 15),
+        mutationTimeout: Duration(seconds: 20),
+        actionTimeout: Duration(seconds: 30),
+      ),
+    ),
+  );
   final session = ConvexSession(gateway: gateway);
   Get.put<ConvexGateway>(gateway, permanent: true);
   Get.put<ConvexSession>(session, permanent: true);
