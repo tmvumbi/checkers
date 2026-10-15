@@ -26,6 +26,19 @@ const deviceKind = v.union(
 );
 
 export default defineSchema({
+  // Supabase export rows awaiting transformation (`npx convex import
+  // --table migrationStaging`), consumed by migration.ts. Empty in normal
+  // operation.
+  migrationStaging: defineTable({
+    table: v.string(),
+    row: v.any(),
+  }).index("by_table", ["table"]),
+  migrationLog: defineTable({
+    step: v.string(),
+    detail: v.any(),
+    at: v.number(),
+  }),
+
   profiles: defineTable({
     tokenIdentifier: v.optional(v.string()),
     nickname: v.string(),
@@ -219,7 +232,10 @@ export default defineSchema({
     expiresAt: v.optional(v.number()),
     createdAt: v.number(),
     revokedAt: v.optional(v.number()),
-  }).index("by_uid", ["uid"]),
+    legacyId: v.optional(v.string()),
+  })
+    .index("by_uid", ["uid"])
+    .index("by_legacy_id", ["legacyId"]),
 
   playerDevices: defineTable({
     uid: v.id("profiles"),

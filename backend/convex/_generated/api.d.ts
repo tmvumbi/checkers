@@ -28,6 +28,7 @@ import type * as lib_serialize from "../lib/serialize.js";
 import type * as lib_time from "../lib/time.js";
 import type * as lib_tournaments from "../lib/tournaments.js";
 import type * as messages from "../messages.js";
+import type * as migration from "../migration.js";
 import type * as pcGames from "../pcGames.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   "lib/time": typeof lib_time;
   "lib/tournaments": typeof lib_tournaments;
   messages: typeof messages;
+  migration: typeof migration;
   pcGames: typeof pcGames;
   presence: typeof presence;
   profiles: typeof profiles;

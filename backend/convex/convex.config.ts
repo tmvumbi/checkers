@@ -17,6 +17,8 @@ const app = defineApp({
     // Legacy Supabase GoTrue, used only to verify account-claim handoffs.
     SUPABASE_LEGACY_URL: v.optional(v.string()),
     SUPABASE_LEGACY_ANON_KEY: v.optional(v.string()),
+    // "yes" lets migration:wipe empty the deployment (rehearsals only).
+    MIGRATION_ALLOW_WIPE: v.optional(v.string()),
   },
 });
 

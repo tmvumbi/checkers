@@ -32,6 +32,7 @@ type Env = {
   readonly CONVEX_SITE_URL: string;
   readonly ADMIN_API_SECRET: string | undefined;
   readonly FEEDBACK_EMAIL_TO: string | undefined;
+  readonly MIGRATION_ALLOW_WIPE: string | undefined;
   readonly PUSH_RELAY_KEY: string | undefined;
   readonly PUSH_RELAY_URL: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
