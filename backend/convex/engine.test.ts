@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { CheckersEngineJS as Engine, checkersEngine } from "../convex/lib/engine.js";
+import vectorFile from "../../supabase/engine/test_vectors.json";
+import { CheckersEngineJS as Engine, checkersEngine } from "./lib/engine.js";
 
 // Same Dart-generated vectors as supabase/engine/engine_test.ts (Deno), run
 // against the generated Convex module to prove the copy is faithful.
@@ -20,9 +20,7 @@ type Vector = {
   result?: string;
 };
 
-const vectors: Vector[] = JSON.parse(
-  readFileSync(new URL("../../supabase/engine/test_vectors.json", import.meta.url), "utf8"),
-).vectors;
+const vectors = vectorFile.vectors as Vector[];
 
 describe("convex engine module", () => {
   test("matches Dart legal-move sets on every vector", () => {
