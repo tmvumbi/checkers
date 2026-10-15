@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/models/ad_config.dart';
+import 'app_config_service.dart';
 import 'tracking_consent_service.dart';
 
 /// Google AdMob integration (kopo parity, minus subscriptions): adaptive
@@ -68,7 +68,7 @@ class GoogleAdService extends AdService {
            loadPrivacyOptionsRequirement ?? _isPrivacyOptionsRequiredNow,
        _presentPrivacyOptions =
            presentPrivacyOptions ?? _showPrivacyOptionsForm,
-       _loadAdConfig = loadAdConfig ?? _loadSupabaseAdConfig,
+       _loadAdConfig = loadAdConfig ?? _loadRemoteAdConfig,
        _loadInterstitialAd = loadInterstitialAd ?? _loadGoogleInterstitialAd,
        _loadPreferences = loadPreferences ?? SharedPreferences.getInstance,
        _disableAdsForLocalTesting = disableAdsForLocalTesting,
@@ -330,14 +330,9 @@ class GoogleAdService extends AdService {
     await MobileAds.instance.initialize();
   }
 
-  static Future<AppAdConfig> _loadSupabaseAdConfig() async {
-    final row = await Supabase.instance.client
-        .from('app_config')
-        .select('config')
-        .eq('id', 'public')
-        .maybeSingle();
-    final config = (row?['config'] as Map?)?.cast<String, dynamic>();
-    return AppAdConfig.fromJson(config?['ads']);
+  static Future<AppAdConfig> _loadRemoteAdConfig() async {
+    final config = await Get.find<AppConfigService>().fetchPublicConfig();
+    return AppAdConfig.fromJson(config['ads']);
   }
 
   static Future<bool> _gatherUserConsent() async {

@@ -1,10 +1,41 @@
 import 'dart:async';
 
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../engine/checkers_engine.dart' show PieceColor;
+import 'auth_service.dart';
+
+/// Backend half of [CustomAdService].
+abstract class CustomAdBackend {
+  /// The campaign to show now (`{id, banner_url, target_url, pieces}`), or
+  /// null when none is live.
+  Future<Map<String, dynamic>?> getActiveAd();
+  Future<void> recordPrint(String campaignId);
+  Future<void> recordClick(String campaignId);
+}
+
+class SupabaseCustomAdBackend implements CustomAdBackend {
+  SupabaseCustomAdBackend({SupabaseClient? client}) : _client = client;
+
+  final SupabaseClient? _client;
+  SupabaseClient get client => _client ?? Supabase.instance.client;
+
+  @override
+  Future<Map<String, dynamic>?> getActiveAd() async {
+    final response = await client.rpc<dynamic>('get_active_ad');
+    return response == null ? null : (response as Map).cast<String, dynamic>();
+  }
+
+  @override
+  Future<void> recordPrint(String campaignId) =>
+      client.rpc<void>('record_ad_print', params: {'p_campaign': campaignId});
+
+  @override
+  Future<void> recordClick(String campaignId) =>
+      client.rpc<void>('record_ad_click', params: {'p_campaign': campaignId});
+}
 
 /// A backend-managed advertisement campaign: banner + target URL, and
 /// optionally sponsored piece skins.
@@ -41,21 +72,25 @@ class CustomAd {
 /// banner slot shows it instead of AdMob (interstitials stay AdMob), and
 /// board pieces optionally wear the campaign's skins.
 class CustomAdService extends GetxService {
-  CustomAdService({SupabaseClient? client}) : _client = client;
+  CustomAdService({CustomAdBackend? backend, AuthService? authService})
+    : _backendOverride = backend,
+      _authServiceOverride = authService;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final CustomAdBackend? _backendOverride;
+  final AuthService? _authServiceOverride;
+  CustomAdBackend get _backend => _backendOverride ?? Get.find();
+  AuthService get _auth => _authServiceOverride ?? Get.find();
 
   final Rxn<CustomAd> activeAd = Rxn<CustomAd>();
   Timer? _refreshTimer;
-  StreamSubscription<AuthState>? _authSubscription;
+  StreamSubscription<AuthUser?>? _authSubscription;
 
   @override
   void onInit() {
     super.onInit();
     // The RPCs need an authenticated session; refetch on login too.
-    _authSubscription = client.auth.onAuthStateChange.listen((state) {
-      if (state.session != null) {
+    _authSubscription = _auth.userChanges.listen((user) {
+      if (user != null) {
         refresh();
       }
     });
@@ -67,14 +102,12 @@ class CustomAdService extends GetxService {
   }
 
   Future<void> refresh() async {
-    if (client.auth.currentSession == null) {
+    if (_auth.currentUser == null) {
       return;
     }
     try {
-      final response = await client.rpc<dynamic>('get_active_ad');
-      activeAd.value = response == null
-          ? null
-          : CustomAd.fromJson((response as Map).cast<String, dynamic>());
+      final response = await _backend.getActiveAd();
+      activeAd.value = response == null ? null : CustomAd.fromJson(response);
     } catch (_) {
       // Keep the last known ad on transient errors.
     }
@@ -93,19 +126,11 @@ class CustomAdService extends GetxService {
   }
 
   void recordPrint(String campaignId) {
-    unawaited(
-      client
-          .rpc<void>('record_ad_print', params: {'p_campaign': campaignId})
-          .catchError((_) {}),
-    );
+    unawaited(_backend.recordPrint(campaignId).catchError((_) {}));
   }
 
   Future<void> openAd(CustomAd ad) async {
-    unawaited(
-      client
-          .rpc<void>('record_ad_click', params: {'p_campaign': ad.id})
-          .catchError((_) {}),
-    );
+    unawaited(_backend.recordClick(ad.id).catchError((_) {}));
     final uri = Uri.tryParse(ad.targetUrl);
     if (uri != null) {
       try {

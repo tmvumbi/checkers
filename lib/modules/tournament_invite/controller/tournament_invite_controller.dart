@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/app_strings.dart';
+import '../../../services/social_service.dart';
 import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../translations/translation_keys.dart';
 import '../../invite_players/controller/invite_players_controller.dart'
@@ -14,10 +14,11 @@ import '../../invite_players/controller/invite_players_controller.dart'
 /// connected players (server-side filtered: not busy, not already in the
 /// lobby, not inside the 30-minute invite cooldown).
 class TournamentInviteController extends GetxController {
-  TournamentInviteController({SupabaseClient? client}) : _client = client;
+  TournamentInviteController({SocialService? socialService})
+    : _socialServiceOverride = socialService;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final SocialService? _socialServiceOverride;
+  SocialService get _social => _socialServiceOverride ?? Get.find();
 
   static const int pageSize = 20;
   final RxList<AvailablePlayer> players = <AvailablePlayer>[].obs;
@@ -35,10 +36,7 @@ class TournamentInviteController extends GetxController {
   void onReady() {
     super.onReady();
     _load();
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _load(),
-    );
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
     _searchWorker = debounce<String>(search, (_) {
       _limit = pageSize;
       _load();
@@ -49,15 +47,11 @@ class TournamentInviteController extends GetxController {
     try {
       final query = search.value.trim();
       // One extra row reveals whether a further page exists.
-      final response = await client.rpc<dynamic>(
-        'list_tournament_invitable_players',
-        params: {
-          'p_search': query.isEmpty ? null : query,
-          'p_offset': 0,
-          'p_limit': _limit + 1,
-        },
+      final rows = await _social.listTournamentInvitablePlayers(
+        search: query.isEmpty ? null : query,
+        offset: 0,
+        limit: _limit + 1,
       );
-      final rows = (response as List).cast<Map<String, dynamic>>();
       hasMore.value = rows.length > _limit;
       players.value = [
         for (final row in rows.take(_limit))
@@ -93,10 +87,7 @@ class TournamentInviteController extends GetxController {
     }
     sending.value = true;
     try {
-      final response = await client.rpc<dynamic>(
-        'invite_to_tournament',
-        params: {'p_invitees': selected.toList()},
-      ) as Map;
+      final response = await _social.inviteToTournament(selected.toList());
       final sent = (response['sent'] as num?)?.toInt() ?? 0;
       showCheckersSnackbar(
         TranslationKeys.tournamentInvitesSent.trParams({'count': '$sent'}),

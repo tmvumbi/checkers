@@ -4,13 +4,39 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../routes/app_routes.dart';
 import '../shared/widgets/checkers_gradient_button.dart';
 import '../shared/widgets/checkers_modal.dart';
 import '../themes/app_theme.dart';
 import '../translations/translation_keys.dart';
+import 'auth_service.dart';
+
+/// Backend half of [PushNotificationService].
+abstract class PushDeviceBackend {
+  /// Upserts this device's FCM [token] for the signed-in player.
+  Future<void> registerDevice({
+    required String token,
+    required String platform,
+  });
+}
+
+class SupabasePushDeviceBackend implements PushDeviceBackend {
+  SupabasePushDeviceBackend({SupabaseClient? client}) : _client = client;
+
+  final SupabaseClient? _client;
+  SupabaseClient get client => _client ?? Supabase.instance.client;
+
+  @override
+  Future<void> registerDevice({
+    required String token,
+    required String platform,
+  }) => client.rpc<void>(
+    'register_push_device',
+    params: {'p_token': token, 'p_platform': platform},
+  );
+}
 
 /// FCM plumbing for tournament reminders and administrator broadcasts.
 ///
@@ -19,17 +45,26 @@ import '../translations/translation_keys.dart';
 /// - App backgrounded/closed: the system notification is shown by the
 ///   OS; tapping it routes straight into the tournament lobby.
 class PushNotificationService extends GetxService with WidgetsBindingObserver {
-  PushNotificationService({FirebaseMessaging? messaging})
-    : _messagingOverride = messaging;
+  PushNotificationService({
+    FirebaseMessaging? messaging,
+    PushDeviceBackend? backend,
+    AuthService? authService,
+  }) : _messagingOverride = messaging,
+       _backendOverride = backend,
+       _authServiceOverride = authService;
 
   final FirebaseMessaging? _messagingOverride;
+  final PushDeviceBackend? _backendOverride;
+  final AuthService? _authServiceOverride;
   FirebaseMessaging get _messaging =>
       _messagingOverride ?? FirebaseMessaging.instance;
+  PushDeviceBackend get _backend => _backendOverride ?? Get.find();
+  AuthService get _auth => _authServiceOverride ?? Get.find();
 
   StreamSubscription<RemoteMessage>? _onMessageSubscription;
   StreamSubscription<RemoteMessage>? _onOpenedSubscription;
   StreamSubscription<String>? _tokenRefreshSubscription;
-  StreamSubscription<AuthState>? _authSubscription;
+  StreamSubscription<AuthUser?>? _authSubscription;
   bool _dialogOpen = false;
 
   @override
@@ -53,12 +88,11 @@ class PushNotificationService extends GetxService with WidgetsBindingObserver {
         (token) => unawaited(_registerToken(token)),
         onError: (Object _) {},
       );
-      _authSubscription = Supabase.instance.client.auth.onAuthStateChange
-          .listen((state) {
-            if (state.session != null) {
-              unawaited(syncRegistration());
-            }
-          }, onError: (Object _) {});
+      _authSubscription = _auth.userChanges.listen((user) {
+        if (user != null) {
+          unawaited(syncRegistration());
+        }
+      }, onError: (Object _) {});
       final initial = await _messaging.getInitialMessage();
       if (initial != null) {
         _onOpenedFromNotification(initial);
@@ -107,7 +141,7 @@ class PushNotificationService extends GetxService with WidgetsBindingObserver {
       status == AuthorizationStatus.provisional;
 
   Future<void> _registerToken(String token) async {
-    if (kIsWeb || Supabase.instance.client.auth.currentUser == null) {
+    if (kIsWeb || _auth.currentUser == null) {
       return;
     }
     final platform = switch (defaultTargetPlatform) {
@@ -119,10 +153,7 @@ class PushNotificationService extends GetxService with WidgetsBindingObserver {
       return;
     }
     try {
-      await Supabase.instance.client.rpc<void>(
-        'register_push_device',
-        params: {'p_token': token, 'p_platform': platform},
-      );
+      await _backend.registerDevice(token: token, platform: platform);
     } catch (_) {
       // Registration is best-effort; gameplay must never depend on push.
     }

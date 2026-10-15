@@ -4,11 +4,13 @@ import 'package:get/get.dart';
 import '../services/ad_service.dart';
 import '../services/account_deletion_service.dart';
 import '../services/analytics_service.dart';
+import '../services/app_config_service.dart';
 import '../services/app_rating_service.dart';
 import '../services/auth_service.dart';
 import '../services/block_service.dart';
 import '../services/checkers_ai_service.dart';
 import '../services/custom_ad_service.dart';
+import '../services/feedback_service.dart';
 import '../services/invite_listener_service.dart';
 import '../services/online_game_service.dart';
 import '../services/party_link_service.dart';
@@ -17,6 +19,7 @@ import '../services/presence_service.dart';
 import '../services/profile_photo_service.dart';
 import '../services/profile_service.dart';
 import '../services/push_notification_service.dart';
+import '../services/social_service.dart';
 import '../services/tournament_service.dart';
 import '../services/tracking_consent_service.dart';
 
@@ -29,7 +32,16 @@ class InitialBinding extends Bindings {
           : FirebaseAnalyticsService(),
       fenix: true,
     );
+    // Backend implementations: swapping the backend means swapping this
+    // block only.
     Get.lazyPut<AuthService>(SupabaseAuthService.new, fenix: true);
+    Get.lazyPut<AppConfigService>(SupabaseAppConfigService.new, fenix: true);
+    Get.lazyPut<FeedbackService>(SupabaseFeedbackService.new, fenix: true);
+    Get.lazyPut<SocialService>(SupabaseSocialService.new, fenix: true);
+    Get.lazyPut<PresenceBackend>(SupabasePresenceBackend.new, fenix: true);
+    Get.lazyPut<BlockBackend>(SupabaseBlockBackend.new, fenix: true);
+    Get.lazyPut<CustomAdBackend>(SupabaseCustomAdBackend.new, fenix: true);
+    Get.lazyPut<PushDeviceBackend>(SupabasePushDeviceBackend.new, fenix: true);
     Get.lazyPut<AccountDeletionService>(
       SupabaseAccountDeletionService.new,
       fenix: true,

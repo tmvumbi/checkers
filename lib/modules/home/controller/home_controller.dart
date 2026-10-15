@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/constants/app_locales.dart';
 import '../../../core/locale_preference.dart';
@@ -18,6 +17,7 @@ import '../../../core/network/api_result.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/app_rating_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/feedback_service.dart';
 import '../../../services/online_game_service.dart';
 import '../../../services/party_link_service.dart';
 import '../../../services/player_message_service.dart';
@@ -489,10 +489,7 @@ class HomeController extends GetxController {
     }
     await _analyticsService.logEvent('feedback_submit_attempt');
     try {
-      await Supabase.instance.client.from('feedback').insert({
-        'uid': uid,
-        'text': trimmed,
-      });
+      await Get.find<FeedbackService>().submit(uid: uid, text: trimmed);
       return true;
     } catch (_) {
       return false;

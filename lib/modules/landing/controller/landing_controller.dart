@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/constants/app_locales.dart';
 import '../../../core/constants/app_strings.dart';
@@ -13,6 +12,7 @@ import '../../../core/network/api_result.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/models/block_status.dart';
 import '../../../services/analytics_service.dart';
+import '../../../services/app_config_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/block_service.dart';
 import '../../../services/profile_service.dart';
@@ -88,13 +88,7 @@ class LandingController extends GetxController {
 
   Future<UpdateGate> _evaluateUpdateGate() async {
     try {
-      final row = await Supabase.instance.client
-          .from('app_config')
-          .select('config')
-          .eq('id', 'public')
-          .maybeSingle();
-      final config =
-          (row?['config'] as Map?)?.cast<String, dynamic>() ?? const {};
+      final config = await Get.find<AppConfigService>().fetchPublicConfig();
       return UpdateGate.evaluate(
         config,
         isIOS: !kIsWeb && Platform.isIOS,

@@ -2,7 +2,35 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
+
+import 'auth_service.dart';
+
+/// Backend half of [PresenceService].
+abstract class PresenceBackend {
+  Future<void> heartbeat({required String busyMode});
+  Future<void> leave();
+}
+
+class SupabasePresenceBackend implements PresenceBackend {
+  SupabasePresenceBackend({SupabaseClient? client}) : _client = client;
+
+  final SupabaseClient? _client;
+  SupabaseClient get client => _client ?? Supabase.instance.client;
+
+  @override
+  Future<void> heartbeat({required String busyMode}) async {
+    await client.rpc<dynamic>(
+      'heartbeat_presence',
+      params: {'p_busy_mode': busyMode},
+    );
+  }
+
+  @override
+  Future<void> leave() async {
+    await client.rpc<dynamic>('leave_presence');
+  }
+}
 
 /// Keeps this player's row in `player_presence` fresh while signed in —
 /// powers the invite-a-friend directory (kopo's availablePlayers).
@@ -11,28 +39,32 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// removes the presence row right away (otherwise timers keep firing in
 /// the background and the player looks online forever).
 class PresenceService extends GetxService with WidgetsBindingObserver {
-  PresenceService({SupabaseClient? client}) : _client = client;
+  PresenceService({PresenceBackend? backend, AuthService? authService})
+    : _backendOverride = backend,
+      _authServiceOverride = authService;
 
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final PresenceBackend? _backendOverride;
+  final AuthService? _authServiceOverride;
+  PresenceBackend get _backend => _backendOverride ?? Get.find();
+  AuthService get _auth => _authServiceOverride ?? Get.find();
 
   Timer? _timer;
   String _busyMode = 'idle';
   bool _foreground = true;
-  StreamSubscription<AuthState>? _authSubscription;
+  StreamSubscription<AuthUser?>? _authSubscription;
 
   @override
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
-    _authSubscription = client.auth.onAuthStateChange.listen((state) {
-      if (state.session != null) {
+    _authSubscription = _auth.userChanges.listen((user) {
+      if (user != null) {
         start();
       } else {
         stop();
       }
     });
-    if (client.auth.currentSession != null) {
+    if (_auth.currentUser != null) {
       start();
     }
   }
@@ -42,7 +74,7 @@ class PresenceService extends GetxService with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.resumed:
         _foreground = true;
-        if (client.auth.currentSession != null) {
+        if (_auth.currentUser != null) {
           start();
         }
       case AppLifecycleState.paused:
@@ -79,21 +111,18 @@ class PresenceService extends GetxService with WidgetsBindingObserver {
 
   Future<void> _beat() async {
     try {
-      await client.rpc<dynamic>(
-        'heartbeat_presence',
-        params: {'p_busy_mode': _busyMode},
-      );
+      await _backend.heartbeat(busyMode: _busyMode);
     } catch (_) {
       // Presence is best-effort.
     }
   }
 
   Future<void> _leave() async {
-    if (client.auth.currentSession == null) {
+    if (_auth.currentUser == null) {
       return;
     }
     try {
-      await client.rpc<dynamic>('leave_presence');
+      await _backend.leave();
     } catch (_) {
       // The 3-minute server sweep covers missed goodbyes.
     }

@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/social_service.dart';
 import '../../../shared/widgets/checkers_snackbar.dart';
 import '../../../translations/translation_keys.dart';
 import '../../online_lobby/controller/online_lobby_controller.dart';
@@ -33,16 +33,16 @@ class AvailablePlayer {
 class InvitePlayersController extends GetxController {
   InvitePlayersController({
     InvitePlayersArguments? arguments,
-    SupabaseClient? client,
+    SocialService? socialService,
   }) : args =
            arguments ??
            (Get.arguments as InvitePlayersArguments? ??
                const InvitePlayersArguments(preset: 'international')),
-       _client = client;
+       _socialServiceOverride = socialService;
 
   final InvitePlayersArguments args;
-  final SupabaseClient? _client;
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  final SocialService? _socialServiceOverride;
+  SocialService get _social => _socialServiceOverride ?? Get.find();
 
   static const int pageSize = 20;
   final RxList<AvailablePlayer> players = <AvailablePlayer>[].obs;
@@ -59,10 +59,7 @@ class InvitePlayersController extends GetxController {
   void onReady() {
     super.onReady();
     _load();
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _load(),
-    );
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
     _searchWorker = debounce<String>(search, (_) {
       _limit = pageSize;
       _load();
@@ -73,15 +70,11 @@ class InvitePlayersController extends GetxController {
     try {
       final query = search.value.trim();
       // One extra row reveals whether a further page exists.
-      final response = await client.rpc<dynamic>(
-        'list_available_players',
-        params: {
-          'p_search': query.isEmpty ? null : query,
-          'p_offset': 0,
-          'p_limit': _limit + 1,
-        },
+      final rows = await _social.listAvailablePlayers(
+        search: query.isEmpty ? null : query,
+        offset: 0,
+        limit: _limit + 1,
       );
-      final rows = (response as List).cast<Map<String, dynamic>>();
       hasMore.value = rows.length > _limit;
       players.value = [
         for (final row in rows.take(_limit))
@@ -110,10 +103,10 @@ class InvitePlayersController extends GetxController {
     }
     invitingUid.value = player.uid;
     try {
-      final response = await client.rpc<dynamic>(
-        'create_private_invite',
-        params: {'p_invitee': player.uid, 'p_preset': args.preset},
-      ) as Map;
+      final response = await _social.createPrivateInvite(
+        inviteeUid: player.uid,
+        preset: args.preset,
+      );
       final gameId = response['game_id'] as String;
       Get.offNamed<void>(
         AppRoutes.onlineLobby,
@@ -130,17 +123,14 @@ class InvitePlayersController extends GetxController {
 
   Future<void> shareLink() async {
     try {
-      final response = await client.rpc<dynamic>(
-        'create_social_game',
-        params: {'p_preset': args.preset},
-      ) as Map;
+      final response = await _social.createSocialGame(preset: args.preset);
       final gameId = response['game_id'] as String;
       final url = 'https://${AppStrings.partyLinkHost}/party/$gameId';
       unawaited(
         SharePlus.instance.share(
-          ShareParams(text: TranslationKeys.shareInviteText.trParams({
-            'url': url,
-          })),
+          ShareParams(
+            text: TranslationKeys.shareInviteText.trParams({'url': url}),
+          ),
         ),
       );
       Get.offNamed<void>(

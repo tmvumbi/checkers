@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/models/online_game.dart';
 import '../engine/checkers_engine.dart';
@@ -12,25 +11,31 @@ import '../shared/widgets/checkers_gradient_button.dart';
 import '../shared/widgets/checkers_modal.dart';
 import '../themes/app_theme.dart';
 import '../translations/translation_keys.dart';
+import 'auth_service.dart';
 import 'online_game_service.dart';
+import 'social_service.dart';
 
 /// Always-on listener that pops an accept/decline modal when a private
 /// invite arrives (kopo's PrivateInviteListenerService).
 class InviteListenerService extends GetxService {
   InviteListenerService({
-    SupabaseClient? client,
+    SocialService? socialService,
+    AuthService? authService,
     OnlineGameService? onlineGameService,
-  }) : _client = client,
+  }) : _socialServiceOverride = socialService,
+       _authServiceOverride = authService,
        _onlineGameServiceOverride = onlineGameService;
 
-  final SupabaseClient? _client;
+  final SocialService? _socialServiceOverride;
+  final AuthService? _authServiceOverride;
   final OnlineGameService? _onlineGameServiceOverride;
 
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  SocialService get _social => _socialServiceOverride ?? Get.find();
+  AuthService get _auth => _authServiceOverride ?? Get.find();
   OnlineGameService get _onlineGameService =>
       _onlineGameServiceOverride ?? Get.find();
 
-  StreamSubscription<AuthState>? _authSubscription;
+  StreamSubscription<AuthUser?>? _authSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _inviteSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _tournamentSubscription;
   final Set<String> _handled = {};
@@ -39,32 +44,28 @@ class InviteListenerService extends GetxService {
   @override
   void onInit() {
     super.onInit();
-    _authSubscription = client.auth.onAuthStateChange.listen((state) {
-      if (state.session != null) {
-        _listen(state.session!.user.id);
+    _authSubscription = _auth.userChanges.listen((user) {
+      if (user != null) {
+        _listen(user.uid);
       } else {
         _inviteSubscription?.cancel();
         _tournamentSubscription?.cancel();
       }
     });
-    final session = client.auth.currentSession;
-    if (session != null) {
-      _listen(session.user.id);
+    final user = _auth.currentUser;
+    if (user != null) {
+      _listen(user.uid);
     }
   }
 
   void _listen(String uid) {
     _inviteSubscription?.cancel();
-    _inviteSubscription = client
-        .from('invites')
-        .stream(primaryKey: ['id'])
-        .eq('invitee_uid', uid)
+    _inviteSubscription = _social
+        .incomingInvites(uid)
         .listen(_onRows, onError: (_) {});
     _tournamentSubscription?.cancel();
-    _tournamentSubscription = client
-        .from('tournament_invites')
-        .stream(primaryKey: ['id'])
-        .eq('invitee_uid', uid)
+    _tournamentSubscription = _social
+        .incomingTournamentInvites(uid)
         .listen(_onTournamentRows, onError: (_) {});
   }
 
@@ -145,10 +146,9 @@ class InviteListenerService extends GetxService {
               gradientStyle: CheckersGradientButtonStyle.logo,
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                client.rpc<dynamic>(
-                  'respond_tournament_invite',
-                  params: {'p_invite_id': inviteId, 'p_accept': false},
-                );
+                _social
+                    .respondTournamentInvite(inviteId, accept: false)
+                    .catchError((_) => const <String, dynamic>{});
               },
             ),
           ],
@@ -159,12 +159,10 @@ class InviteListenerService extends GetxService {
 
   Future<void> _acceptTournamentInvite(String inviteId) async {
     try {
-      final response =
-          await client.rpc<dynamic>(
-                'respond_tournament_invite',
-                params: {'p_invite_id': inviteId, 'p_accept': true},
-              )
-              as Map;
+      final response = await _social.respondTournamentInvite(
+        inviteId,
+        accept: true,
+      );
       if (response['status'] != 'accepted') {
         return;
       }
@@ -245,10 +243,9 @@ class InviteListenerService extends GetxService {
               gradientStyle: CheckersGradientButtonStyle.logo,
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                client.rpc<dynamic>('respond_invite', params: {
-                  'p_invite_id': inviteId,
-                  'p_accept': false,
-                });
+                _social
+                    .respondInvite(inviteId, accept: false)
+                    .catchError((_) => const <String, dynamic>{});
               },
             ),
           ],
@@ -259,10 +256,7 @@ class InviteListenerService extends GetxService {
 
   Future<void> _acceptInvite(String inviteId) async {
     try {
-      final response = await client.rpc<dynamic>('respond_invite', params: {
-        'p_invite_id': inviteId,
-        'p_accept': true,
-      }) as Map;
+      final response = await _social.respondInvite(inviteId, accept: true);
       if (response['status'] != 'accepted') {
         return;
       }
@@ -270,7 +264,7 @@ class InviteListenerService extends GetxService {
       final fetched = await _onlineGameService.fetchGame(gameId);
       fetched.when(
         success: (snap) {
-          final uid = client.auth.currentUser?.id;
+          final uid = _auth.currentUser?.uid;
           var color = PieceColor.white;
           for (final OnlineGamePlayer player in snap.players) {
             if (player.uid == uid && player.color != null) {

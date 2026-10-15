@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants/app_strings.dart';
 import '../engine/checkers_engine.dart';
@@ -10,8 +9,10 @@ import '../modules/game_board/models/game_board_arguments.dart';
 import '../routes/app_routes.dart';
 import '../shared/widgets/checkers_snackbar.dart';
 import '../translations/translation_keys.dart';
+import 'auth_service.dart';
 import 'online_game_service.dart';
 import 'profile_service.dart';
+import 'social_service.dart';
 
 /// Handles `https://dame.cd/party/<gameId>` and
 /// `dame://party/<gameId>` invite links
@@ -19,20 +20,24 @@ import 'profile_service.dart';
 class PartyLinkService extends GetxService {
   PartyLinkService({
     AppLinks? appLinks,
-    SupabaseClient? client,
+    AuthService? authService,
+    SocialService? socialService,
     OnlineGameService? onlineGameService,
     ProfileService? profileService,
   }) : _appLinks = appLinks,
-       _client = client,
+       _authServiceOverride = authService,
+       _socialServiceOverride = socialService,
        _onlineGameServiceOverride = onlineGameService,
        _profileServiceOverride = profileService;
 
   final AppLinks? _appLinks;
-  final SupabaseClient? _client;
+  final AuthService? _authServiceOverride;
+  final SocialService? _socialServiceOverride;
   final OnlineGameService? _onlineGameServiceOverride;
   final ProfileService? _profileServiceOverride;
 
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  AuthService get _auth => _authServiceOverride ?? Get.find();
+  SocialService get _social => _socialServiceOverride ?? Get.find();
   OnlineGameService get _onlineGameService =>
       _onlineGameServiceOverride ?? Get.find();
   ProfileService? get _profileService =>
@@ -120,7 +125,7 @@ class PartyLinkService extends GetxService {
   /// Links need a signed-in player with a nickname: joining a lobby or a
   /// party seats them under that name, and the backend rejects empty ones.
   Future<bool> _isReadyForLinks() async {
-    final user = client.auth.currentUser;
+    final user = _auth.currentUser;
     if (user == null) {
       return false;
     }
@@ -128,7 +133,7 @@ class PartyLinkService extends GetxService {
     if (service == null) {
       return true;
     }
-    final result = await service.getProfile(user.id);
+    final result = await service.getProfile(user.uid);
     return result.when(
       success: (profile) => (profile?.nickname ?? '').isNotEmpty,
       failure: (_) => false,
@@ -179,12 +184,7 @@ class PartyLinkService extends GetxService {
       return;
     }
     try {
-      final response =
-          await client.rpc<dynamic>(
-                'join_social_game',
-                params: {'p_game_id': gameId},
-              )
-              as Map;
+      final response = await _social.joinSocialGame(gameId);
       final status = response['status'] as String?;
       if (status != 'joined' && status != 'already_seated') {
         return;
@@ -192,7 +192,7 @@ class PartyLinkService extends GetxService {
       final fetched = await _onlineGameService.fetchGame(gameId);
       fetched.when(
         success: (snap) {
-          final uid = client.auth.currentUser?.id;
+          final uid = _auth.currentUser?.uid;
           var color = PieceColor.white;
           for (final player in snap.players) {
             if (player.uid == uid && player.color != null) {
