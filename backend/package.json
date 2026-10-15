@@ -1,0 +1,25 @@
+{
+  "name": "checkers-backend",
+  "version": "1.0.0",
+  "description": "Convex backend for the Checkers app",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "codegen": "convex codegen",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:engine": "../scripts/build_engine_convex.sh"
+  },
+  "author": "tmvumbi",
+  "type": "module",
+  "dependencies": {
+    "convex": "^1.46.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "convex-test": "^0.0.62",
+    "typescript": "~5.9",
+    "vitest": "^5.0.4"
+  },
+  "private": true
+}
