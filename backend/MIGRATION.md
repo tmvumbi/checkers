@@ -1,5 +1,12 @@
 # Supabase → Convex cutover runbook
 
+**Status (2026-10-15): cutover done.** Supabase frozen (allowed versions
+`["2.0.0"]`), data imported into prod (24,015 staged rows → all tables;
+ELO/points leaderboards identical; 23 files in Convex storage), admin
+console (`checkers-admin`) serving from prod, release builds of 2.0.0+7
+produced. Remaining: store submission of 2.0.0, then step 6 after the
+handoff window.
+
 The backend moved from the self-hosted Supabase stack (`api.dame.cd` →
 Coolify) to Convex Cloud (team `tresor-mvumbi`, project `checkers`).
 Players sign in with Firebase Auth (project `checkers-club`); Convex
@@ -33,7 +40,7 @@ npx convex env set --prod SUPABASE_LEGACY_ANON_KEY "$(cat ~/.config/checkers_sup
 Note the prod URLs printed by `deploy` (`https://<name>.convex.cloud` and
 `.convex.site`). Never set `MIGRATION_ALLOW_WIPE` on prod.
 
-## 2. Admin console
+## 2. Admin console — DONE 2026-10-15
 
 ```bash
 npx wrangler secret put CONVEX_SITE_URL  --config wrangler.admin.jsonc   # https://harmless-loris-857.convex.site
