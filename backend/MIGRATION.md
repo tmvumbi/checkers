@@ -5,12 +5,19 @@ Coolify) to Convex Cloud (team `tresor-mvumbi`, project `checkers`).
 Players sign in with Firebase Auth (project `checkers-club`); Convex
 verifies the Firebase ID tokens (`convex/auth.config.ts`).
 
-Dev deployment: `silent-donkey-723` (`npx convex dev` in `backend/`).
+Deployments: dev `silent-donkey-723` (`npx convex dev` in `backend/`),
+prod `harmless-loris-857` (https://harmless-loris-857.convex.cloud, HTTP
+actions at https://harmless-loris-857.convex.site). Release builds of the
+app use prod automatically (`lib/core/config/convex_config.dart`).
 A full rehearsal of steps 4–6 against real data ran on dev on 2026-10-15:
 every table imported, files copied, ELO and points leaderboards identical
 to Supabase.
 
-## 1. Production deployment (one time)
+## 1. Production deployment (one time) — DONE 2026-10-15
+
+Deployed and all env vars set; the admin API secret is in
+`~/.config/checkers/convex_admin_api_secret`. Re-run `npx convex deploy`
+after backend changes.
 
 ```bash
 cd backend
@@ -29,8 +36,8 @@ Note the prod URLs printed by `deploy` (`https://<name>.convex.cloud` and
 ## 2. Admin console
 
 ```bash
-npx wrangler secret put CONVEX_SITE_URL  --config wrangler.admin.jsonc   # https://<prod>.convex.site
-npx wrangler secret put ADMIN_API_SECRET --config wrangler.admin.jsonc   # same value as above
+npx wrangler secret put CONVEX_SITE_URL  --config wrangler.admin.jsonc   # https://harmless-loris-857.convex.site
+npx wrangler secret put ADMIN_API_SECRET --config wrangler.admin.jsonc   # ~/.config/checkers/convex_admin_api_secret
 npx wrangler deploy --config wrangler.admin.jsonc
 ```
 
@@ -38,8 +45,7 @@ npx wrangler deploy --config wrangler.admin.jsonc
 
 ## 3. App release 2.0.0
 
-- `lib/core/config/convex_config.dart`: default `CONVEX_URL` → prod URL
-  (or build with `--dart-define=CONVEX_URL=...`).
+- Release builds already target prod (`ConvexConfig.productionUrl`).
 - `pubspec.yaml` version `2.0.0+N`; submit both stores with **manual
   release** and wait for approval.
 
