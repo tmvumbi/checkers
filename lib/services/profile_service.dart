@@ -6,6 +6,7 @@ import 'convex/convex_gateway.dart';
 
 abstract class ProfileService {
   Future<ApiResult<UserProfile?>> getProfile(String uid);
+  Stream<UserProfile?> watchProfile(String uid);
   Future<ApiResult<UserProfile>> upsertProfile(UserProfile profile);
 }
 
@@ -14,6 +15,11 @@ class ConvexProfileService implements ProfileService {
 
   final ConvexGateway? _gatewayOverride;
   ConvexGateway get _convex => _gatewayOverride ?? Get.find<ConvexGateway>();
+
+  @override
+  Stream<UserProfile?> watchProfile(String uid) => _convex
+      .watch('profiles:get', {'uid': uid})
+      .map((row) => row == null ? null : UserProfile.fromJson(asRow(row)));
 
   @override
   Future<ApiResult<UserProfile?>> getProfile(String uid) {

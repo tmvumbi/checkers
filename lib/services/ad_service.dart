@@ -176,9 +176,20 @@ class GoogleAdService extends AdService {
           .requestAuthorizationIfNeeded();
       _shouldRequestNonPersonalizedAds =
           trackingStatus.shouldRequestNonPersonalizedAds;
-      await _initializeAds();
+      // UMP's personalized-ad/cookie prompt must not override an ATT refusal.
+      // On iOS, fail closed before calling either Google SDK unless Apple has
+      // explicitly authorized tracking (including when the prompt is pending).
+      if ((_targetPlatform ?? defaultTargetPlatform) == TargetPlatform.iOS &&
+          trackingStatus != TrackingConsentStatus.authorized) {
+        _isInitialized = true;
+        _refreshBannerAvailability();
+        return;
+      }
       _canRequestAds = await _gatherConsent();
       isPrivacyOptionsRequired.value = await _loadPrivacyOptionsRequirement();
+      if (_canRequestAds) {
+        await _initializeAds();
+      }
       _config = await _loadAdConfig();
       _isInitialized = true;
       _refreshBannerAvailability();
@@ -211,7 +222,7 @@ class GoogleAdService extends AdService {
 
   @override
   Future<void> showPrivacyOptions() {
-    if (_disableAdsForLocalTesting) {
+    if (_disableAdsForLocalTesting || !isPrivacyOptionsRequired.value) {
       return Future<void>.value();
     }
     return _presentPrivacyOptions();

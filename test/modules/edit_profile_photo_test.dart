@@ -63,6 +63,11 @@ void main() {
   setUp(() {
     auth = MockAuthService();
     profile = MockProfileService();
+    when(() => profile.watchProfile(any())).thenAnswer(
+      (call) => Stream.fromFuture(
+        profile.getProfile(call.positionalArguments.first as String),
+      ).map((result) => result.when(success: (p) => p, failure: (_) => null)),
+    );
     photo = MockPhotoService();
     when(() => auth.supportsAppleSignIn).thenReturn(false);
     when(() => auth.currentUser).thenReturn(_user);

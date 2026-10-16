@@ -78,6 +78,7 @@ class HomeController extends GetxController {
 
   final Rx<HomeTab> tab = HomeTab.play.obs;
   final Rxn<UserProfile> profile = Rxn<UserProfile>();
+  StreamSubscription<UserProfile?>? _profileSubscription;
   static const int watchPageSize = 15;
   final RxList<OnlineGameSnapshot> watchableGames = <OnlineGameSnapshot>[].obs;
   final RxBool watchLoading = false.obs;
@@ -129,7 +130,16 @@ class HomeController extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    refreshProfile();
+    final user = _authService.currentUser;
+    if (user != null) {
+      // A one-shot Convex query can return its cached pre-save value. Keep
+      // listening so the header receives the current server profile too.
+      _profileSubscription = _profileService
+          .watchProfile(user.uid)
+          .listen((loaded) => profile.value = loaded, onError: (Object _) {});
+    } else {
+      Get.offAllNamed<void>(AppRoutes.landing);
+    }
     refreshActiveGame();
     _maybeQueueRatingPrompt();
     // Ask once, after onboarding, so this device can receive tournament
@@ -505,6 +515,7 @@ class HomeController extends GetxController {
 
   @override
   void onClose() {
+    unawaited(_profileSubscription?.cancel());
     _recentSearchWorker?.dispose();
     _watchRefreshTimer?.cancel();
     super.onClose();

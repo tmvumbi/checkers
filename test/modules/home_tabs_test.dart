@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:checkers/core/network/api_result.dart';
 import 'package:checkers/core/network/api_error.dart';
 import 'package:checkers/services/account_deletion_service.dart';
@@ -52,6 +54,11 @@ void main() {
   setUp(() {
     auth = MockAuthService();
     profile = MockProfileService();
+    when(() => profile.watchProfile(any())).thenAnswer(
+      (call) => Stream.fromFuture(
+        profile.getProfile(call.positionalArguments.first as String),
+      ).map((result) => result.when(success: (p) => p, failure: (_) => null)),
+    );
     online = MockOnlineGameService();
     when(
       () => online.fetchWatchableGames(
@@ -100,6 +107,25 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('profile header follows fresh values after a cached result', (
+    tester,
+  ) async {
+    final updates = StreamController<UserProfile?>();
+    when(() => profile.watchProfile('uid-1')).thenAnswer((_) => updates.stream);
+    await pumpHome(tester);
+    updates.add(const UserProfile(uid: 'uid-1', nickname: ''));
+    await tester.pump();
+    expect(find.text('Saved player'), findsNothing);
+    updates.add(const UserProfile(uid: 'uid-1', nickname: 'Saved player'));
+    await tester.pump();
+    expect(find.text('Saved player'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    Get.reset();
+    expect(updates.hasListener, isFalse);
+    unawaited(updates.close());
+    await tester.pump();
+  });
 
   testWidgets(
     'failed deletion keeps session and home; successful retry signs out',

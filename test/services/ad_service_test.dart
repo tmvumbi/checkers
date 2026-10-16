@@ -6,9 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeTrackingConsent extends TrackingConsentService {
+  _FakeTrackingConsent([this.status = TrackingConsentStatus.notSupported]);
+
+  final TrackingConsentStatus status;
+
   @override
   Future<TrackingConsentStatus> requestAuthorizationIfNeeded() async {
-    return TrackingConsentStatus.notSupported;
+    return status;
   }
 }
 
@@ -103,6 +107,75 @@ void main() {
   });
 
   group('GoogleAdService', () {
+    for (final status in TrackingConsentStatus.values.where(
+      (status) => status != TrackingConsentStatus.authorized,
+    )) {
+      test('iOS $status never contacts Google ads or shows UMP', () async {
+        final calls = <String>[];
+        final service = GoogleAdService(
+          trackingConsentService: _FakeTrackingConsent(status),
+          initializeAds: () async => calls.add('initialize'),
+          gatherConsent: () async {
+            calls.add('consent');
+            return true;
+          },
+          loadPrivacyOptionsRequirement: () async {
+            calls.add('privacy requirement');
+            return true;
+          },
+          presentPrivacyOptions: () async => calls.add('privacy form'),
+          loadAdConfig: () async {
+            calls.add('config');
+            return _config;
+          },
+          loadInterstitialAd: (_, _) async {
+            calls.add('ad request');
+            return null;
+          },
+          targetPlatform: TargetPlatform.iOS,
+        );
+        await service.initialize();
+        await service.showPrivacyOptions();
+        await service.recordBottomNavigationTransition();
+        expect(await service.recordPcGameFinished(), isFalse);
+        expect(service.bannerAdUnitId, isNull);
+        expect(service.canShowBannerAds.value, isFalse);
+        expect(service.isPrivacyOptionsRequired.value, isFalse);
+        expect(calls, isEmpty);
+      });
+    }
+
+    for (final consent in [true, false]) {
+      test(
+        'authorized iOS initializes ads only after UMP permits: $consent',
+        () async {
+          final calls = <String>[];
+          final service = GoogleAdService(
+            trackingConsentService: _FakeTrackingConsent(
+              TrackingConsentStatus.authorized,
+            ),
+            gatherConsent: () async {
+              calls.add('consent');
+              return consent;
+            },
+            loadPrivacyOptionsRequirement: () async => true,
+            initializeAds: () async => calls.add('initialize'),
+            loadAdConfig: () async => const AppAdConfig(
+              enabled: true,
+              interstitialFrequency: 15,
+              android: AppPlatformAdConfig(),
+              ios: AppPlatformAdConfig(bannerAdUnitId: 'ios-banner'),
+            ),
+            useTestAdUnits: false,
+            targetPlatform: TargetPlatform.iOS,
+          );
+          await service.initialize();
+          expect(calls, consent ? ['consent', 'initialize'] : ['consent']);
+          expect(service.bannerAdUnitId, consent ? 'ios-banner' : null);
+        },
+      );
+    }
+
     test('banner unit id resolves from remote config when enabled', () async {
       final service = _service(onInterstitialShown: () {});
       await service.initialize();
