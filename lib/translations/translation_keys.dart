@@ -15,6 +15,7 @@ abstract final class TranslationKeys {
   static const String editProfileTitle = 'edit_profile_title';
   static const String nicknameLabel = 'nickname_label';
   static const String nicknameRequired = 'nickname_required';
+  static const String nicknameTaken = 'nickname_taken';
   static const String privacyNudge = 'privacy_nudge';
   static const String saveProfile = 'save_profile';
   static const String profileSaveFailed = 'profile_save_failed';

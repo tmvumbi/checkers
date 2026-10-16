@@ -33,6 +33,7 @@ Future<void> main() async {
   await _initLegacySupabaseForHandoff();
 
   final gateway = DartvexGateway(
+    deploymentUrl: ConvexConfig.url,
     ConvexClient(
       ConvexConfig.url,
       // Fail calls instead of waiting forever while offline; mutations

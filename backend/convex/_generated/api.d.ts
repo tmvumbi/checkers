@@ -23,6 +23,7 @@ import type * as lib_config from "../lib/config.js";
 import type * as lib_engine from "../lib/engine.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_games from "../lib/games.js";
+import type * as lib_nickname from "../lib/nickname.js";
 import type * as lib_points from "../lib/points.js";
 import type * as lib_serialize from "../lib/serialize.js";
 import type * as lib_time from "../lib/time.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   "lib/engine": typeof lib_engine;
   "lib/errors": typeof lib_errors;
   "lib/games": typeof lib_games;
+  "lib/nickname": typeof lib_nickname;
   "lib/points": typeof lib_points;
   "lib/serialize": typeof lib_serialize;
   "lib/time": typeof lib_time;

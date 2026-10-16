@@ -120,7 +120,10 @@ class EditProfileController extends GetxController {
           newPhotoUrl = url;
           return false;
         },
-        failure: (_) => true,
+        failure: (error) {
+          debugPrint('avatar upload failed: ${error.code} ${error.message}');
+          return true;
+        },
       );
       if (uploadFailed) {
         isSaving.value = false;
@@ -149,7 +152,12 @@ class EditProfileController extends GetxController {
     isSaving.value = false;
     result.when(
       success: (_) => Get.offAllNamed<void>(AppRoutes.home),
-      failure: (_) {
+      failure: (error) {
+        if (error.code == 'nickname_taken') {
+          validationError.value = TranslationKeys.nicknameTaken.tr;
+          return;
+        }
+        debugPrint('profile save failed: ${error.code} ${error.message}');
         showCheckersSnackbar(TranslationKeys.profileSaveFailed.tr);
       },
     );

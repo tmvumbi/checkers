@@ -13,6 +13,8 @@ const Map<String, String> enUs = {
   TranslationKeys.editProfileTitle: 'Your Profile',
   TranslationKeys.nicknameLabel: 'Nickname',
   TranslationKeys.nicknameRequired: 'Please choose a nickname.',
+  TranslationKeys.nicknameTaken:
+      'This nickname is already taken. Please choose another one.',
   TranslationKeys.privacyNudge:
       'For your privacy, do not use your real name or photo.',
   TranslationKeys.saveProfile: 'Save',

@@ -271,3 +271,41 @@ describe("admin HTTP API", () => {
     expect(ops.totals.players).toBe(1);
   });
 });
+
+describe("nicknames", () => {
+  test("a nickname another player uses is refused, case-insensitively", async () => {
+    const t = newBackend();
+    await player(t, "Magnus");
+    const other = await player(t, "other");
+    await expect(
+      other.as.mutation(api.profiles.updateMine, { nickname: "  mAGNUS " }),
+    ).rejects.toMatchObject({ data: "nickname_taken" });
+    // Your own nickname (any case) and a free one are fine.
+    await other.as.mutation(api.profiles.updateMine, { nickname: "OTHER" });
+    await other.as.mutation(api.profiles.updateMine, { nickname: "Carlsen" });
+  });
+
+  test("players who already share a nickname keep it", async () => {
+    const t = newBackend();
+    const a = await player(t, "twin");
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("profiles", {
+        nickname: "Twin",
+        nicknameKey: "twin",
+        isAnonymous: true,
+        rating: 1200,
+        ratedGames: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        points: 0,
+        createdAt: now,
+        updatedAt: now,
+      } as never);
+    });
+    await a.as.mutation(api.profiles.updateMine, { nickname: "twin" });
+    const backfilled = await t.mutation(internal.profiles.backfillNicknameKeys, { cursor: null });
+    expect(backfilled).toBe(2);
+  });
+});

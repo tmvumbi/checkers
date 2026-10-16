@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:dartvex/dartvex.dart';
 
@@ -24,14 +26,63 @@ abstract class ConvexGateway {
 }
 
 class DartvexGateway implements ConvexGateway {
-  DartvexGateway(this.client);
+  DartvexGateway(
+    this.client, {
+    required String deploymentUrl,
+    Duration queryTimeout = const Duration(seconds: 15),
+    HttpClient? httpClient,
+  }) : _queryEndpoint = Uri.parse(
+         '${deploymentUrl.replaceAll(RegExp(r'/+$'), '')}/api/query',
+       ),
+       _queryTimeout = queryTimeout,
+       _http = httpClient ?? HttpClient();
 
   final ConvexClient client;
+  final Uri _queryEndpoint;
+  final Duration _queryTimeout;
+  final HttpClient _http;
   AuthHandle? _authHandle;
+  ConvexTokenFetcher? _fetchToken;
 
+  /// One-shot reads go through Convex's HTTP query API rather than
+  /// `ConvexClient.query`: dartvex answers a re-subscribed query from its
+  /// local result cache, so a second read of the same query+args returned
+  /// the value from the first read even after the data changed. Live data
+  /// still uses [watch] (WebSocket subscriptions).
   @override
-  Future<dynamic> query(String name, [Map<String, dynamic> args = const {}]) =>
-      client.query(name, args);
+  Future<dynamic> query(String name, [Map<String, dynamic> args = const {}]) {
+    return _httpQuery(name, args).timeout(_queryTimeout);
+  }
+
+  Future<dynamic> _httpQuery(String name, Map<String, dynamic> args) async {
+    final token = await _fetchToken?.call(forceRefresh: false);
+    final request = await _http.postUrl(_queryEndpoint);
+    request.headers.contentType = ContentType.json;
+    if (token != null) {
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+    }
+    request.add(
+      utf8.encode(jsonEncode({'path': name, 'args': args, 'format': 'json'})),
+    );
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(body);
+    } on FormatException {
+      throw ConvexException('HTTP ${response.statusCode}: $body');
+    }
+    if (decoded is Map && decoded['status'] == 'success') {
+      return decoded['value'];
+    }
+    if (decoded is Map && decoded['status'] == 'error') {
+      throw ConvexException(
+        (decoded['errorMessage'] as String?) ?? 'query failed',
+        data: decoded['errorData'],
+      );
+    }
+    throw ConvexException('HTTP ${response.statusCode}: $body');
+  }
 
   @override
   Future<dynamic> mutation(
@@ -72,6 +123,7 @@ class DartvexGateway implements ConvexGateway {
 
   @override
   Future<void> setAuth(ConvexTokenFetcher? fetchToken) async {
+    _fetchToken = fetchToken;
     await _authHandle?.cancel();
     _authHandle = null;
     if (fetchToken == null) {

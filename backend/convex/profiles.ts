@@ -1,7 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { currentProfile, getOrCreateProfile } from "./lib/auth";
 import { fail } from "./lib/errors";
+import { nicknameKey, nicknameTaken } from "./lib/nickname";
 import { profileRow } from "./lib/serialize";
 
 // Player profiles (0001). The profile id is the player's uid everywhere.
@@ -48,8 +50,14 @@ export const updateMine = mutation({
     const profile = await getOrCreateProfile(ctx, args.isAnonymous);
     const nickname = args.nickname.trim();
     if ([...nickname].length > 20) fail("nickname_too_long");
+    // New nicknames must be unique; players who already share one (data
+    // from before this rule) keep theirs as long as they don't change it.
+    if (nicknameKey(nickname) !== nicknameKey(profile.nickname) && (await nicknameTaken(ctx, nickname, profile._id))) {
+      fail("nickname_taken");
+    }
     await ctx.db.patch("profiles", profile._id, {
       nickname,
+      nicknameKey: nicknameKey(nickname),
       ...(args.photoUrl !== undefined ? { photoUrl: args.photoUrl ?? undefined } : {}),
       ...(args.photoUrl === null ? { photoStorageId: undefined } : {}),
       ...(args.isAnonymous !== undefined ? { isAnonymous: args.isAnonymous } : {}),
@@ -110,5 +118,23 @@ export const removeAvatar = mutation({
       updatedAt: Date.now(),
     });
     return null;
+  },
+});
+
+/** One-off backfill of nicknameKey for profiles created before the rule. */
+export const backfillNicknameKeys = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query("profiles").paginate({ numItems: 500, cursor });
+    for (const p of page.page) {
+      const key = nicknameKey(p.nickname);
+      if (p.nicknameKey !== key) await ctx.db.patch("profiles", p._id, { nicknameKey: key });
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.profiles.backfillNicknameKeys, {
+        cursor: page.continueCursor,
+      });
+    }
+    return page.page.length;
   },
 });

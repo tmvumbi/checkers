@@ -13,6 +13,8 @@ const Map<String, String> frFr = {
   TranslationKeys.editProfileTitle: 'Votre profil',
   TranslationKeys.nicknameLabel: 'Pseudo',
   TranslationKeys.nicknameRequired: 'Veuillez choisir un pseudo.',
+  TranslationKeys.nicknameTaken:
+      'Ce pseudo est déjà pris. Veuillez en choisir un autre.',
   TranslationKeys.privacyNudge:
       'Pour votre confidentialité, évitez votre vrai nom ou votre photo.',
   TranslationKeys.saveProfile: 'Enregistrer',

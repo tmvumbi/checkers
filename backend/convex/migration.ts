@@ -9,6 +9,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { rearmTimeout, seatsOf } from "./lib/games";
+import { nicknameKey } from "./lib/nickname";
 
 // One-off import of the Supabase data (see backend/MIGRATION.md):
 //   1. backend/scripts/export_supabase.py  → staging.jsonl
@@ -93,6 +94,7 @@ const TRANSFORMS: Record<string, (ctx: MutationCtx, r: Row) => Promise<unknown>>
   profiles: async (ctx, r) =>
     await ctx.db.insert("profiles", {
       nickname: r.nickname ?? "",
+      nicknameKey: nicknameKey(r.nickname ?? ""),
       photoUrl: opt(r.photo_url),
       isAnonymous: r.is_anonymous ?? true,
       rating: num(r.rating, 1200),

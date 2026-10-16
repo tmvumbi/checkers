@@ -41,6 +41,11 @@ void main() {
   setUp(() {
     auth = MockAuthService();
     profile = MockProfileService();
+    when(() => profile.watchProfile(any())).thenAnswer(
+      (call) => Stream.fromFuture(
+        profile.getProfile(call.positionalArguments.first as String),
+      ).map((result) => result.when(success: (p) => p, failure: (_) => null)),
+    );
     when(() => auth.supportsAppleSignIn).thenReturn(false);
     when(() => auth.currentUser).thenReturn(null);
     when(() => auth.userChanges).thenAnswer((_) => const Stream.empty());
@@ -116,6 +121,35 @@ void main() {
     expect(find.text('Zola'), findsOneWidget);
   });
 
+  testWidgets('a taken nickname shows an explicit message and stays', (
+    tester,
+  ) async {
+    when(() => auth.currentUser).thenReturn(_guestUser);
+    when(
+      () => profile.getProfile('uid-1'),
+    ).thenAnswer((_) async => const Success(null));
+    when(() => profile.upsertProfile(any())).thenAnswer(
+      (_) async => const Failure(
+        ApiError(code: 'nickname_taken', message: 'Server Error'),
+      ),
+    );
+
+    await pumpApp(tester, initialRoute: '/edit-profile');
+    await tester.enterText(
+      find.byKey(const Key('edit-profile-nickname')),
+      'Magnus',
+    );
+    await tester.ensureVisible(find.byKey(const Key('edit-profile-save')));
+    await tester.tap(find.byKey(const Key('edit-profile-save')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('This nickname is already taken. Please choose another one.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('edit-profile-nickname')), findsOneWidget);
+  });
+
   testWidgets('empty nickname shows validation error and stays', (
     tester,
   ) async {
@@ -134,8 +168,7 @@ void main() {
 
   testWidgets('failed sign-in stays on landing', (tester) async {
     when(() => auth.signInAnonymously()).thenAnswer(
-      (_) async =>
-          const Failure(ApiError(code: 'auth-error', message: 'nope')),
+      (_) async => const Failure(ApiError(code: 'auth-error', message: 'nope')),
     );
 
     await pumpApp(tester);

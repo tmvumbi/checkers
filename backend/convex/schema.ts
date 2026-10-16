@@ -42,6 +42,8 @@ export default defineSchema({
   profiles: defineTable({
     tokenIdentifier: v.optional(v.string()),
     nickname: v.string(),
+    // nicknameKey(nickname): uniqueness of new nicknames (case-insensitive).
+    nicknameKey: v.optional(v.string()),
     photoUrl: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
     isAnonymous: v.boolean(),
@@ -56,6 +58,7 @@ export default defineSchema({
     legacyId: v.optional(v.string()),
   })
     .index("by_token", ["tokenIdentifier"])
+    .index("by_nickname_key", ["nicknameKey"])
     .index("by_created", ["createdAt"])
     .index("by_legacy_id", ["legacyId"])
     .index("by_rating", ["rating"])
