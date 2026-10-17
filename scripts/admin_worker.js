@@ -109,6 +109,7 @@ button.small { background: var(--panel2); color: var(--gold);
   font-size: 12px; font-weight: 700; }
 .pill.on { background: #1d4d2c; color: #7ce09a; }
 .pill.off { background: #4d1d1d; color: #e07c7c; }
+.pill.gold { background: #4d3d12; color: var(--gold); }
 .bar { height: 10px; background: var(--gold); border-radius: 4px; min-width: 2px; }
 .muted { color: var(--muted); }
 img.thumb { height: 40px; border-radius: 6px; display: block; }
@@ -149,6 +150,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <section id="tab-msgs" hidden></section>
   <section id="tab-push" hidden></section>
   <section id="tab-players" hidden></section>
+  <section id="tab-gifts" hidden></section>
   <section id="tab-settings" hidden></section>
 </main>
 <script>
@@ -177,6 +179,7 @@ const ROUTES = [
   ['msgs', '/admin/messages', 'Messages'],
   ['push', '/admin/push', 'Push notifications'],
   ['players', '/admin/players', 'Players'],
+  ['gifts', '/admin/gifts', 'Gifts'],
   ['settings', '/admin/settings', 'Settings'],
 ];
 let currentTab = 'dash';
@@ -213,6 +216,7 @@ function showTab(tab) {
   if (tab === 'ops') loadOps();
   if (tab === 'pstats') loadPstats();
   if (tab === 'push') loadPush();
+  if (tab === 'gifts') loadGifts();
 }
 
 window.addEventListener('popstate', () => showTab(tabForPath(location.pathname)));
@@ -1190,6 +1194,276 @@ function renderSettings() {
     }));
 }
 
+// --- Gift store (points auctions on dame.cd/gifts) ----------------------
+let gifts = [], giftEditingId = null, giftImages = [], giftBidsView = null;
+const MAX_GIFT_IMAGES = 10;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+async function loadGifts() {
+  try {
+    // The sponsor picker needs customers even before refresh() finishes.
+    [gifts, customers] = await Promise.all([api('/gifts'), api('/customers')]);
+  } catch (e) {
+    gifts = [];
+    document.getElementById('tab-gifts').innerHTML =
+      '<div class="card msg err">Failed to load gifts: ' + esc(apiError(e)) + '</div>';
+    return;
+  }
+  renderGifts();
+}
+
+/** Server errors arrive as {"error": "..."} text; show just the message. */
+function apiError(e) {
+  try { return JSON.parse(e.message).error || e.message; } catch (_) { return e.message; }
+}
+
+function toLocalInput(iso) {
+  const d = iso ? new Date(iso) : new Date(Date.now() + 7 * 86400000);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function fmtTime(iso) {
+  return iso ? new Date(iso).toLocaleString() : '—';
+}
+
+function giftStatusPill(g) {
+  if (g.status === 'open') return g.active
+    ? '<span class="pill on">open</span>' : '<span class="pill off">hidden</span>';
+  if (g.status === 'closed') return '<span class="pill gold">won</span>';
+  return '<span class="pill off">cancelled</span>';
+}
+
+function renderGifts() {
+  const el = document.getElementById('tab-gifts');
+  const editing = gifts.find(g => g.id === giftEditingId) ?? null;
+  const open = !editing || editing.status === 'open';
+  const rows = gifts.map(g => {
+    const img = g.images[0] ? '<img class="thumb" src="' + esc(g.images[0].url) + '">' : '';
+    const bid = g.highest_bid != null
+      ? '<b>' + g.highest_bid + '</b> pts · ' + esc(g.highest_bidder_nickname ?? '')
+      : '<span class="muted">no bids (min ' + g.minimum_bid + ')</span>';
+    const outcome = g.status === 'closed'
+      ? 'Winner: <b>' + esc(g.winner_nickname ?? '') + '</b> (' + g.winner_amount + ' pts)'
+        + (g.delivered_at ? ' · delivered ' + fmtTime(g.delivered_at) : ' · <i>not delivered</i>')
+      : g.status === 'cancelled' ? 'Cancelled ' + fmtTime(g.cancelled_at)
+      : 'Ends ' + fmtTime(g.ends_at) + (g.extension_count ? ' · extended ×' + g.extension_count : '');
+    const actions = ['<button class="small" data-act="edit" data-id="' + g.id + '">Edit</button>',
+      '<button class="small" data-act="bids" data-id="' + g.id + '">Bids</button>'];
+    if (g.status === 'open') actions.push('<button class="small" data-act="cancel" data-id="' + g.id + '">Cancel</button>');
+    if (g.status === 'closed') actions.push('<button class="small" data-act="deliver" data-id="' + g.id + '">'
+      + (g.delivered_at ? 'Undo delivered' : 'Mark delivered') + '</button>');
+    if (!g.participant_count && g.highest_bid == null) {
+      actions.push('<button class="small" data-act="delete" data-id="' + g.id + '">Delete</button>');
+    }
+    return '<tr><td>' + img + '</td><td>' + esc(g.name)
+      + '<div class="muted" style="font-size:12px">' + esc(g.customer_name ?? '') + '</div></td>'
+      + '<td>' + giftStatusPill(g) + '</td>'
+      + '<td>' + bid + '<div class="muted" style="font-size:12px">' + g.participant_count
+      + ' bidder(s) · ' + g.bid_count + ' bid(s)</div></td>'
+      + '<td style="font-size:13px">' + outcome + '</td>'
+      + '<td style="white-space:nowrap">' + actions.join(' ') + '</td></tr>';
+  }).join('');
+  const custOpts = '<option value="">— none —</option>' + customers.map(c =>
+    '<option value="' + c.id + '"' + (editing && editing.customer_id === c.id ? ' selected' : '')
+    + '>' + esc(c.name) + '</option>').join('');
+  const lock = open ? '' : ' disabled title="Frozen once the auction has ended"';
+  el.innerHTML =
+    '<div class="card"><h2>Gift store</h2>'
+    + '<p class="muted" style="font-size:13px;margin-bottom:10px">Players bid points on '
+    + '<a style="color:var(--gold)" href="https://dame.cd/gifts" target="_blank">dame.cd/gifts</a>. '
+    + 'The highest bid at the deadline wins; gifts nobody bid on extend by 24h.</p>'
+    + '<table><tr><th></th><th>Gift</th><th>Status</th><th>Highest bid</th><th>Outcome</th><th></th></tr>'
+    + (rows || '<tr><td colspan="6" class="muted">No gifts yet.</td></tr>')
+    + '</table></div>'
+    + (giftBidsView ? renderGiftBids() : '')
+    + '<div class="card" id="g-editor"><h2>'
+    + (editing ? 'Edit gift — ' + esc(editing.name) : 'New gift') + '</h2>'
+    + '<div class="row"><div><label>Name *</label><input id="g-name" maxlength="120"></div>'
+    + '<div><label>Offered by (customer)</label><select id="g-cust">' + custOpts + '</select></div></div>'
+    + '<div class="row"><div><label>Minimum bid (points) *</label><input type="number" min="1" id="g-min"' + lock + '></div>'
+    + '<div><label>Ends at (your local time) *</label><input type="datetime-local" id="g-end"' + lock + '></div></div>'
+    + '<label>YouTube video (optional)</label><input id="g-yt" placeholder="https://youtu.be/…">'
+    + '<label>Description</label><textarea id="g-desc" rows="5" maxlength="4000"></textarea>'
+    + '<label>Images (up to ' + MAX_GIFT_IMAGES + ', 4 MB each; the first is the cover)</label>'
+    + '<div id="g-imgs" style="display:flex;flex-wrap:wrap;gap:10px;margin:6px 0"></div>'
+    + '<input type="file" accept="image/*" multiple id="g-files">'
+    + '<label><input type="checkbox" id="g-active"' + (!editing || editing.active ? ' checked' : '')
+    + '> Visible on the website</label>'
+    + '<button class="primary" data-act="save">' + (editing ? 'Save changes' : 'Create gift') + '</button>'
+    + (editing ? ' <button class="small" style="margin-left:10px" data-act="new">Cancel</button>' : '')
+    + '<div class="msg" id="g-msg"></div></div>';
+  document.getElementById('g-name').value = editing?.name ?? '';
+  document.getElementById('g-min').value = editing?.minimum_bid ?? 10;
+  document.getElementById('g-end').value = toLocalInput(editing?.ends_at);
+  document.getElementById('g-yt').value = editing?.youtube_video_id
+    ? 'https://youtu.be/' + editing.youtube_video_id : '';
+  document.getElementById('g-desc').value = editing?.description ?? '';
+  document.getElementById('g-files').onchange = addGiftFiles;
+  renderGiftImages();
+  el.onclick = onGiftClick;
+}
+
+function renderGiftImages() {
+  document.getElementById('g-imgs').innerHTML = giftImages.map((img, i) =>
+    '<div style="text-align:center"><img class="thumb" style="height:70px" src="' + esc(img.preview || img.url) + '">'
+    + '<div style="margin-top:4px">'
+    + (i > 0 ? '<button class="small" data-act="img-left" data-i="' + i + '">←</button> ' : '')
+    + (i < giftImages.length - 1 ? '<button class="small" data-act="img-right" data-i="' + i + '">→</button> ' : '')
+    + '<button class="small" data-act="img-remove" data-i="' + i + '">✕</button></div></div>').join('')
+    || '<span class="muted" style="font-size:13px">No images yet.</span>';
+}
+
+async function addGiftFiles(e) {
+  const msg = document.getElementById('g-msg');
+  msg.className = 'msg'; msg.textContent = '';
+  for (const file of Array.from(e.target.files)) {
+    if (giftImages.length >= MAX_GIFT_IMAGES) { msg.className = 'msg err'; msg.textContent = 'At most ' + MAX_GIFT_IMAGES + ' images.'; break; }
+    if (!file.type.startsWith('image/')) { msg.className = 'msg err'; msg.textContent = file.name + ' is not an image.'; continue; }
+    if (file.size > MAX_IMAGE_BYTES) { msg.className = 'msg err'; msg.textContent = file.name + ' is larger than 4 MB.'; continue; }
+    try {
+      const bitmap = await createImageBitmap(file);
+      giftImages.push({ file, preview: URL.createObjectURL(file), width: bitmap.width, height: bitmap.height });
+      bitmap.close();
+    } catch (_) {
+      msg.className = 'msg err'; msg.textContent = file.name + ' could not be read as an image.';
+    }
+  }
+  e.target.value = '';
+  renderGiftImages();
+}
+
+function startGiftEdit(id) {
+  giftEditingId = id;
+  const g = gifts.find(x => x.id === id);
+  giftImages = g ? g.images.map(i => ({ ...i })) : [];
+  renderGifts();
+  document.getElementById('g-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function onGiftClick(e) {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act, id = b.dataset.id, i = parseInt(b.dataset.i, 10);
+  if (act === 'edit') return startGiftEdit(id);
+  if (act === 'new') { giftEditingId = null; giftImages = []; return renderGifts(); }
+  if (act === 'save') return saveGift();
+  if (act === 'img-left' || act === 'img-right') {
+    const j = act === 'img-left' ? i - 1 : i + 1;
+    [giftImages[i], giftImages[j]] = [giftImages[j], giftImages[i]];
+    return renderGiftImages();
+  }
+  if (act === 'img-remove') { giftImages.splice(i, 1); return renderGiftImages(); }
+  if (act === 'bids') return showGiftBids(id);
+  if (act === 'close-bids') { giftBidsView = null; return renderGifts(); }
+  const g = gifts.find(x => x.id === id);
+  try {
+    if (act === 'cancel') {
+      if (!confirm('Cancel "' + g.name + '"? The leading bid is refunded and the auction ends with no winner.')) return;
+      await api('/gift-cancel/' + id, { method: 'POST' });
+    } else if (act === 'delete') {
+      if (!confirm('Delete "' + g.name + '" and its images?')) return;
+      await api('/gifts/' + id, { method: 'DELETE' });
+      if (giftEditingId === id) { giftEditingId = null; giftImages = []; }
+    } else if (act === 'deliver') {
+      const delivered = !g.delivered_at;
+      const note = delivered ? prompt('Delivery note (optional):', g.delivery_note ?? '') : null;
+      if (delivered && note === null) return;
+      await api('/gift-delivered/' + id, { method: 'POST',
+        body: JSON.stringify({ delivered, note }),
+        headers: { 'Content-Type': 'application/json' } });
+    } else {
+      return;
+    }
+    await loadGifts();
+  } catch (err) {
+    alert(apiError(err));
+  }
+}
+
+async function saveGift() {
+  const msg = document.getElementById('g-msg');
+  msg.className = 'msg'; msg.textContent = 'Saving…';
+  try {
+    const editing = gifts.find(x => x.id === giftEditingId) ?? null;
+    const name = document.getElementById('g-name').value.trim();
+    if (!name) throw new Error('Name is required.');
+    const endValue = document.getElementById('g-end').value;
+    if (!endValue) throw new Error('End date is required.');
+    const images = [];
+    for (const img of giftImages) {
+      if (img.file) {
+        msg.textContent = 'Uploading ' + img.file.name + '…';
+        const r = await fetch(apiBase + '/upload?name=' + encodeURIComponent(img.file.name), {
+          method: 'POST', headers: { 'Content-Type': img.file.type }, body: img.file });
+        if (!r.ok) throw new Error(await r.text());
+        const up = await r.json();
+        Object.assign(img, { url: up.url, storage_id: up.storage_id, file: null, preview: null });
+      }
+      images.push({ url: img.url, storage_id: img.storage_id ?? null, width: img.width, height: img.height });
+    }
+    const body = {
+      name,
+      customer_id: document.getElementById('g-cust').value || null,
+      youtube_url: document.getElementById('g-yt').value.trim() || null,
+      description: document.getElementById('g-desc').value,
+      active: document.getElementById('g-active').checked,
+      images,
+    };
+    const minimum = parseInt(document.getElementById('g-min').value, 10);
+    const endsAt = new Date(endValue).toISOString();
+    // Send price and deadline only when they change (they freeze after the end).
+    if (!editing || minimum !== editing.minimum_bid) body.minimum_bid = minimum;
+    if (!editing || endValue !== toLocalInput(editing.ends_at)) body.ends_at = endsAt;
+    msg.textContent = 'Saving…';
+    if (editing) {
+      await api('/gifts/' + editing.id, { method: 'PATCH', body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' } });
+    } else {
+      await api('/gifts', { method: 'POST', body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' } });
+    }
+    giftEditingId = null; giftImages = [];
+    await loadGifts();
+    const done = document.getElementById('g-msg');
+    done.className = 'msg'; done.textContent = editing ? 'Gift updated.' : 'Gift created.';
+  } catch (e) {
+    msg.className = 'msg err'; msg.textContent = apiError(e);
+  }
+}
+
+async function showGiftBids(id) {
+  try {
+    const data = await api('/gift-bids/' + id);
+    giftBidsView = { id, ...data };
+    renderGifts();
+    document.getElementById('g-bids').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    alert(apiError(e));
+  }
+}
+
+function renderGiftBids() {
+  const g = gifts.find(x => x.id === giftBidsView.id);
+  const bidRows = giftBidsView.bids.map(b =>
+    '<tr><td>' + esc(b.nickname) + '<div class="muted" style="font-size:11px">' + esc(b.uid) + '</div></td>'
+    + '<td class="num">' + b.amount + '</td><td>' + esc(b.status)
+    + (b.refund_skipped ? ' <span class="pill off">refund skipped</span>' : '') + '</td>'
+    + '<td class="num">' + b.bid_count + '</td><td>' + esc(b.language) + '</td>'
+    + '<td>' + fmtTime(b.last_bid_at) + '</td></tr>').join('');
+  const eventRows = giftBidsView.events.map(ev =>
+    '<tr><td>' + fmtTime(ev.at) + '</td><td>' + esc(ev.type) + '</td><td>' + esc(ev.nickname ?? ev.uid) + '</td>'
+    + '<td class="num">' + ev.amount + '</td><td class="num">' + ev.points_before + ' → ' + ev.points_after
+    + '</td></tr>').join('');
+  return '<div class="card" id="g-bids"><h2>Bids — ' + esc(g ? g.name : '') + '</h2>'
+    + '<table><tr><th>Player</th><th class="num">Amount</th><th>Status</th><th class="num">Bids</th>'
+    + '<th>Lang</th><th>Last bid</th></tr>'
+    + (bidRows || '<tr><td colspan="6" class="muted">No bids yet.</td></tr>') + '</table>'
+    + '<h2 style="margin-top:18px">Points ledger</h2>'
+    + '<table><tr><th>When</th><th>Type</th><th>Player</th><th class="num">Points</th><th class="num">Balance</th></tr>'
+    + (eventRows || '<tr><td colspan="5" class="muted">No movements yet.</td></tr>') + '</table>'
+    + '<button class="small" style="margin-top:12px" data-act="close-bids">Close</button></div>';
+}
+
 renderNav();
 showTab(tabForPath(location.pathname));
 
@@ -1212,6 +1486,7 @@ const PAGE_ROUTES = new Set([
   "/admin/messages",
   "/admin/push",
   "/admin/players",
+  "/admin/gifts",
   "/admin/settings",
 ]);
 

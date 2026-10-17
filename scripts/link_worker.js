@@ -1,7 +1,10 @@
 // Cloudflare Worker for dame.cd — the public site
 // (landing page, privacy policy, terms of use), the app-link verification
 // files, and a deep-link fallback page for invite links.
-// Deployed on the route dame.cd/* .
+// Deployed on the route dame.cd/* (wrangler.links.jsonc). The gift store
+// at /gifts lives in gift_store_page.js.
+
+import { GIFT_STORE_CSS, PROD_CONVEX_URL, giftStoreBody } from "./gift_store_page.js";
 
 const PLAY_STORE_URL =
   "https://play.google.com/store/apps/details?id=cd.dame";
@@ -9,6 +12,7 @@ const PLAY_STORE_URL =
 const APP_STORE_URL =
   "https://apps.apple.com/app/checkers-tournaments/id6806184531";
 const CONTACT_EMAIL = "tresormvumbi@gmail.com";
+const FIREBASE_AUTH_ORIGIN = "https://checkers-club.firebaseapp.com";
 const APP_ADS_TXT =
   "google.com, pub-3437010247383226, DIRECT, f08c47fec0942fa0\n";
 
@@ -64,7 +68,7 @@ const SITE_CSS = `
   --card:rgba(255,255,255,.05)}
 *{box-sizing:border-box;margin:0}
 body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  background:linear-gradient(var(--bg1),var(--bg2)) fixed;color:var(--soft);
+  background:var(--bg2) linear-gradient(var(--bg1),var(--bg2)) fixed;color:var(--soft);
   line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:var(--gold)}
 .wrap{max-width:880px;margin:0 auto;padding:0 22px}
@@ -72,7 +76,12 @@ header.site{display:flex;align-items:center;gap:12px;padding:18px 0}
 header.site a.brand{display:flex;align-items:center;gap:12px;
   text-decoration:none;color:var(--soft)}
 header.site .word{font-weight:800;letter-spacing:4px;font-size:18px}
-.langs{margin-left:auto;font-size:14px}
+.langs{font-size:14px}
+.giftlink{margin-left:auto;font-size:14px;font-weight:700;text-decoration:none;
+  padding:6px 12px;border-radius:99px;border:1px solid rgba(255,200,1,.5);
+  white-space:nowrap}
+.giftlink.on{background:rgba(255,200,1,.14)}
+@media (max-width:480px){header.site .word{display:none}}
 .langs a{color:var(--muted);text-decoration:none;padding:4px 8px;
   border-radius:6px}
 .langs a.on{color:var(--gold);background:var(--card);font-weight:700}
@@ -96,8 +105,14 @@ h1,h2,h3{color:var(--gold);line-height:1.25}
 // ---------------------------------------------------------------------
 
 const NAV_STRINGS = {
-  en: { privacy: "Privacy Policy", terms: "Terms of Use", contact: "Contact" },
+  en: {
+    privacy: "Privacy Policy",
+    terms: "Terms of Use",
+    contact: "Contact",
+    gifts: "Gift store",
+  },
   fr: {
+    gifts: "Boutique cadeaux",
     privacy: "Politique de confidentialité",
     terms: "Conditions d’utilisation",
     contact: "Contact",
@@ -125,11 +140,14 @@ function sitePage(lang, path, title, body, extraCss = "") {
 <header class="site">
   <a class="brand" href="/${q}">${LOGO_SVG(34)}
     <span class="word">CHECKERS</span></a>
+  <a class="giftlink${path.startsWith("/gifts") ? " on" : ""}"
+    href="/gifts${q}">${nav.gifts}</a>
   <nav class="langs">${langLink("en")} ${langLink("fr")}</nav>
 </header>
 ${body}
 <footer class="site">
   <nav>
+    <a href="/gifts${q}">${nav.gifts}</a>
     <a href="/privacy${q}">${nav.privacy}</a>
     <a href="/terms${q}">${nav.terms}</a>
     <a href="mailto:${CONTACT_EMAIL}">${nav.contact}</a>
@@ -171,6 +189,12 @@ const LANDING_CSS = `
 .openapp{display:inline-block;margin-top:14px;color:var(--muted);
   font-size:14px;text-decoration:underline}
 .openapp:hover{color:var(--gold)}
+.giftpromo{margin-top:34px;text-align:center;padding:24px 18px;
+  border:1px solid rgba(255,200,1,.45);border-radius:16px;
+  background:rgba(255,200,1,.07)}
+.giftpromo h2{font-size:22px;margin-bottom:6px}
+.giftpromo p{color:var(--muted);margin-bottom:14px}
+.giftpromo .btn{background:#FFC801;color:#1b1300;border-color:#FFC801}
 `;
 
 const LANDING_STRINGS = {
@@ -180,6 +204,10 @@ const LANDING_STRINGS = {
     getOn: "Get it on",
     onThe: "Download on the",
     openApp: "Already installed? Open the app",
+    giftTitle: "Win real gifts with your points",
+    giftText: "Every win against the computer and every tournament victory " +
+      "earns points. Bid them on gifts in our store — the highest bid wins.",
+    giftCta: "Visit the gift store",
     features: [
       ["Play the machine",
        "Three difficulty levels, from a friendly first game to a Hard " +
@@ -205,6 +233,11 @@ const LANDING_STRINGS = {
     getOn: "Disponible sur",
     onThe: "Télécharger sur l’",
     openApp: "Déjà installée ? Ouvrir l’application",
+    giftTitle: "Gagnez de vrais cadeaux avec vos points",
+    giftText: "Chaque victoire contre l’ordinateur et chaque tournoi " +
+      "remporté rapporte des points. Misez-les sur nos cadeaux — la plus " +
+      "haute mise l’emporte.",
+    giftCta: "Voir la boutique cadeaux",
     features: [
       ["Jouer contre l’ordinateur",
        "Trois niveaux de difficulté, d’une première " +
@@ -253,6 +286,11 @@ function landingPage(lang) {
   <a class="openapp" href="dame://home">${t.openApp}</a>
 </section>
 <section class="features">${cards}</section>
+<section class="giftpromo">
+  <h2>${t.giftTitle}</h2>
+  <p>${t.giftText}</p>
+  <a class="btn" href="/gifts?lang=${lang}">${t.giftCta}</a>
+</section>
 <p class="rules">${t.rules}</p>
 `,
     LANDING_CSS,
@@ -272,7 +310,7 @@ main.doc li{margin:5px 0}
 const PRIVACY_BODY = {
   en: `
 <h1>Privacy Policy</h1>
-<div class="date">Effective August 22, 2026</div>
+<div class="date">Effective October 17, 2026</div>
 
 <p>This policy describes what the Checkers mobile app ("the app", "we")
 collects, why, and the choices you have. Checkers is published at
@@ -299,6 +337,12 @@ service or game announcements. You can disable notifications in your
 device settings.</li>
 <li><b>Usage analytics.</b> We use Google Firebase Analytics to
 understand which features are used, via anonymous usage events.</li>
+<li><b>Gift store.</b> If you sign in at <a href="/gifts?lang=en">dame.cd/gifts</a>
+and bid, we store your bids and every change they make to your points.
+The nickname of the current leader and of each winner is shown publicly
+on the site. To deliver a gift we contact the winner and keep the
+delivery details they choose to give us only as long as needed to send
+it.</li>
 </ul>
 
 <h2>Advertising</h2>
@@ -337,7 +381,7 @@ with an updated effective date.</p>
 `,
   fr: `
 <h1>Politique de confidentialité</h1>
-<div class="date">En vigueur le 22 août 2026</div>
+<div class="date">En vigueur le 17 octobre 2026</div>
 
 <p>Cette politique décrit ce que l’application mobile Checkers
 (« l’application », « nous »)
@@ -372,6 +416,13 @@ réglages de votre appareil.</li>
 <li><b>Statistiques d’usage.</b> Nous utilisons Google Firebase
 Analytics pour comprendre quelles fonctionnalités sont
 utilisées, via des événements anonymes.</li>
+<li><b>Boutique cadeaux.</b> Si vous vous connectez sur
+<a href="/gifts?lang=fr">dame.cd/gifts</a> et misez, nous conservons vos
+mises et chaque mouvement de vos points. Le pseudo du joueur en tête et
+celui de chaque gagnant sont affichés publiquement sur le site. Pour
+livrer un cadeau, nous contactons le gagnant et ne conservons les
+informations de livraison qu’il choisit de nous donner que le temps
+nécessaire à l’envoi.</li>
 </ul>
 
 <h2>Publicité</h2>
@@ -423,7 +474,7 @@ vigueur.</p>
 const TERMS_BODY = {
   en: `
 <h1>Terms of Use</h1>
-<div class="date">Effective August 22, 2026</div>
+<div class="date">Effective October 17, 2026</div>
 
 <p>These terms govern your use of the Checkers mobile app and its online
 services ("the service"). By playing, you accept them. Questions:
@@ -461,6 +512,20 @@ third-party ads (Google AdMob) and sponsored content served by us. See
 the <a href="/privacy?lang=en">Privacy Policy</a> for the choices you
 have.</p>
 
+<h2>Points and the gift store</h2>
+<p>You earn points by winning games against the computer and by winning
+tournaments, under rules we publish in the app and may change for the
+future. Points have no cash value: they cannot be bought, sold,
+transferred or exchanged for money. On
+<a href="/gifts?lang=en">dame.cd/gifts</a> you can bid points on gifts.
+A bid holds its points; if someone outbids you, your points come back.
+When the countdown ends, the highest bid wins the gift and its points are
+spent. A gift nobody bid on stays open for another day. We may cancel an
+auction (bids are then refunded), and we may withdraw the bids and void
+the win of an account blocked for breaking these terms. Gifts are
+delivered by arrangement with the winner; we will contact you after you
+win.</p>
+
 <h2>Intellectual property</h2>
 <p>The app, its design and its content (except your own profile content)
 belong to us or our licensors. We grant you a personal, non-transferable
@@ -487,7 +552,7 @@ change means you accept the updated terms.</p>
 `,
   fr: `
 <h1>Conditions d’utilisation</h1>
-<div class="date">En vigueur le 22 août 2026</div>
+<div class="date">En vigueur le 17 octobre 2026</div>
 
 <p>Ces conditions régissent votre utilisation de l’application
 mobile Checkers et de ses services en ligne
@@ -533,6 +598,21 @@ peut inclure des annonces de tiers (Google AdMob) et des contenus
 sponsorisés que nous diffusons. Consultez la
 <a href="/privacy?lang=fr">politique de confidentialité</a> pour
 connaître vos choix.</p>
+
+<h2>Points et boutique cadeaux</h2>
+<p>Vous gagnez des points en battant l’ordinateur et en remportant des
+tournois, selon des règles publiées dans l’application et susceptibles
+d’évoluer pour l’avenir. Les points n’ont aucune valeur monétaire : ils
+ne peuvent être ni achetés, ni vendus, ni transférés, ni échangés contre
+de l’argent. Sur <a href="/gifts?lang=fr">dame.cd/gifts</a>, vous pouvez
+miser vos points sur des cadeaux. Une mise bloque ses points ; si
+quelqu’un mise plus que vous, vos points vous sont rendus. À la fin du
+compte à rebours, la plus haute mise remporte le cadeau et ses points
+sont dépensés. Un cadeau sans mise reste ouvert un jour de plus. Nous
+pouvons annuler une enchère (les mises sont alors remboursées) et
+retirer les mises ou annuler le gain d’un compte bloqué pour
+non-respect de ces conditions. Les cadeaux sont livrés en accord avec le
+gagnant ; nous vous contacterons après votre victoire.</p>
 
 <h2>Propriété intellectuelle</h2>
 <p>L’application, son design et ses contenus (hors contenus de
@@ -623,8 +703,13 @@ first, then tap the link again.</p>
 </body></html>`;
 }
 
+function giftStorePage(lang, path, convexUrl) {
+  const page = giftStoreBody(lang, convexUrl);
+  return sitePage(lang, path, page.title, page.body, GIFT_STORE_CSS);
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env = {}) {
     const url = new URL(request.url);
     const p = url.pathname;
     const json = (obj) =>
@@ -644,6 +729,12 @@ export default {
         "https://checkers-admin.tresormvumbi.workers.dev",
       );
       return fetch(new Request(adminUrl, request));
+    }
+
+    // Firebase Auth's sign-in helper, served first-party so popups and
+    // redirects work in browsers that block third-party storage.
+    if (p.startsWith("/__/auth/") || p.startsWith("/__/firebase/")) {
+      return fetch(new Request(new URL(p + url.search, FIREBASE_AUTH_ORIGIN), request));
     }
 
     if (p === "/.well-known/assetlinks.json") return json(ASSETLINKS);
@@ -683,6 +774,11 @@ export default {
     }
     if (p === "/terms" || p === "/terms/") {
       return html(termsPage(lang));
+    }
+    if (p === "/gifts" || p.startsWith("/gifts/")) {
+      const response = html(giftStorePage(lang, p, env.CONVEX_URL || PROD_CONVEX_URL));
+      response.headers.set("cache-control", "no-store");
+      return response;
     }
     return html(landingPage(lang));
   },

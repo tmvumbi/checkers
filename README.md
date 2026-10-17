@@ -39,6 +39,16 @@ the international family and the 40-move rule for American. Online clocks:
   Flutter client is [dartvex](https://pub.dev/packages/dartvex).
   Migration from the former self-hosted Supabase stack:
   [backend/MIGRATION.md](backend/MIGRATION.md).
+- **Website** ([scripts/link_worker.js](scripts/link_worker.js), Cloudflare
+  Worker on `dame.cd/*`, `npx wrangler deploy --config wrangler.links.jsonc`):
+  landing and legal pages, app-link files, and the **gift store** at
+  `/gifts` ([scripts/gift_store_page.js](scripts/gift_store_page.js)) where
+  players sign in with their app's Google/Apple account and bid their points
+  on gifts (auction rules in `backend/convex/lib/gifts.ts`).
+- **Admin console** ([scripts/admin_worker.js](scripts/admin_worker.js),
+  `npx wrangler deploy --config wrangler.admin.jsonc`): basic-auth page that
+  proxies to the Convex admin HTTP API; the Gifts tab manages auctions,
+  images, bids and delivery.
 
 ## Development
 

@@ -9,5 +9,6 @@ crons.interval("online games sweep", { seconds: 30 }, internal.sweeps.onlineGame
 crons.interval("tournament lobby sweep", { seconds: 45 }, internal.tournaments.sweepLobby, {});
 crons.cron("tournament start", "0,30 * * * *", internal.tournaments.tryStart, {});
 crons.cron("tournament reminder", "29,59 * * * *", internal.tournaments.notifySoon, {});
+crons.interval("gift auctions", { minutes: 5 }, internal.gifts.closeExpired, {});
 
 export default crons;

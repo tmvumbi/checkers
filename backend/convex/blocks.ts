@@ -4,6 +4,7 @@ import { internalMutation, mutation, type MutationCtx } from "./_generated/serve
 import { requireProfile } from "./lib/auth";
 import { effectiveBlock } from "./lib/blocks";
 import { fail } from "./lib/errors";
+import { withdrawLeadingBids } from "./lib/gifts";
 import { DAY } from "./lib/time";
 
 // Player blocking with device-level enforcement (0016).
@@ -104,6 +105,8 @@ export const blockPlayer = internalMutation({
     for (const d of devices) {
       await ctx.db.insert("blockedDevices", { blockId, kind: d.kind, value: d.value, level, expiresAt });
     }
+    // A blocked player cannot bid, so their held points come back.
+    await withdrawLeadingBids(ctx, args.uid, "refund_block");
     return {
       block_id: blockId,
       level,

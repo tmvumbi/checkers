@@ -1,0 +1,17 @@
+{
+  // dame.cd public site: landing, legal pages, app-link files, deep-link
+  // fallbacks and the gift store (scripts/gift_store_page.js).
+  // The dame.cd zone lives in "Tresor's Account".
+  "account_id": "21a31898b89c0c07a0671bb9737855b8",
+  "name": "checkers-links",
+  "main": "scripts/link_worker.js",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "dame.cd/*",
+      "zone_name": "dame.cd"
+    }
+  ]
+}

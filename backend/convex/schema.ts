@@ -12,6 +12,14 @@ import { v } from "convex/values";
 // - `legacyId` keeps the Supabase primary key on migrated rows.
 
 const color = v.union(v.literal("white"), v.literal("black"));
+export const giftStatus = v.union(v.literal("open"), v.literal("closed"), v.literal("cancelled"));
+export const giftBidStatus = v.union(
+  v.literal("leading"),
+  v.literal("outbid"),
+  v.literal("won"),
+  v.literal("lost"),
+  v.literal("cancelled"),
+);
 const gameStatus = v.union(
   v.literal("waiting"),
   v.literal("playing"),
@@ -418,4 +426,96 @@ export default defineSchema({
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
   }).index("by_created", ["createdAt"]),
+
+  // Gift store (dame.cd/gifts): points auctions, one winner per gift.
+  // Rules live in lib/gifts.ts; admins manage gifts from the console.
+  gifts: defineTable({
+    name: v.string(),
+    description: v.string(),
+    images: v.array(
+      v.object({
+        url: v.string(),
+        storageId: v.optional(v.id("_storage")),
+        width: v.number(),
+        height: v.number(),
+      }),
+    ),
+    youtubeVideoId: v.optional(v.string()),
+    // The sponsor shown as "offered by".
+    customerId: v.optional(v.id("adCustomers")),
+    minimumBid: v.number(),
+    endsAt: v.number(),
+    active: v.boolean(),
+    status: giftStatus,
+    highestBid: v.optional(v.number()),
+    highestBidderUid: v.optional(v.id("profiles")),
+    highestBidderNickname: v.optional(v.string()),
+    highestBidAt: v.optional(v.number()),
+    bidCount: v.number(),
+    participantCount: v.number(),
+    // Times the deadline moved 24h because nobody had bid.
+    extensionCount: v.number(),
+    winnerUid: v.optional(v.id("profiles")),
+    winnerNickname: v.optional(v.string()),
+    winnerAmount: v.optional(v.number()),
+    closedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    // false while outbid rows still await their final lost/cancelled status.
+    participantsFinalized: v.optional(v.boolean()),
+    deliveredAt: v.optional(v.number()),
+    deliveryNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_active_and_status_and_endsAt", ["active", "status", "endsAt"])
+    .index("by_active_and_status_and_closedAt", ["active", "status", "closedAt"])
+    .index("by_status_and_endsAt", ["status", "endsAt"])
+    .index("by_status_and_participantsFinalized", ["status", "participantsFinalized"]),
+
+  // One row per player per gift; gift fields are copied for "My gifts".
+  giftBids: defineTable({
+    giftId: v.id("gifts"),
+    uid: v.id("profiles"),
+    nickname: v.string(),
+    amount: v.number(),
+    status: giftBidStatus,
+    bidCount: v.number(),
+    // Website language at the last bid; notifications use it.
+    language: v.union(v.literal("en"), v.literal("fr")),
+    lastClientBidId: v.optional(v.string()),
+    // The outbid refund found no profile to credit.
+    refundSkipped: v.optional(v.boolean()),
+    giftName: v.string(),
+    giftImageUrl: v.optional(v.string()),
+    giftEndsAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastBidAt: v.number(),
+  })
+    .index("by_gift_and_uid", ["giftId", "uid"])
+    .index("by_gift_and_status", ["giftId", "status"])
+    .index("by_gift_and_updatedAt", ["giftId", "updatedAt"])
+    .index("by_uid_and_status_and_giftEndsAt", ["uid", "status", "giftEndsAt"])
+    .index("by_uid_and_status_and_updatedAt", ["uid", "status", "updatedAt"]),
+
+  // Append-only ledger of every points movement the gift store makes.
+  giftBidEvents: defineTable({
+    giftId: v.id("gifts"),
+    uid: v.id("profiles"),
+    type: v.union(
+      v.literal("bid"),
+      v.literal("raise"),
+      v.literal("refund_outbid"),
+      v.literal("refund_cancel"),
+      v.literal("refund_block"),
+      v.literal("win"),
+    ),
+    amount: v.number(),
+    pointsBefore: v.number(),
+    pointsAfter: v.number(),
+    refunded: v.boolean(),
+    at: v.number(),
+  })
+    .index("by_gift_and_at", ["giftId", "at"])
+    .index("by_uid", ["uid"]),
 });

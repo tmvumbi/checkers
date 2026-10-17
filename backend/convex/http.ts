@@ -1,4 +1,5 @@
 import { httpRouter } from "convex/server";
+import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { env, httpAction, type ActionCtx } from "./_generated/server";
@@ -452,7 +453,7 @@ const handle = httpAction(async (ctx, request) => {
         if (body.size > 4 * 1024 * 1024) return bad("file too large (max 4MB)");
         const type = request.headers.get("Content-Type") ?? "application/octet-stream";
         const storageId = await ctx.storage.store(new Blob([await body.arrayBuffer()], { type }));
-        return json({ url: await ctx.storage.getUrl(storageId) });
+        return json({ url: await ctx.storage.getUrl(storageId), storage_id: storageId });
       }
       case "GET /messages":
         return json(await ctx.runQuery(internal.admin.listMessages, {}));
@@ -538,6 +539,33 @@ const handle = httpAction(async (ctx, request) => {
         const config = applySettings({ ...(await ctx.runQuery(internal.admin.getConfig, {})) }, b);
         return json(await ctx.runMutation(internal.admin.replaceConfig, { config }));
       }
+      case "GET /gifts":
+        return json(await ctx.runQuery(internal.giftsAdmin.list, {}));
+      case "POST /gifts":
+        return json(
+          await ctx.runMutation(internal.giftsAdmin.create, { gift: pickGift(await readJson(request)) }),
+          201,
+        );
+      case "PATCH /gifts/:id":
+        return json(
+          await ctx.runMutation(internal.giftsAdmin.update, { id, gift: pickGift(await readJson(request)) }),
+        );
+      case "DELETE /gifts/:id":
+        return json(await ctx.runMutation(internal.giftsAdmin.remove, { id }));
+      case "POST /gift-cancel/:id":
+        return json(await ctx.runMutation(internal.giftsAdmin.cancel, { id }));
+      case "POST /gift-delivered/:id": {
+        const b = await readJson(request);
+        return json(
+          await ctx.runMutation(internal.giftsAdmin.markDelivered, {
+            id,
+            delivered: b.delivered !== false,
+            note: typeof b.note === "string" ? b.note : null,
+          }),
+        );
+      }
+      case "GET /gift-bids/:id":
+        return json(await ctx.runQuery(internal.giftsAdmin.bids, { id }));
       case "GET /feedback":
         return json(
           await ctx.runQuery(internal.admin.feedbackInbox, {
@@ -550,10 +578,48 @@ const handle = httpAction(async (ctx, request) => {
       }
     }
   } catch (error) {
-    return json({ error: (error as Error).message }, 400);
+    return json({ error: errorText(error) }, 400);
   }
   return json({ error: "not found" }, 404);
 });
+
+/** Readable text of a failed call: a ConvexError's data, else the message. */
+function errorText(error: unknown): string {
+  if (error instanceof ConvexError) return String(error.data);
+  return (error as Error).message;
+}
+
+/** Gift editor payload, with types checked so bad input is a 400. */
+function pickGift(b: Record<string, any>) {
+  const out: Record<string, any> = {};
+  const str = (k: string) => {
+    if (b[k] === undefined) return;
+    if (b[k] !== null && typeof b[k] !== "string") throw new ConvexError(`${k} must be text`);
+    out[k] = b[k];
+  };
+  for (const k of ["name", "description", "ends_at"]) {
+    str(k);
+    if (out[k] === null) delete out[k];
+  }
+  str("youtube_url");
+  str("customer_id");
+  if (b.minimum_bid !== undefined) {
+    const n = Number(b.minimum_bid);
+    if (!Number.isFinite(n)) throw new ConvexError("minimum bid must be a number");
+    out.minimum_bid = n;
+  }
+  if (b.active !== undefined) out.active = !!b.active;
+  if (b.images !== undefined) {
+    if (!Array.isArray(b.images)) throw new ConvexError("images must be a list");
+    out.images = b.images.map((i: any) => ({
+      url: String(i?.url ?? ""),
+      storage_id: i?.storage_id ? String(i.storage_id) : null,
+      width: Number(i?.width) || 0,
+      height: Number(i?.height) || 0,
+    }));
+  }
+  return out;
+}
 
 const CAMPAIGN_KEYS = [
   "name",
@@ -576,7 +642,7 @@ function pickCampaign(b: Record<string, any>) {
   return out;
 }
 
-for (const method of ["GET", "POST", "PATCH"] as const) {
+for (const method of ["GET", "POST", "PATCH", "DELETE"] as const) {
   http.route({ pathPrefix: PREFIX, method, handler: handle });
 }
 

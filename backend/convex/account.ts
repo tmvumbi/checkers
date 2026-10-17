@@ -4,6 +4,7 @@ import type { Doc } from "./_generated/dataModel";
 import { action, env, internalMutation, mutation, type MutationCtx } from "./_generated/server";
 import { isAnonymousIdentity, requireProfile } from "./lib/auth";
 import { finishGame, other, seatsOf } from "./lib/games";
+import { withdrawLeadingBids } from "./lib/gifts";
 
 // Account lifecycle: deletion (0007/0037) and the Supabase → Convex
 // account handoff.
@@ -94,6 +95,13 @@ async function deleteProfile(ctx: MutationCtx, me: Doc<"profiles">) {
   }
   for await (const r of ctx.db.query("legacyIdentities").withIndex("by_profile", (q) => q.eq("profileId", uid))) {
     await ctx.db.delete("legacyIdentities", r._id);
+  }
+  await withdrawLeadingBids(ctx, uid, null);
+  for await (const r of ctx.db.query("giftBids").withIndex("by_uid_and_status_and_giftEndsAt", (q) => q.eq("uid", uid))) {
+    await ctx.db.delete("giftBids", r._id);
+  }
+  for await (const r of ctx.db.query("giftBidEvents").withIndex("by_uid", (q) => q.eq("uid", uid))) {
+    await ctx.db.delete("giftBidEvents", r._id);
   }
   if (me.photoStorageId) await ctx.storage.delete(me.photoStorageId);
   // Blocks and device records stay: they must keep binding the devices.
